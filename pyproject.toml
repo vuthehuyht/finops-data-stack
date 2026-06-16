@@ -3,6 +3,9 @@ name = "finops-data-stack"
 version = "0.1.0"
 description = "Automated Data Pipeline for Vietnam Stock Market analysis and valuation."
 readme = "README.md"
+authors = [
+    { name = "Data Engineer Team", email = "team@example.com" }
+]
 requires-python = ">=3.12"
 dependencies = [
     "dagster>=1.7.0",
@@ -20,8 +23,8 @@ dependencies = [
     "numpy>=1.26.0",
 ]
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "pytest>=8.0.0",
     "dagster-graphql",
     "ruff>=0.3.0",
@@ -31,6 +34,25 @@ dev-dependencies = [
 [tool.dagster]
 module_name = "src.dagster"
 
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
 [tool.ruff]
 line-length = 88
 target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "C",   # flake8-comprehensions
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+]
+ignore = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
