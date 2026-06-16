@@ -1,0 +1,51 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Caches
+.ruff_cache/
+.pytest_cache/
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+
+# Distribution / Build
+build/
+dist/
+*.egg-info/
+
+# Logs
+*.log
+
+# Dagster
+storage/
+*.dagster
+
+# dbt
+target/
+dbt_packages/
+logs/
+
+# ML
+*.tar.gz
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+.env*
+
+# TODO file
+TODO.md
+
+# superpowers folders
+docs/superpowers/*
