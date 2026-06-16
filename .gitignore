@@ -43,3 +43,9 @@ Thumbs.db
 
 # Secrets
 .env*
+
+# TODO file
+TODO.md
+
+# superpowers folders
+docs/superpowers/*
