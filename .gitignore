@@ -1,0 +1,36 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+
+# uv
+uv.lock
+
+# Dagster
+storage/
+*.dagster
+
+# dbt
+target/
+dbt_packages/
+logs/
+
+# ML
+*.tar.gz
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+.env
