@@ -3,13 +3,22 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Caches
+.ruff_cache/
+.pytest_cache/
+
 # Virtual Environments
 .venv/
 venv/
 ENV/
 
-# uv
-uv.lock
+# Distribution / Build
+build/
+dist/
+*.egg-info/
+
+# Logs
+*.log
 
 # Dagster
 storage/
@@ -33,4 +42,4 @@ logs/
 Thumbs.db
 
 # Secrets
-.env
+.env*
