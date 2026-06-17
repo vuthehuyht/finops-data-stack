@@ -2,18 +2,18 @@
 
 Project: Data pipeline + ML for the Vietnamese stock market (Dagster, dbt, Redshift, SageMaker).
 
-Detailed context lives in `.ai/` — read these files as needed:
-- `.ai/project.md` — goals, scope, data inventory
-- `.ai/architecture.md` — stack, data flow, directory structure
-- `.ai/coding-rules.md` — Python/Dagster/dbt coding conventions
-- `.ai/testing.md` — testing conventions
+Detailed context lives in `.agents/` — read these files as needed:
+- `.agents/project.md` — goals, scope, data inventory
+- `.agents/architecture.md` — stack, data flow, directory structure
+- `.agents/coding-rules.md` — Python/Dagster/dbt coding conventions
+- `.agents/testing.md` — testing conventions
 
 Full design documentation: see `docs/`.
 
 ## Project stage
 
 Skeleton (Phase 1) — `src/` chỉ có `__init__.py` rỗng, chưa có code thật. Phase 2 mới bắt đầu implement.
-Khi search/glob, dùng `src/`, `tests/`, `docs/`, `.ai/` làm root — bỏ qua `.venv/`.
+Khi search/glob, dùng `src/`, `tests/`, `docs/`, `.agents/` làm root — bỏ qua `.venv/`.
 
 ## Dev commands
 

@@ -5,7 +5,7 @@ description: Scaffold a new Dagster asset following this project's layer naming 
 
 # Dagster Asset Scaffold
 
-Generate a new Dagster `@asset` following the conventions in `.ai/coding-rules.md`.
+Generate a new Dagster `@asset` following the conventions in `.agents/coding-rules.md`.
 
 ## Conventions
 
@@ -13,8 +13,8 @@ Generate a new Dagster `@asset` following the conventions in `.ai/coding-rules.m
 - Every asset must declare a clear `description` and `metadata` (e.g. data source, update frequency).
 - Asset dependencies must be explicit via `AssetIn`/`deps` — no implicit side effects between assets.
 - Type hints required on the asset function signature (params and return).
-- Comments explaining WHY (not WHAT) should be in Vietnamese, per `.ai/coding-rules.md`.
-- Errors must raise clearly (no catch-and-ignore) so Dagster retry/alerting can react — see `.ai/coding-rules.md` "Error handling".
+- Comments explaining WHY (not WHAT) should be in Vietnamese, per `.agents/coding-rules.md`.
+- Errors must raise clearly (no catch-and-ignore) so Dagster retry/alerting can react — see `.agents/coding-rules.md` "Error handling".
 
 ## Steps
 
@@ -38,4 +38,4 @@ Generate a new Dagster `@asset` following the conventions in `.ai/coding-rules.m
        ...
    ```
 5. Do not invent the actual transformation/ingestion logic — leave a clear placeholder and ask the user to confirm or provide the real logic.
-6. Remind the user this asset needs a corresponding unit test in `tests/` per `.ai/testing.md` before merging (mocking any S3/Redshift/SageMaker calls).
+6. Remind the user this asset needs a corresponding unit test in `tests/` per `.agents/testing.md` before merging (mocking any S3/Redshift/SageMaker calls).

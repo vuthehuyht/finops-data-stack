@@ -5,14 +5,14 @@ description: Scaffold a new dbt model (SQL + .yml schema) following this project
 
 # dbt Model Scaffold
 
-Generate a new dbt model and its `.yml` schema file following the conventions in `.ai/coding-rules.md` and `.ai/testing.md`.
+Generate a new dbt model and its `.yml` schema file following the conventions in `.agents/coding-rules.md` and `.agents/testing.md`.
 
-## Conventions (from `.ai/coding-rules.md`)
+## Conventions (from `.agents/coding-rules.md`)
 
 - Layers: Bronze (raw) / Silver (staging/cleaned) / Gold (mart).
 - Naming: `stg_<source>_<entity>` for staging models, `fct_`/`dim_` for mart-layer (Gold) models.
 - Metadata: Raw layer tagged `_CONATA_*`, Cleaned layer tagged `DATACORE_*` (see `docs/architecture-design.md`).
-- Every model must have a `.yml` file with at least `unique` + `not_null` tests on the primary key (per `.ai/testing.md`).
+- Every model must have a `.yml` file with at least `unique` + `not_null` tests on the primary key (per `.agents/testing.md`).
 - The Gold-layer model feeding ML (`fact_ml_feature_set`) needs an additional custom test for the Data Quality Gate (null rate, value range) — see `docs/architecture-design.md` section 4.1.
 
 ## Steps
@@ -38,5 +38,5 @@ Generate a new dbt model and its `.yml` schema file following the conventions in
              - unique
              - not_null
    ```
-6. If this is the `fact_ml_feature_set` model (or another Gold-layer ML feature model), add a note reminding the user to add a custom Data Quality Gate test (do not invent the test logic — ask what thresholds to use, per `.ai/testing.md`).
+6. If this is the `fact_ml_feature_set` model (or another Gold-layer ML feature model), add a note reminding the user to add a custom Data Quality Gate test (do not invent the test logic — ask what thresholds to use, per `.agents/testing.md`).
 7. Show the user the created files and ask them to fill in the actual SQL transformation logic — do not invent business logic.

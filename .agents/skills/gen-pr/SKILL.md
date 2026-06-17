@@ -24,7 +24,7 @@ Analyze the current git changes (staged, unstaged, or relative to the base branc
 1. Find the base branch (usually `main`, fallback to `master` if not found).
 2. Retrieve the git diff using:
    ```bash
-   git diff <base_branch>... -- . ":(exclude)uv.lock" ":(exclude)*.lock" ":(exclude).ai/*" ":(exclude).github/*"
+   git diff <base_branch>... -- . ":(exclude)uv.lock" ":(exclude)*.lock" ":(exclude).agents/*" ":(exclude).github/*"
    ```
    *Note: If the user specifically asks for staged changes, use `git diff --staged`. If they ask for unstaged/HEAD changes, use `git diff HEAD`.*
 3. Read the PR template file: `.github/pull_request_template.md`.

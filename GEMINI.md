@@ -53,8 +53,8 @@ This file serves as the main context entrypoint for AI Agents. It provides a com
 
 ## 4. Reference Files
 Read detailed guidelines under these paths when performing deep work:
-- Detailed Project Context: [.ai/project.md](.ai/project.md)
-- Architecture details: [.ai/architecture.md](.ai/architecture.md)
-- Detailed Coding Rules: [.ai/coding-rules.md](.ai/coding-rules.md)
-- Testing Conventions: [.ai/testing.md](.ai/testing.md)
+- Detailed Project Context: [.agents/project.md](.agents/project.md)
+- Architecture details: [.agents/architecture.md](.agents/architecture.md)
+- Detailed Coding Rules: [.agents/coding-rules.md](.agents/coding-rules.md)
+- Testing Conventions: [.agents/testing.md](.agents/testing.md)
 - Full Design Docs: `docs/architecture-design.md`, `docs/ml-architecture-design.md`, `docs/infrastructure-design.md`.
