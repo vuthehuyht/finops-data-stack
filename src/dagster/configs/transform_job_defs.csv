@@ -1,0 +1,3 @@
+model_name,schema_layer,trigger_type,trigger_parameter,dbt_command
+fct_stock_valuation,marts,SENSOR,raw_stock_price_eod,run
+dim_market_sentiment,marts,SENSOR,raw_news_articles,run

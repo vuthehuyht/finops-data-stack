@@ -1,0 +1,10 @@
+version: 2
+
+sources:
+  - name: raw_batch
+    schema: raw_batch
+    description: "Các bảng dữ liệu thô được load từ S3 Bronze"
+    tables:
+      - name: stg_vnstock_eod_prices
+      - name: stg_cpi_macro_indicators
+      - name: stg_corporate_news_sentiment

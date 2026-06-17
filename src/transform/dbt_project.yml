@@ -1,0 +1,26 @@
+name: "finops"
+version: "1.0.0"
+config-version: 2
+profile: "finops"
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  finops:
+    # Lớp Staging: Mặc định là VIEW, đặt trong schema suffix _staging
+    staging:
+      +materialized: view
+      +schema: staging
+
+    # Lớp Marts: Mặc định là TABLE, đặt tại schema gốc (dev_mart/prod_mart)
+    marts:
+      +materialized: table

@@ -1,0 +1,23 @@
+finops:
+  outputs:
+    dev:
+      type: redshift
+      host: "{{ env_var('REDSHIFT_HOST') }}"
+      port: {{ env_var('REDSHIFT_PORT', '5439') | int }}
+      user: "{{ env_var('REDSHIFT_USER') }}"
+      password: "{{ env_var('REDSHIFT_PASSWORD') }}"
+      dbname: "{{ env_var('REDSHIFT_DATABASE') }}"
+      schema: dev_mart
+      threads: 4
+      keepalives_idle: 240
+    prod:
+      type: redshift
+      host: "{{ env_var('REDSHIFT_HOST') }}"
+      port: {{ env_var('REDSHIFT_PORT', '5439') | int }}
+      user: "{{ env_var('REDSHIFT_USER') }}"
+      password: "{{ env_var('REDSHIFT_PASSWORD') }}"
+      dbname: "{{ env_var('REDSHIFT_DATABASE') }}"
+      schema: prod_mart
+      threads: 8
+      keepalives_idle: 240
+  target: "{{ env_var('FINOPS_ENVIRONMENT', 'dev') }}"
