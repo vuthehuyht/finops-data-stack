@@ -1,0 +1,51 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run ruff check *)",
+      "Bash(uv run pytest *)",
+      "Bash(uv tree *)",
+      "Bash(uv lock --check)",
+      "Bash(uv pip list *)",
+      "Bash(uv run dagster asset list *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git diff *)",
+      "Bash(git branch *)",
+      "Bash(git status *)",
+      "Bash(printenv *)",
+      "Bash(env)",
+      "Bash(curl -s *)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(Get-Content *)",
+      "PowerShell(Select-String *)",
+      "PowerShell(Test-Path *)",
+      "PowerShell(Get-Item *)",
+      "PowerShell(Resolve-Path *)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(python -c \"import json,sys; print(json.load(sys.stdin).get('tool_input',{}).get('file_path',''))\"); case \"$f\" in *.py) uv run ruff check --fix \"$f\"; uv run ruff format \"$f\";; esac; true",
+            "statusMessage": "Running ruff check + format..."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(python -c \"import json,sys; print(json.load(sys.stdin).get('tool_input',{}).get('file_path',''))\"); bn=$(basename \"$f\"); case \"$bn\" in .env*|*.pem|*.key|credentials.json) echo \"{\\\"hookSpecificOutput\\\":{\\\"hookEventName\\\":\\\"PreToolUse\\\",\\\"permissionDecision\\\":\\\"deny\\\",\\\"permissionDecisionReason\\\":\\\"Blocked: secret/credential file ($bn)\\\"}}\";; esac"
+          }
+        ]
+      }
+    ]
+  }
+}
