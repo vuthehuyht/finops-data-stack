@@ -26,7 +26,7 @@
 
 ## dbt model convention
 
-- Organize by layer: Bronze (raw) / Silver (staging/cleaned) / Gold (mart), matching the Data Lake structure in `.ai/architecture.md`.
+- Organize by layer: Bronze (raw) / Silver (staging/cleaned) / Gold (mart), matching the Data Lake structure in `.agents/architecture.md`.
 - Naming: `stg_<source>_<entity>` for staging, `fct_`/`dim_` for the mart layer (Gold).
 - Every model must have a `.yml` file declaring at least `unique` and `not_null` tests on the primary key.
 - Metadata: Raw layer tagged with `_CONATA_*`, Cleaned layer tagged with `DATACORE_*` (see `docs/architecture-design.md` for detail).
