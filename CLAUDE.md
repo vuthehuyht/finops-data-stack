@@ -10,6 +10,10 @@ Detailed context lives in `.agents/` — read these files as needed:
 
 Full design documentation: see `docs/`.
 
+## Language
+
+Code comments, docstrings, and commit messages: **English only**.
+
 ## Project stage
 
 Skeleton (Phase 1) — `src/` chỉ có `__init__.py` rỗng, chưa có code thật. Phase 2 mới bắt đầu implement.

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Script to initialize dev_local environment (creates placeholder .env and terraform.tfvars).
+Script to initialize dev_local environment (creates placeholder .env, terraform.tfvars, and dbt profiles.yml).
 """
 
 import io
@@ -55,6 +55,34 @@ def setup_dev_local():
             print(f"Error creating terraform.tfvars file: {e}")
     else:
         print("terraform.tfvars file already exists. Skipping creation.")
+
+    # 3. Create dbt profiles.yml dynamic configuration template if it doesn't exist
+    dbt_dir = os.path.join("src", "transform")
+    profiles_path = os.path.join(dbt_dir, "profiles.yml")
+
+    if not os.path.exists(profiles_path):
+        print("Creating template dbt profiles.yml in src/transform/...")
+        try:
+            os.makedirs(dbt_dir, exist_ok=True)
+            with open(profiles_path, "w", encoding="utf-8") as f:
+                f.write("finops:\n")
+                f.write("  outputs:\n")
+                f.write("    dev:\n")
+                f.write("      type: redshift\n")
+                f.write("      host: \"{{ env_var('REDSHIFT_HOST') }}\"\n")
+                f.write("      port: 5439\n")
+                f.write("      user: \"{{ env_var('REDSHIFT_USER') }}\"\n")
+                f.write("      password: \"{{ env_var('REDSHIFT_PASSWORD') }}\"\n")
+                f.write("      dbname: \"{{ env_var('REDSHIFT_DATABASE') }}\"\n")
+                f.write("      schema: dev_mart\n")
+                f.write("      threads: 4\n")
+                f.write("      keepalives_idle: 240\n")
+                f.write("  target: dev\n")
+            print("Successfully created dbt profiles.yml file.")
+        except Exception as e:
+            print(f"Error creating dbt profiles.yml file: {e}")
+    else:
+        print("dbt profiles.yml file already exists. Skipping creation.")
 
 
 if __name__ == "__main__":

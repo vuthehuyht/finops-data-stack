@@ -68,3 +68,5 @@ terraform.rc
 # pr description file
 PR_DESCRIPTION.md
 
+# tmp
+.tmp*

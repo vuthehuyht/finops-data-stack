@@ -36,8 +36,8 @@ This file serves as the main context entrypoint for AI Agents. It provides a com
 - **Variable Naming**: English. Meaningful names, avoid single-letter variables. Booleans start with `is_`, `has_`, `should_`, `can_`. Avoid shadowing built-ins.
 - **Function Design**: Single responsibility, ideally <= 50 lines, max 4 parameters. Prefer pure functions for data transformations (avoid mutating inputs).
 - **Type Hints**: Required for public function signatures. Avoid `Any`.
-- **Docstrings**: Use Google Style for complex functions (with `Args`, `Returns`, `Raises`). Short docstrings for simple public ones.
-- **Comments**: Only explain WHY (non-obvious reasoning), written in Vietnamese. No inline comments unless necessary. Update comments along with code.
+- **Docstrings**: Use Google Style for complex functions (with `Args`, `Returns`, `Raises`). Written in English.
+- **Comments**: Only explain WHY (non-obvious reasoning), written in English. Update comments along with code.
 - **Constants**: `UPPER_CASE_WITH_UNDERSCORES`. Extract to `constants.py` or `config.py` if there are too many.
 - **Error Handling**: Do not catch-and-ignore exceptions. Pipeline errors must fail loudly. Validate input at boundaries.
 - **Logging**: Use Dagster's built-in `context.log` for asset/job execution.
