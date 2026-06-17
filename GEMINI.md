@@ -18,6 +18,7 @@ This file serves as the main context entrypoint for AI Agents. It provides a com
 ## 2. Technology Stack & Directory Structure
 - **Stack**: AWS (S3, Redshift Serverless, SageMaker Serverless, EKS), **Dagster** (orchestrator), **dbt** (transformation).
 - **Python Version**: `>=3.12`, package manager: `uv`.
+- **Execution Rules**: All terminal commands (e.g., `python`, `pytest`, `ruff`, `dagster`, `dbt`) **MUST** be run using `uv run` (e.g., `uv run pytest`, `uv run dagster dev`).
 - **Directory Layout (Flywheel Architecture)**:
   - `src/common/` — Shared AWS Utils, DB Utils, Logging.
   - `src/dagster/` — Software-Defined Assets, Jobs, Sensors, Resources.
@@ -52,8 +53,8 @@ This file serves as the main context entrypoint for AI Agents. It provides a com
 
 ## 4. Reference Files
 Read detailed guidelines under these paths when performing deep work:
-- Detailed Project Context: [.ai/project.md](file:///D:/code/data-engineer/finops-data-stack/.ai/project.md)
-- Architecture details: [.ai/architecture.md](file:///D:/code/data-engineer/finops-data-stack/.ai/architecture.md)
-- Detailed Coding Rules: [.ai/coding-rules.md](file:///D:/code/data-engineer/finops-data-stack/.ai/coding-rules.md)
-- Testing Conventions: [.ai/testing.md](file:///D:/code/data-engineer/finops-data-stack/.ai/testing.md)
+- Detailed Project Context: [.ai/project.md](.ai/project.md)
+- Architecture details: [.ai/architecture.md](.ai/architecture.md)
+- Detailed Coding Rules: [.ai/coding-rules.md](.ai/coding-rules.md)
+- Testing Conventions: [.ai/testing.md](.ai/testing.md)
 - Full Design Docs: `docs/architecture-design.md`, `docs/ml-architecture-design.md`, `docs/infrastructure-design.md`.

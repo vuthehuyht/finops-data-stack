@@ -1,4 +1,28 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(uv run ruff check *)",
+      "Bash(uv run pytest *)",
+      "Bash(uv tree *)",
+      "Bash(uv lock --check)",
+      "Bash(uv pip list *)",
+      "Bash(uv run dagster asset list *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git diff *)",
+      "Bash(git branch *)",
+      "Bash(git status *)",
+      "Bash(printenv *)",
+      "Bash(env)",
+      "Bash(curl -s *)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(Get-Content *)",
+      "PowerShell(Select-String *)",
+      "PowerShell(Test-Path *)",
+      "PowerShell(Get-Item *)",
+      "PowerShell(Resolve-Path *)"
+    ]
+  },
   "hooks": {
     "PostToolUse": [
       {

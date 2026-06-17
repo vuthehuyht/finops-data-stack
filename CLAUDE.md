@@ -17,11 +17,13 @@ Khi search/glob, dùng `src/`, `tests/`, `docs/`, `.ai/` làm root — bỏ qua 
 
 ## Dev commands
 
+All commands must be executed using `uv run` to ensure they run in the project's virtual environment.
+
 ```bash
-ruff check src/ tests/   # lint
-ruff format src/ tests/  # format
-pytest tests/            # chạy tests
-dagster dev              # Dagster UI tại localhost:3000
+uv run ruff check src/ tests/   # lint
+uv run ruff format src/ tests/  # format
+uv run pytest tests/            # chạy tests
+uv run dagster dev              # Dagster UI tại localhost:3000
 ```
 
 ## Project-specific skills
