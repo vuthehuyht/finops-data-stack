@@ -10,7 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
     "dagster>=1.7.0",
     "dagster-webserver>=1.7.0",
-    "dagster-aws",
+    "dagster-aws==0.29.9",
     "dagster-dbt",
     "dagster-pandas",
     "dbt-redshift>=1.7.0",
@@ -65,6 +65,8 @@ ignore = []
 force-single-line = false
 split-on-trailing-comma = true
 force-sort-within-sections = false
+known-first-party = ["src"]
+known-third-party = ["dagster"]
 
 [tool.ruff.lint.per-file-ignores]
 "src/pipeline/dagster/__init__.py" = ["I"]
@@ -72,3 +74,9 @@ force-sort-within-sections = false
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore:The `__fields__` attribute is deprecated:DeprecationWarning",
+    "ignore:Class `MultiAssetSensorDefinition` is superseded:dagster.SupersessionWarning",
+]

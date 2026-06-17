@@ -1,0 +1,64 @@
+"""Dagster resources for FinOps pipeline."""
+
+import contextlib
+import os
+import pathlib
+from collections.abc import Iterator
+from typing import Any
+
+import dagster
+from dagster_aws.s3 import S3Resource
+from dagster_dbt import DbtCliResource
+from pydantic import Field
+
+from src.common.redshift_util import get_redshift_connection
+
+_PROJECT_ROOT = pathlib.Path(__file__).parent.parent.parent
+
+
+class RedshiftResource(dagster.ConfigurableResource):
+    """Redshift connection resource — delegates to get_redshift_connection()."""
+
+    @contextlib.contextmanager
+    def get_connection(self) -> Iterator[Any]:
+        """Open a psycopg2 connection to Redshift Serverless."""
+        conn = get_redshift_connection()
+        try:
+            yield conn
+        finally:
+            conn.close()
+
+
+class S3BucketResource(dagster.ConfigurableResource):
+    """S3 bucket name for raw (Bronze) data."""
+
+    raw_bucket: str = Field(
+        default_factory=lambda: os.getenv("FINOPS_RAW_BUCKET", "finops-raw-dev"),
+        description="S3 bucket holding Bronze layer Parquet files.",
+    )
+
+
+class DbtConfigResource(dagster.ConfigurableResource):
+    """Runtime dbt configuration passed to each transform job."""
+
+    variables: dict[str, str] = Field(default_factory=dict)
+    full_refresh: bool = Field(default=False)
+
+
+class LoadJobConfigResource(dagster.ConfigurableResource):
+    """IAM configuration for Redshift COPY from S3."""
+
+    iam_role_arn: str = Field(
+        default_factory=lambda: os.getenv("REDSHIFT_IAM_ROLE_ARN", ""),
+        description="IAM Role ARN authorizing Redshift to read from S3.",
+    )
+
+
+dbt = DbtCliResource(
+    project_dir=os.fspath(_PROJECT_ROOT / "src" / "transform"),
+)
+s3 = S3Resource(region_name="ap-southeast-1")
+s3bucket = S3BucketResource()
+redshift = RedshiftResource()
+dbt_config = DbtConfigResource()
+load_config = LoadJobConfigResource()

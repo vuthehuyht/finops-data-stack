@@ -46,9 +46,7 @@ def test_copy_raw_file_to_snowflake_stage_noop(
     mock_s3_client = unittest.mock.Mock()
     mock_s3_client.download_file.return_value = {}
     mock_logger = unittest.mock.Mock()
-    copy_s3_object_mock = mocker.patch(
-        "src.dagster.preprocess.s3_util.copy_s3_object"
-    )
+    copy_s3_object_mock = mocker.patch("src.dagster.preprocess.s3_util.copy_s3_object")
     preprocess.preprocess_raw_file_on_s3(
         "s3://datacore-input-dev/data_storage/japan/batch/TABLE_NAME/2024-07-01/1719821350/TABLE_NAME.csv.20240701112233",
         ".*/(TABLE_NAME/2024-07-01/1719821350/[^/\\.]+\\.\\w+\\.[0-9]{14})$",
@@ -118,9 +116,7 @@ def test_copy_raw_file_to_snowflake_stage_remove_null(
         "src.dagster.preprocess.s3_util.download_from_s3"
     )
     upload_to_s3_mock = mocker.patch("src.dagster.preprocess.s3_util.upload_to_s3")
-    remove_null_mock = mocker.patch(
-        "src.dagster.preprocess._remove_null_character"
-    )
+    remove_null_mock = mocker.patch("src.dagster.preprocess._remove_null_character")
     preprocess.preprocess_raw_file_on_s3(
         "s3://datacore-input-dev/data_storage/japan/batch/TABLE_NAME/2024-07-01/1719821350/TABLE_NAME.csv.20240701112233",
         ".*/(TABLE_NAME/2024-07-01/1719821350/[^/\\.]+\\.\\w+\\.[0-9]{14})$",

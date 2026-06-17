@@ -9,7 +9,7 @@ import os
 from collections.abc import Iterator, MutableMapping
 from typing import Any
 
-from dagster_aws.s3 import s3_pickle_io_manager
+from dagster_aws.s3.io_manager import s3_pickle_io_manager
 
 import dagster
 from src.common import dict_util
