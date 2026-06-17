@@ -1,0 +1,27 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(python -c \"import json,sys; print(json.load(sys.stdin).get('tool_input',{}).get('file_path',''))\"); case \"$f\" in *.py) uv run ruff check --fix \"$f\"; uv run ruff format \"$f\";; esac; true",
+            "statusMessage": "Running ruff check + format..."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(python -c \"import json,sys; print(json.load(sys.stdin).get('tool_input',{}).get('file_path',''))\"); bn=$(basename \"$f\"); case \"$bn\" in .env*|*.pem|*.key|credentials.json) echo \"{\\\"hookSpecificOutput\\\":{\\\"hookEventName\\\":\\\"PreToolUse\\\",\\\"permissionDecision\\\":\\\"deny\\\",\\\"permissionDecisionReason\\\":\\\"Blocked: secret/credential file ($bn)\\\"}}\";; esac"
+          }
+        ]
+      }
+    ]
+  }
+}
