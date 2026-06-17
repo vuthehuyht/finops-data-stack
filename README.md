@@ -49,13 +49,41 @@ Sử dụng kiến trúc **Multimodal Hybrid Neural Network**:
 *   **Output**: Dự báo tỷ suất sinh lời kỳ vọng (Regression) hoặc Phân loại xu hướng (Classification).
 
 ## 🛠 Hướng dẫn phát triển (Development)
-Dự án sử dụng **uv** để quản lý môi trường:
-```bash
-# Khởi tạo môi trường
-uv sync
 
-# Chạy Dagster local
-uv run dagster dev
+Hệ thống sử dụng **uv** làm package manager và cung cấp **Makefile** giúp quản lý môi trường phát triển local (`dev_local`) dễ dàng:
+
+### 1. Khởi tạo môi trường (Setup)
+Cài đặt các thư viện cần thiết và khởi tạo các tệp cấu hình mẫu (`.env`, `terraform.tfvars`):
+```bash
+make setup
+```
+
+### 2. Khởi tạo tài nguyên AWS cho local (Terraform)
+Khởi tạo hoặc hủy bỏ các tài nguyên AWS phục vụ cho việc phát triển ở local (VPC, S3, Redshift Serverless...):
+```bash
+# Khởi tạo tài nguyên (Hãy cấu hình allowed_ips trực tiếp trong terraform.tfvars)
+make dev_local up
+
+# Hủy bỏ/Xóa tài nguyên khi không dùng nữa
+make dev_local down
+```
+
+### 3. Vận hành và kiểm thử
+```bash
+# Khởi chạy Dagster dev server local (mặc định tại localhost:3000)
+make dev
+
+# Kiểm tra định dạng và lỗi code tĩnh bằng ruff
+make lint
+
+# Tự động sửa lỗi định dạng và các lỗi lint cơ bản bằng ruff
+make format
+
+# Chạy các unit test bằng pytest
+make test
+
+# Dọn dẹp cache và file rác sinh ra trong quá trình dev
+make clean
 ```
 
 ## 📄 Tài liệu liên quan

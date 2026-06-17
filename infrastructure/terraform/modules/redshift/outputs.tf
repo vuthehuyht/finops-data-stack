@@ -15,7 +15,8 @@ output "database_name" {
 
 output "admin_username" {
   value       = aws_redshiftserverless_namespace.main.admin_username
-  description = "The database admin username"
+  sensitive   = true
+  description = "The database admin username (sensitive)"
 }
 
 output "admin_password" {

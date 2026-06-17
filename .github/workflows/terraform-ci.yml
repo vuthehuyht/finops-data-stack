@@ -2,11 +2,11 @@ name: Terraform CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
     paths:
       - 'infrastructure/terraform/**'
   pull_request:
-    branches: [ main, master ]
+    branches: [ main ]
     paths:
       - 'infrastructure/terraform/**'
 
@@ -48,6 +48,15 @@ jobs:
       - name: Bootstrap Project - Validate
         run: terraform validate
         working-directory: ./infrastructure/terraform/bootstrap
+
+      # Step 6: Initialize and validate the dev_local configuration
+      - name: Dev Local Project - Init
+        run: terraform init
+        working-directory: ./infrastructure/terraform/dev_local
+
+      - name: Dev Local Project - Validate
+        run: terraform validate
+        working-directory: ./infrastructure/terraform/dev_local
 
       # Step 6: Set up TFLint to check for AWS configuration best practices
       - name: Setup TFLint
