@@ -22,11 +22,12 @@ All commands must be executed using `uv run` to ensure they run in the project's
 ```bash
 uv run ruff check src/ tests/   # lint
 uv run ruff format src/ tests/  # format
-uv run pytest tests/            # chạy tests
-uv run dagster dev              # Dagster UI tại localhost:3000
+uv run pytest tests/            # run tests
+uv run dagster dev              # start Dagster UI at localhost:3000
 ```
 
 ## Project-specific skills
 
 - `/dagster-asset` — scaffold Dagster asset đúng naming + metadata convention.
 - `/dbt-model` — scaffold dbt model (SQL + `.yml`) đúng layer convention.
+- `/gen-pr` — tự động tạo PR description từ git diff hiện tại theo template.
