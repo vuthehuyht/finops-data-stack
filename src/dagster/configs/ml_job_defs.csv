@@ -1,3 +1,0 @@
-pipeline_name,task_type,schedule_cron,upstream_assets
-stock_valuation_prediction,train,0 6 * * 1,"[""fct_stock_valuation"", ""dim_market_sentiment""]"
-stock_valuation_prediction,inference,0 18 * * 1-5,"[""fct_stock_valuation""]"

@@ -7,7 +7,7 @@
 - Follow the ruff rules configured in `pyproject.toml`: `E`, `W`, `F`, `I`, `C`, `B`, `UP`.
 - `line-length = 88`, `target-version = "py312"`.
 - Type hints are required for public function/method signatures (both params and return type). Avoid using `Any` in type hints unless absolutely necessary.
-- Comments should only explain WHY (non-obvious reasoning), written in Vietnamese. Do not comment WHAT. Ensure comments are updated alongside code changes to avoid obsolete explanations.
+- Comments should only explain WHY (non-obvious reasoning), written in English. Do not comment WHAT. Ensure comments are updated alongside code changes to avoid obsolete explanations.
 - Inline comments must be kept to a minimum and separated by at least two spaces from the code statement.
 - Follow Google Style for docstrings. For complex functions, include `Args`, `Returns`, and `Raises` sections.
 - Short docstrings for simple public functions/classes — state the purpose, don't restate the function name.

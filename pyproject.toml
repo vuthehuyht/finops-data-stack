@@ -21,6 +21,8 @@ dependencies = [
     "torch>=2.2.0",
     "sagemaker>=2.200.0",
     "numpy>=1.26.0",
+    "mypy-boto3-s3>=1.43.31",
+    "more-itertools>=10.8.0",
 ]
 
 [dependency-groups]
