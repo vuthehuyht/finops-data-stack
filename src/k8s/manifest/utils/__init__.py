@@ -7,14 +7,16 @@ from typing import Any
 def default_container_env() -> list[dict[str, Any]]:
     """Get the default container environment variables."""
     # The same set of env vars as specified in
+    # https://github.com/flywheel-jp/monorepo/blob/master/kubernetes/manifests/libsonnet/container.libsonnet
+    # See the comment there.
     return [
         {
             "name": "AWS_REGION",
-            "value": os.environ.get("AWS_REGION", "ap-southeast-1"),
+            "value": os.environ.get("AWS_REGION", "ap-northeast-1"),
         },
         {
             "name": "AWS_DEFAULT_REGION",
-            "value": os.environ.get("AWS_DEFAULT_REGION", "ap-southeast-1"),
+            "value": os.environ.get("AWS_DEFAULT_REGION", "ap-northeast-1"),
         },
         {
             "name": "AWS_STS_REGIONAL_ENDPOINTS",
