@@ -23,6 +23,11 @@ dependencies = [
     "numpy>=1.26.0",
     "mypy-boto3-s3>=1.43.31",
     "more-itertools>=10.8.0",
+    "mashumaro>=3.15",
+    "dagster-k8s>=0.29.9",
+    "dagster-slack>=0.29.9",
+    "prometheus-client>=0.25.0",
+    "psutil>=7.2.2",
 ]
 
 [dependency-groups]
@@ -31,6 +36,7 @@ dev = [
     "dagster-graphql",
     "ruff>=0.3.0",
     "ipykernel",
+    "pytest-mock>=3.15.1",
 ]
 
 [tool.dagster]
@@ -54,6 +60,14 @@ select = [
     "UP",  # pyupgrade
 ]
 ignore = []
+
+[tool.ruff.lint.isort]
+force-single-line = false
+split-on-trailing-comma = true
+force-sort-within-sections = false
+
+[tool.ruff.lint.per-file-ignores]
+"src/pipeline/dagster/__init__.py" = ["I"]
 
 [build-system]
 requires = ["hatchling"]
