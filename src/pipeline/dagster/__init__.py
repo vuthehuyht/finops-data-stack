@@ -80,11 +80,13 @@ from src.pipeline.dagster.decorators import (  # noqa: E402
 from src.pipeline.dagster.define_asset_jobs import define_asset_job  # noqa: E402
 from src.pipeline.dagster.definitions import (  # noqa: E402
     definitions,
-    validate_definitions_and_run_configs,
 )
 from src.pipeline.dagster.k8s import (  # noqa: E402
     kubernetes_cluster_name,
     on_k8s,
+)
+from src.pipeline.dagster.testing import (  # noqa: E402
+    validate_definitions_and_run_configs,
 )
 from src.pipeline.dagster.utils import (  # noqa: E402
     asset_key,
