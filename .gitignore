@@ -65,3 +65,6 @@ override.tf.json
 .terraform.rc
 terraform.rc
 
+# pr description file
+PR_DESCRIPTION.md
+
