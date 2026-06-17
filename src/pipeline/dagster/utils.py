@@ -5,24 +5,6 @@ from collections.abc import Generator
 
 import dagster
 
-# Import K8s infrastructure utilities from k8s.py for backward compatibility
-# These will be removed from this module in Task 8 when __init__.py is updated
-from src.pipeline.dagster.k8s import (
-    _io_manager_bucket_name,
-    io_manager,
-    kubernetes_cluster_name,
-    on_k8s,
-)
-
-__all__ = [
-    "asset_key",
-    "fetch_materializations",
-    "kubernetes_cluster_name",
-    "on_k8s",
-    "_io_manager_bucket_name",
-    "io_manager",
-]
-
 
 def asset_key(path: list[str]) -> dagster.AssetKey:
     """Create an asset key with an optional prefix based on the environment variable."""
