@@ -1,0 +1,73 @@
+name: Terraform CI
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'infrastructure/terraform/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'infrastructure/terraform/**'
+
+jobs:
+  terraform-ci:
+    name: Terraform Lint & Validate
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout code from the repository
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Step 2: Set up Terraform CLI
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+
+      # Step 3: Check Terraform formatting (failing if code is not formatted correctly)
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+        working-directory: ./infrastructure/terraform
+
+      # Step 4: Initialize and validate the main project modules (offline mode)
+      - name: Main Project - Init
+        run: terraform init -backend=false
+        working-directory: ./infrastructure/terraform
+
+      - name: Main Project - Validate
+        run: terraform validate
+        working-directory: ./infrastructure/terraform
+
+      # Step 5: Initialize and validate the bootstrap configuration
+      - name: Bootstrap Project - Init
+        run: terraform init
+        working-directory: ./infrastructure/terraform/bootstrap
+
+      - name: Bootstrap Project - Validate
+        run: terraform validate
+        working-directory: ./infrastructure/terraform/bootstrap
+
+      # Step 6: Initialize and validate the dev_local configuration
+      - name: Dev Local Project - Init
+        run: terraform init
+        working-directory: ./infrastructure/terraform/dev_local
+
+      - name: Dev Local Project - Validate
+        run: terraform validate
+        working-directory: ./infrastructure/terraform/dev_local
+
+      # Step 6: Set up TFLint to check for AWS configuration best practices
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.50.0
+
+      - name: Initialize TFLint
+        run: tflint --init
+        working-directory: ./infrastructure/terraform
+
+      - name: Run TFLint
+        run: tflint -f compact
+        working-directory: ./infrastructure/terraform
