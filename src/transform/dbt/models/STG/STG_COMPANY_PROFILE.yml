@@ -14,13 +14,13 @@ models:
           - not_null
           - unique
       - name: COMPANY_NAME
-        data_type: VARCHAR(256)
+        data_type: VARCHAR(512)
       - name: INDUSTRY
         data_type: VARCHAR(256)
       - name: EXCHANGE
         data_type: VARCHAR(256)
       - name: DESCRIPTION
-        data_type: VARCHAR(256)
+        data_type: VARCHAR(65535)
       - name: BATCH_DATE
         data_type: DATE
       - name: _CONATA_SOURCE

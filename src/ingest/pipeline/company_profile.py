@@ -1,6 +1,7 @@
 """Ingestion pipeline for RAW_COMPANY_PROFILE."""
 
 import pandas as pd
+from vnstock import Company
 
 from src.ingest.client.vnstock_client import VnStockClient
 from src.ingest.pipeline.base import DEFAULT_TICKER_SYMBOLS, BaseIngestPipeline
@@ -28,21 +29,34 @@ class CompanyProfilePipeline(BaseIngestPipeline):
         ]
 
     def fetch(self) -> pd.DataFrame:
-        """Fetch company profiles for symbols on the batch date."""
+        """Fetch company profiles for symbols from VCI source."""
         client = VnStockClient()
         all_dfs = []
         targets = self.symbols or DEFAULT_TICKER_SYMBOLS
 
         for symbol in targets:
             try:
-                stock_obj = client.client.stock(symbol=symbol, source="TCBS")
-                if not hasattr(stock_obj, "company"):
-                    continue
-
-                df = client.call_api_with_retry(stock_obj.company.profile)
+                # Use Company from the modern vnstock library with VCI source
+                # call_api_with_retry ensures rate limit and retries
+                df = client.call_api_with_retry(
+                    lambda s=symbol: Company(source="VCI", symbol=s).info()
+                )
                 if not df.empty:
-                    if "TICKER" not in df.columns and "symbol" not in df.columns:
-                        df["ticker"] = symbol
+                    # Map raw columns to pipeline schema columns
+                    df = df.rename(
+                        columns={
+                            "symbol": "ticker",
+                            "organ_name": "company_name",
+                            "sector": "industry",
+                            "com_group_code": "exchange",
+                            "company_profile": "description",
+                        }
+                    )
+                    # Keep only columns defined in schema
+                    available_cols = [
+                        col for col in self.schema_columns if col in df.columns
+                    ]
+                    df = df[available_cols]
                     all_dfs.append(df)
             except Exception as e:
                 self.logger.error(

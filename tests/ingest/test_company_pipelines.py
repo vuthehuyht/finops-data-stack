@@ -15,40 +15,39 @@ from src.ingest.pipeline.news_articles import NewsArticlesPipeline
 # ---------------------------------------------------------------------------
 
 
+@patch("src.ingest.pipeline.company_profile.Company")
 @patch("src.ingest.pipeline.company_profile.VnStockClient")
-def test_company_profile_pipeline_fetch(mock_client_class: MagicMock) -> None:
-    """Verify fetch calls company.profile for each symbol and injects ticker."""
-    mock_client = MagicMock()
-    mock_client_class.return_value = mock_client
-    mock_stock_obj = MagicMock()
-    mock_client.client.stock.return_value = mock_stock_obj
-
-    mock_df = pd.DataFrame({"company_name": ["Techcombank"], "industry": ["Banking"]})
-    mock_client.call_api_with_retry.return_value = mock_df
-
-    pipeline = CompanyProfilePipeline(batch_date="2026-06-18", symbols=["TCB"])
-    result_df = pipeline.fetch()
-
-    mock_client.call_api_with_retry.assert_called_once_with(
-        mock_stock_obj.company.profile
-    )
-    assert result_df["ticker"].iloc[0] == "TCB"
-
-
-@patch("src.ingest.pipeline.company_profile.VnStockClient")
-def test_company_profile_pipeline_skips_symbol_without_company_attr(
-    mock_client_class: MagicMock,
+def test_company_profile_pipeline_fetch(
+    mock_client_class: MagicMock, mock_company_class: MagicMock
 ) -> None:
-    """Verify symbols where stock_obj has no company are skipped."""
+    """Verify fetch calls Company VCI info for each symbol and maps columns."""
     mock_client = MagicMock()
     mock_client_class.return_value = mock_client
-    mock_client.client.stock.return_value = MagicMock(spec=[])
+    mock_client.call_api_with_retry.side_effect = lambda f: f()
+
+    mock_company = MagicMock()
+    mock_company_class.return_value = mock_company
+
+    mock_df = pd.DataFrame(
+        {
+            "symbol": ["TCB"],
+            "organ_name": ["Techcombank"],
+            "sector": ["Banking"],
+            "com_group_code": ["HOSE"],
+            "company_profile": ["Techcombank profile info"],
+        }
+    )
+    mock_company.info.return_value = mock_df
 
     pipeline = CompanyProfilePipeline(batch_date="2026-06-18", symbols=["TCB"])
     result_df = pipeline.fetch()
 
-    mock_client.call_api_with_retry.assert_not_called()
-    assert result_df.empty
+    mock_company_class.assert_called_once_with(source="VCI", symbol="TCB")
+    assert result_df["ticker"].iloc[0] == "TCB"
+    assert result_df["company_name"].iloc[0] == "Techcombank"
+    assert result_df["industry"].iloc[0] == "Banking"
+    assert result_df["exchange"].iloc[0] == "HOSE"
+    assert result_df["description"].iloc[0] == "Techcombank profile info"
 
 
 # ---------------------------------------------------------------------------
@@ -126,22 +125,27 @@ def test_news_articles_pipeline_fetch(mock_client_class: MagicMock) -> None:
     assert result_df["ticker"].iloc[0] == "FPT"
 
 
+@patch("src.ingest.pipeline.company_profile.Company")
 @patch("src.ingest.pipeline.company_profile.VnStockClient")
 def test_company_profile_defaults_to_vn30_when_no_symbols(
     mock_client_class: MagicMock,
+    mock_company_class: MagicMock,
 ) -> None:
     # Ensure fetch uses DEFAULT_TICKER_SYMBOLS when no symbols are explicitly specified
     """Verify fetch uses DEFAULT_TICKER_SYMBOLS when symbols=[]."""
     mock_client = MagicMock()
     mock_client_class.return_value = mock_client
-    mock_client.call_api_with_retry.return_value = pd.DataFrame()
+    mock_client.call_api_with_retry.side_effect = lambda f: f()
+
+    mock_company = MagicMock()
+    mock_company_class.return_value = mock_company
+    mock_company.info.return_value = pd.DataFrame()
 
     pipeline = CompanyProfilePipeline(batch_date="2026-06-18")
     pipeline.fetch()
 
     called_symbols = [
-        call.kwargs["symbol"]
-        for call in mock_client.client.stock.call_args_list
+        call.kwargs["symbol"] for call in mock_company_class.call_args_list
     ]
     assert called_symbols == DEFAULT_TICKER_SYMBOLS
 
@@ -160,8 +164,7 @@ def test_news_articles_defaults_to_vn30_when_no_symbols(
     pipeline.fetch()
 
     called_symbols = [
-        call.kwargs["symbol"]
-        for call in mock_client.client.stock.call_args_list
+        call.kwargs["symbol"] for call in mock_client.client.stock.call_args_list
     ]
     assert called_symbols == DEFAULT_TICKER_SYMBOLS
 
@@ -180,8 +183,7 @@ def test_corporate_events_defaults_to_vn30_when_no_symbols(
     pipeline.fetch()
 
     called_symbols = [
-        call.kwargs["symbol"]
-        for call in mock_client.client.stock.call_args_list
+        call.kwargs["symbol"] for call in mock_client.client.stock.call_args_list
     ]
     assert called_symbols == DEFAULT_TICKER_SYMBOLS
 
@@ -200,8 +202,6 @@ def test_insider_transactions_defaults_to_vn30_when_no_symbols(
     pipeline.fetch()
 
     called_symbols = [
-        call.kwargs["symbol"]
-        for call in mock_client.client.stock.call_args_list
+        call.kwargs["symbol"] for call in mock_client.client.stock.call_args_list
     ]
     assert called_symbols == DEFAULT_TICKER_SYMBOLS
-
