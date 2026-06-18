@@ -1,6 +1,6 @@
 # Makefile to setup and run dev_local environment for FinOps Data Stack
 
-.PHONY: help setup dev lint format test clean dev_local dev_local_up dev_local_down up down
+.PHONY: help setup dev lint format test clean dev_local dev_local_up dev_local_down up down lint-sql format-sql
 
 # Default target when running `make`
 help:
@@ -38,6 +38,16 @@ format:
 	@echo "Formatting code with ruff..."
 	uv run ruff format src/ tests/
 	uv run ruff check --fix src/ tests/
+
+# Run SQLFluff linter
+lint-sql:
+	@echo "Running sqlfluff lint..."
+	cd src/transform/dbt && uv run sqlfluff lint models
+
+# Automatically format SQL code
+format-sql:
+	@echo "Formatting SQL with sqlfluff..."
+	cd src/transform/dbt && uv run sqlfluff format models -f
 
 # Run unit tests
 test:

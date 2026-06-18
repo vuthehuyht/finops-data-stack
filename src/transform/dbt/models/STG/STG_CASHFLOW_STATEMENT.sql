@@ -1,0 +1,27 @@
+{{
+  config(
+    materialized='incremental',
+    unique_key=['TICKER', 'PERIOD', 'YEAR'],
+    incremental_strategy='merge'
+  )
+}}
+
+SELECT
+  TICKER::VARCHAR(256) AS TICKER,
+  PERIOD::VARCHAR(256) AS PERIOD,
+  YEAR::INTEGER AS YEAR,
+  CFO::NUMERIC(18, 4) AS CFO,
+  CFI::NUMERIC(18, 4) AS CFI,
+  CFF::NUMERIC(18, 4) AS CFF,
+  NET_CASH_FLOW::NUMERIC(18, 4) AS NET_CASH_FLOW,
+  CAPEX::NUMERIC(18, 4) AS CAPEX,
+  BATCH_DATE::DATE AS BATCH_DATE,
+  _CONATA_SOURCE::VARCHAR(256) AS _CONATA_SOURCE,
+  _CONATA_SOURCE_ROW_NUMBER::INTEGER AS _CONATA_SOURCE_ROW_NUMBER,
+  _CONATA_PARTITION_KEY::VARCHAR(256) AS _CONATA_PARTITION_KEY,
+  _CONATA_LOADED_AT::TIMESTAMP AS _CONATA_LOADED_AT
+FROM {{ source('RAW', 'RAW_CASHFLOW_STATEMENT') }}
+{% if is_incremental() %}
+  -- Lọc theo partition key khi chạy incremental
+  WHERE _CONATA_PARTITION_KEY = '{{ var("partition_key") }}'
+{% endif %}

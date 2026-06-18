@@ -1,0 +1,35 @@
+models:
+  - name: STG_EXCHANGE_RATES
+    description: Cleaned/Staging model for raw_exchange_rates
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - PAIR
+            - DATE
+    meta:
+      dagster:
+        asset_key:
+          - DWH
+          - BATCH
+          - STG_EXCHANGE_RATES
+    columns:
+      - name: PAIR
+        data_type: VARCHAR(256)
+        data_tests:
+          - not_null
+      - name: DATE
+        data_type: DATE
+        data_tests:
+          - not_null
+      - name: EXCHANGE_RATE
+        data_type: NUMERIC(18, 4)
+      - name: BATCH_DATE
+        data_type: DATE
+      - name: _CONATA_SOURCE
+        data_type: VARCHAR(256)
+      - name: _CONATA_SOURCE_ROW_NUMBER
+        data_type: INTEGER
+      - name: _CONATA_PARTITION_KEY
+        data_type: VARCHAR(256)
+      - name: _CONATA_LOADED_AT
+        data_type: TIMESTAMP

@@ -1,0 +1,48 @@
+models:
+  - name: STG_CASHFLOW_STATEMENT
+    description: Cleaned/Staging model for raw_cashflow_statement
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - TICKER
+            - PERIOD
+            - YEAR
+    meta:
+      dagster:
+        asset_key:
+          - DWH
+          - BATCH
+          - STG_CASHFLOW_STATEMENT
+    columns:
+      - name: TICKER
+        data_type: VARCHAR(256)
+        data_tests:
+          - not_null
+      - name: PERIOD
+        data_type: VARCHAR(256)
+        data_tests:
+          - not_null
+      - name: YEAR
+        data_type: INTEGER
+        data_tests:
+          - not_null
+      - name: CFO
+        data_type: NUMERIC(18, 4)
+      - name: CFI
+        data_type: NUMERIC(18, 4)
+      - name: CFF
+        data_type: NUMERIC(18, 4)
+      - name: NET_CASH_FLOW
+        data_type: NUMERIC(18, 4)
+      - name: CAPEX
+        data_type: NUMERIC(18, 4)
+      - name: BATCH_DATE
+        data_type: DATE
+      - name: _CONATA_SOURCE
+        data_type: VARCHAR(256)
+      - name: _CONATA_SOURCE_ROW_NUMBER
+        data_type: INTEGER
+      - name: _CONATA_PARTITION_KEY
+        data_type: VARCHAR(256)
+      - name: _CONATA_LOADED_AT
+        data_type: TIMESTAMP

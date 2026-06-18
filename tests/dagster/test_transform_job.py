@@ -51,14 +51,14 @@ def test_trigger_type_values() -> None:
 
 def test_get_upstream_bronze_key() -> None:
     key = _get_upstream_bronze_key("stg_stock_price_eod")
-    assert key.path == ["BRONZE", "RAW_STOCK_PRICE_EOD"]
+    assert key.path == ["RAW", "RAW_STOCK_PRICE_EOD"]
 
 
 def test_get_upstream_bronze_key_all_models() -> None:
     params = list(read_transform_job_parameter(_SILVER_JOB_DEFINITION_FILE))
     for p in params:
         key = _get_upstream_bronze_key(p.table_name)
-        assert key.path[0] == "BRONZE"
+        assert key.path[0] == "RAW"
         assert key.path[1].startswith("RAW_")
 
 
@@ -129,9 +129,9 @@ def test_transform_sensor_evaluates() -> None:
         "transform_SILVER__STG_TEST_job", selection=[dummy_asset]
     )
     sensor_jobs = [mock_job]
-    all_upstream_keys = [AssetKey(["BRONZE", "RAW_TEST"])]
+    all_upstream_keys = [AssetKey(["RAW", "RAW_TEST"])]
     asset_to_upstream = {
-        AssetKey(["SILVER", "STG_TEST"]): AssetKey(["BRONZE", "RAW_TEST"])
+        AssetKey(["SILVER", "STG_TEST"]): AssetKey(["RAW", "RAW_TEST"])
     }
 
     sensor_def = _create_sensor_for_jobs(
@@ -139,7 +139,7 @@ def test_transform_sensor_evaluates() -> None:
     )
 
     # Mock fetch_materializations
-    mock_key = AssetKey(["BRONZE", "RAW_TEST"])
+    mock_key = AssetKey(["RAW", "RAW_TEST"])
     mock_event = MagicMock(spec=EventLogRecord)
     mock_materialization = AssetMaterialization(
         asset_key=mock_key,
@@ -167,4 +167,4 @@ def test_transform_sensor_evaluates() -> None:
     assert len(results) == 1
     run_request = results[0]
     assert run_request.job_name == "transform_SILVER__STG_TEST_job"
-    assert run_request.run_key == "BRONZE__RAW_TEST_2026-06-17"
+    assert run_request.run_key == "RAW__RAW_TEST_2026-06-17"

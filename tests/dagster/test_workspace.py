@@ -84,7 +84,7 @@ def test_workspace_has_17_load_assets() -> None:
         reload(src.dagster.workspace)
         defs = src.dagster.workspace.defs
         bronze_keys = [
-            k for k in defs.assets_defs_by_key.keys() if k.path[0] == "BRONZE"
+            k for k in defs.assets_defs_by_key.keys() if k.path[0] == "RAW"
         ]
         assert len(bronze_keys) == 17
 

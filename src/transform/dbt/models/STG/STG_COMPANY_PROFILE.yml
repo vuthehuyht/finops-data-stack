@@ -1,0 +1,33 @@
+models:
+  - name: STG_COMPANY_PROFILE
+    description: Cleaned/Staging model for raw_company_profile
+    meta:
+      dagster:
+        asset_key:
+          - DWH
+          - BATCH
+          - STG_COMPANY_PROFILE
+    columns:
+      - name: TICKER
+        data_type: VARCHAR(256)
+        data_tests:
+          - not_null
+          - unique
+      - name: COMPANY_NAME
+        data_type: VARCHAR(256)
+      - name: INDUSTRY
+        data_type: VARCHAR(256)
+      - name: EXCHANGE
+        data_type: VARCHAR(256)
+      - name: DESCRIPTION
+        data_type: VARCHAR(256)
+      - name: BATCH_DATE
+        data_type: DATE
+      - name: _CONATA_SOURCE
+        data_type: VARCHAR(256)
+      - name: _CONATA_SOURCE_ROW_NUMBER
+        data_type: INTEGER
+      - name: _CONATA_PARTITION_KEY
+        data_type: VARCHAR(256)
+      - name: _CONATA_LOADED_AT
+        data_type: TIMESTAMP

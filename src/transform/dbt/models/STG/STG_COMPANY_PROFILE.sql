@@ -1,0 +1,24 @@
+{{
+  config(
+    materialized='incremental',
+    unique_key='TICKER',
+    incremental_strategy='merge'
+  )
+}}
+
+SELECT
+  TICKER::VARCHAR(256) AS TICKER,
+  COMPANY_NAME::VARCHAR(256) AS COMPANY_NAME,
+  INDUSTRY::VARCHAR(256) AS INDUSTRY,
+  EXCHANGE::VARCHAR(256) AS EXCHANGE,
+  DESCRIPTION::VARCHAR(256) AS DESCRIPTION,
+  BATCH_DATE::DATE AS BATCH_DATE,
+  _CONATA_SOURCE::VARCHAR(256) AS _CONATA_SOURCE,
+  _CONATA_SOURCE_ROW_NUMBER::INTEGER AS _CONATA_SOURCE_ROW_NUMBER,
+  _CONATA_PARTITION_KEY::VARCHAR(256) AS _CONATA_PARTITION_KEY,
+  _CONATA_LOADED_AT::TIMESTAMP AS _CONATA_LOADED_AT
+FROM {{ source('RAW', 'RAW_COMPANY_PROFILE') }}
+{% if is_incremental() %}
+  -- Lọc theo partition key khi chạy incremental
+  WHERE _CONATA_PARTITION_KEY = '{{ var("partition_key") }}'
+{% endif %}

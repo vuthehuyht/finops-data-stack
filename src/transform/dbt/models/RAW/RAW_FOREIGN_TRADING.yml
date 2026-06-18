@@ -1,0 +1,38 @@
+version: 2
+sources:
+  - name: RAW
+    description: Raw data source for RAW
+    schema: RAW
+    tables:
+      - name: RAW_FOREIGN_TRADING
+        description: Raw data source for RAW_FOREIGN_TRADING
+        meta:
+          dagster:
+            asset_key:
+              - RAW
+              - RAW_FOREIGN_TRADING
+        columns:
+          - name: TICKER
+            data_type: VARCHAR(256)
+          - name: TRADING_DATE
+            data_type: VARCHAR(256)
+          - name: BUY_VOL
+            data_type: VARCHAR(256)
+          - name: SELL_VOL
+            data_type: VARCHAR(256)
+          - name: BUY_VAL
+            data_type: VARCHAR(256)
+          - name: SELL_VAL
+            data_type: VARCHAR(256)
+          - name: NET_VAL
+            data_type: VARCHAR(256)
+          - name: BATCH_DATE
+            data_type: DATE
+          - name: _CONATA_SOURCE
+            data_type: VARCHAR(256)
+          - name: _CONATA_SOURCE_ROW_NUMBER
+            data_type: INTEGER
+          - name: _CONATA_PARTITION_KEY
+            data_type: VARCHAR(256)
+          - name: _CONATA_LOADED_AT
+            data_type: TIMESTAMP

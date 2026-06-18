@@ -1,0 +1,7 @@
+groups:
+  - name: CLEANED
+    owner:
+      name: DATACORE
+  - name: MART
+    owner:
+      name: DATACORE

@@ -76,9 +76,9 @@ def read_transform_job_parameter(csv_file: str) -> Iterator[TransformJobParamete
 
 
 def _get_upstream_bronze_key(silver_table_name: str) -> AssetKey:
-    """Derive the BRONZE asset key from a Silver staging model name."""
+    """Derive the RAW asset key from a Silver staging model name."""
     entity = silver_table_name.removeprefix("stg_")
-    return dagster_lib.asset_key(["BRONZE", f"raw_{entity}".upper()])
+    return dagster_lib.asset_key(["RAW", f"raw_{entity}".upper()])
 
 
 def _make_transform_schedule(

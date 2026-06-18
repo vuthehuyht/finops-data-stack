@@ -1,0 +1,94 @@
+name: "transform"
+version: "1.0.0"
+config-version: 2
+require-dbt-version: [">=1.3.0", "<2.0.0"]
+
+profile: "transform"
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+flags:
+  send_anonymous_usage_stats: false
+  # warn_error_options:
+  #   error: all
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+query-comment:
+  # TODO: Refine the comment in production.
+  comment: >
+    Executed by FLYWHEEL Conata.
+    {% set comment_dict = {} -%}
+    {%- if node is not none -%}
+      {%- do comment_dict.update(node_id=node.unique_id) -%}
+    {% else %}
+      {%- do comment_dict.update(connection_name=connection_name) -%}
+    {%- endif -%}
+    {{ tojson(comment_dict) }}
+  # Append the query comment because Snowflake automatically removes leading comments.
+  append: true
+
+vars:
+  # The following variable is used to insert / update data in the ENTITY_STATUS table.
+  snowflake_operation_schema_name: '{{ env_var("SNOWFLAKE_SCHEMA_OPERATION", "_UNSPECIFIED_") }}'
+  # The following variable is used to store past snapshots for output.
+  snowflake_output_schema_name: '{{ env_var("SNOWFLAKE_SCHEMA_OUTPUT", "_UNSPECIFIED_") }}'
+  # TODO: remove this since this should be given in execution.
+  region: "global"
+  partition_key: ""
+  batch_date: ""
+  dagster_job_name: ""
+  is_updating_entity_status: true
+  today_for_realtime: ""
+  realtime_warehouse: ""
+  # The number of days to look back when calculating diffs in the diff table creation macro.
+  days_offset_for_output_diff: -1
+
+models:
+  # Set descriptions as comments
+  +persist_docs:
+    relation: true
+    columns: true
+  +transient: false
+  # Cap the execution time to prevent unexpected increases in costs.
+  +sql_header: |
+    ALTER SESSION SET ABORT_DETACHED_QUERY=TRUE;
+  # Merged from template but commented out for now because we control this another way.
+  #  ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS={{ var('statement_timeout_in_seconds', 3600) }};
+  transform:
+    +dbt-osmosis: "{model}.yml"
+    # Comment out Snowflake hooks because macro files are deleted
+    # +pre-hook: |
+    #   {{ add_query_tag() }}
+    # +post-hook: |
+    #   {{ create_corresponding_view_for_internal_table() }}
+    #   {{ update_entity_status(this) }}
+    #   {{ enable_change_tracking_for_realtime() }}
+    # +tmp_relation_type: table
+    STG:
+      +group: CLEANED
+      +schema: dev_mart
+      +materialized: incremental
+      +incremental_strategy: merge
+    MART:
+      +group: MART
+      +schema: dev_mart
+      +materialized: table
+
+# unit_tests:
+#   transform:
+#     unit:
+#       AGGMST_SKU_COUNTRY:
+#         +enabled: false
+#       MINAGG_ACTUAL_BY_DATE_STORE_ITEM_COLOR_SIZE_MEMBER:
+#         +enabled: false
+#       MINAGG_SALES_BY_TIMESLOT_STORE_ITEM_COLOR_SIZE:
+#         +enabled: false
+

@@ -1,0 +1,54 @@
+models:
+  - name: STG_BALANCE_SHEET
+    description: Cleaned/Staging model for raw_balance_sheet
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - TICKER
+            - PERIOD
+            - YEAR
+    meta:
+      dagster:
+        asset_key:
+          - DWH
+          - BATCH
+          - STG_BALANCE_SHEET
+    columns:
+      - name: TICKER
+        data_type: VARCHAR(256)
+        data_tests:
+          - not_null
+      - name: PERIOD
+        data_type: VARCHAR(256)
+        data_tests:
+          - not_null
+      - name: YEAR
+        data_type: INTEGER
+        data_tests:
+          - not_null
+      - name: TOTAL_ASSETS
+        data_type: NUMERIC(18, 4)
+      - name: CURRENT_ASSETS
+        data_type: NUMERIC(18, 4)
+      - name: CASH
+        data_type: NUMERIC(18, 4)
+      - name: INVENTORY
+        data_type: NUMERIC(18, 4)
+      - name: TOTAL_LIABILITIES
+        data_type: NUMERIC(18, 4)
+      - name: SHORT_TERM_DEBT
+        data_type: NUMERIC(18, 4)
+      - name: LONG_TERM_DEBT
+        data_type: NUMERIC(18, 4)
+      - name: EQUITY
+        data_type: NUMERIC(18, 4)
+      - name: BATCH_DATE
+        data_type: DATE
+      - name: _CONATA_SOURCE
+        data_type: VARCHAR(256)
+      - name: _CONATA_SOURCE_ROW_NUMBER
+        data_type: INTEGER
+      - name: _CONATA_PARTITION_KEY
+        data_type: VARCHAR(256)
+      - name: _CONATA_LOADED_AT
+        data_type: TIMESTAMP

@@ -1,0 +1,34 @@
+version: 2
+sources:
+  - name: RAW
+    description: Raw data source for RAW
+    schema: RAW
+    tables:
+      - name: RAW_COMPANY_PROFILE
+        description: Raw data source for RAW_COMPANY_PROFILE
+        meta:
+          dagster:
+            asset_key:
+              - RAW
+              - RAW_COMPANY_PROFILE
+        columns:
+          - name: TICKER
+            data_type: VARCHAR(256)
+          - name: COMPANY_NAME
+            data_type: VARCHAR(256)
+          - name: INDUSTRY
+            data_type: VARCHAR(256)
+          - name: EXCHANGE
+            data_type: VARCHAR(256)
+          - name: DESCRIPTION
+            data_type: VARCHAR(256)
+          - name: BATCH_DATE
+            data_type: DATE
+          - name: _CONATA_SOURCE
+            data_type: VARCHAR(256)
+          - name: _CONATA_SOURCE_ROW_NUMBER
+            data_type: INTEGER
+          - name: _CONATA_PARTITION_KEY
+            data_type: VARCHAR(256)
+          - name: _CONATA_LOADED_AT
+            data_type: TIMESTAMP
