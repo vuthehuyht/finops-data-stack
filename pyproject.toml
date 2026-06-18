@@ -74,6 +74,14 @@ known-third-party = ["dagster"]
 [tool.ruff.lint.per-file-ignores]
 "src/pipeline/dagster/__init__.py" = ["I"]
 
+[tool.uv]
+# Force deepdiff>=8.0.0 to fix Critical/High CVEs (#21, #23).
+# dbt-common pins deepdiff<8.0 but only uses the DeepDiff class (not Delta),
+# which remains API-compatible across the 7→8 boundary.
+override-dependencies = [
+    "deepdiff>=8.0.0",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
