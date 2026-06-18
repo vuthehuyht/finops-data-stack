@@ -143,6 +143,8 @@ def test_base_pipeline_cleanup_on_failure(mock_upload: MagicMock) -> None:
 
 
 def test_default_ticker_symbols_contains_vn30() -> None:
+    # Ensure the fallback VN30 list contains exactly 30 uppercase tickers
+    # to prevent errors in pipelines consuming this list.
     """DEFAULT_TICKER_SYMBOLS must have exactly 30 entries, all uppercase strings."""
     assert len(DEFAULT_TICKER_SYMBOLS) == 30
     assert len(DEFAULT_TICKER_SYMBOLS) == len(set(DEFAULT_TICKER_SYMBOLS))

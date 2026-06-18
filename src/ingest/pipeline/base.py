@@ -17,6 +17,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
+# Fallback list of VN30 symbols to ensure basic data ingestion runs
+# when no symbols are explicitly provided at runtime.
 DEFAULT_TICKER_SYMBOLS: list[str] = [
     "ACB", "BCM", "BID", "BVH", "CTG",
     "FPT", "GAS", "GVR", "HDB", "HPG",

@@ -1,7 +1,9 @@
 """Unit tests for the StockPriceEodPipeline ingestion flow."""
 
 from unittest.mock import MagicMock, patch
+
 import pandas as pd
+
 from src.ingest.pipeline.stock_price_eod import StockPriceEodPipeline
 
 
