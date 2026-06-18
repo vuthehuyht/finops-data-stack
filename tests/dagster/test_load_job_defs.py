@@ -42,12 +42,9 @@ def test_load_job_defs_csv():
             assert file_format == "parquet", (
                 f"Row {i}: file_format must be 'parquet'. Found '{file_format}'"
             )
-            assert trigger_type == "SCHEDULE", (
-                f"Row {i}: trigger_type must be 'SCHEDULE'. Found '{trigger_type}'"
+            assert trigger_type == "SENSOR", (
+                f"Row {i}: trigger_type must be 'SENSOR'. Found '{trigger_type}'"
             )
-
-            cron_parts = trigger_parameter.split()
-            assert len(cron_parts) == 5, (
-                f"Row {i}: trigger_parameter '{trigger_parameter}' "
-                "is not a valid 5-part cron expression"
+            assert trigger_parameter == "", (
+                f"Row {i}: trigger_parameter must be empty for SENSOR type. Found '{trigger_parameter}'"
             )

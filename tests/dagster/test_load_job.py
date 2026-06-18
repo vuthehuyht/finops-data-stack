@@ -60,12 +60,12 @@ def test_read_load_job_parameter_first_row() -> None:
     assert first.table_name == "RAW_STOCK_PRICE_EOD"
     assert first.schema == "bronze"
     assert first.file_format == "parquet"
-    assert first.trigger_type == TriggerType.Schedule
-    assert first.trigger_parameter == "0 18 * * 1-5"
+    assert first.trigger_type == TriggerType.Sensor
+    assert first.trigger_parameter == ""
     assert first.asset_key == dagster.AssetKey(["RAW", "RAW_STOCK_PRICE_EOD"])
 
 
-def test_read_load_job_parameter_all_schedule() -> None:
+def test_read_load_job_parameter_all_sensor() -> None:
     from src.dagster.load_job import (
         _JOB_DEFINITION_FILE,
         TriggerType,
@@ -73,7 +73,7 @@ def test_read_load_job_parameter_all_schedule() -> None:
     )
 
     params = list(_read_load_job_parameter(_JOB_DEFINITION_FILE))
-    assert all(p.trigger_type == TriggerType.Schedule for p in params)
+    assert all(p.trigger_type == TriggerType.Sensor for p in params)
 
 
 def test_create_raw_data_asset_key() -> None:
@@ -103,8 +103,8 @@ def test_define_load_jobs_returns_bundle() -> None:
     assert isinstance(bundle, LoadJobBundle)
     assert len(bundle.assets) == 17
     assert len(bundle.jobs) == 17
-    assert len(bundle.schedules) == 17
-    assert len(bundle.sensors) == 0  # all SCHEDULE, no SENSOR rows
+    assert len(bundle.schedules) == 0  # all SENSOR, no SCHEDULE rows
+    assert len(bundle.sensors) == 1  # one sensor monitoring all 17 INPUT assets
 
 
 def test_define_load_jobs_asset_keys() -> None:
@@ -117,9 +117,9 @@ def test_define_load_jobs_asset_keys() -> None:
     assert dagster.AssetKey(["RAW", "RAW_ANALYST_REPORTS"]) in keys
 
 
-def test_define_load_jobs_schedule_names() -> None:
+def test_define_load_jobs_sensor_names() -> None:
     from src.dagster.load_job import define_load_jobs
 
     bundle = define_load_jobs()
-    names = {s.name for s in bundle.schedules}
-    assert any("raw_stock_price_eod" in name.lower() for name in names)
+    names = {s.name for s in bundle.sensors}
+    assert any("load_job_sensor" in name.lower() for name in names)
