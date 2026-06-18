@@ -17,6 +17,15 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_TICKER_SYMBOLS: list[str] = [
+    "ACB", "BCM", "BID", "BVH", "CTG",
+    "FPT", "GAS", "GVR", "HDB", "HPG",
+    "MBB", "MSN", "MWG", "PLX", "PNJ",
+    "POW", "SAB", "SHB", "SSB", "SSI",
+    "STB", "TCB", "TPB", "VCB", "VHM",
+    "VIC", "VJC", "VNM", "VPB", "VRE",
+]
+
 
 class BaseIngestPipeline(abc.ABC):
     """Abstract Base Class (ABC) mapping the 4-phase ingestion workflow."""

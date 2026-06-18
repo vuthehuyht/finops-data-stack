@@ -140,3 +140,12 @@ def test_base_pipeline_cleanup_on_failure(mock_upload: MagicMock) -> None:
     # File should still be deleted
     assert len(temp_files_created) == 1
     assert not os.path.exists(temp_files_created[0])
+
+
+from src.ingest.pipeline.base import DEFAULT_TICKER_SYMBOLS
+
+
+def test_default_ticker_symbols_contains_vn30() -> None:
+    """DEFAULT_TICKER_SYMBOLS must have exactly 30 entries, all uppercase strings."""
+    assert len(DEFAULT_TICKER_SYMBOLS) == 30
+    assert all(isinstance(s, str) and s == s.upper() for s in DEFAULT_TICKER_SYMBOLS)
