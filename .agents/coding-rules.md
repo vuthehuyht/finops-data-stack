@@ -26,13 +26,13 @@
 
 ## dbt model convention
 
-- Organize by layer: Bronze (raw) / Silver (staging/cleaned) / Gold (mart), matching the Data Lake structure in `.agents/architecture.md`.
-- Naming: `stg_<source>_<entity>` for staging, `fct_`/`dim_` for the mart layer (Gold).
+- Organize by layer: RAW (sources YML) / STG (staging models SQL & YML) / MART directly under `models/` folder.
+- Naming: RAW layer files use uppercase (e.g. `RAW_STOCK_PRICE_EOD.yml`). STG models use `STG_<ENTITY_NAME>` format (e.g. `STG_STOCK_PRICE_EOD.sql`), `fct_`/`dim_` for the mart layer (Gold/MART).
 - Every model must have a `.yml` file declaring at least `unique` and `not_null` tests on the primary key.
 - Metadata: Raw layer tagged with `_CONATA_*`, Cleaned layer tagged with `DATACORE_*` (see `docs/architecture-design.md` for detail).
 - SQL keywords and syntax (e.g., SELECT, FROM, WHERE, JOIN) must be written in UPPERCASE.
 - Prefer Common Table Expressions (CTEs) over nested subqueries for readability. The final output CTE should be named `final` or `select_final`.
-- Column names and table aliases must be written in lowercase `snake_case`.
+- Column names and table aliases in RAW and STG layers must be written in UPPERCASE.
 
 ## Error handling
 

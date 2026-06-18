@@ -1,0 +1,32 @@
+version: 2
+sources:
+  - name: RAW
+    description: Raw data source for RAW
+    schema: RAW
+    tables:
+      - name: RAW_MACRO_INDICATORS
+        description: Raw data source for RAW_MACRO_INDICATORS
+        meta:
+          dagster:
+            asset_key:
+              - RAW
+              - RAW_MACRO_INDICATORS
+        columns:
+          - name: INDICATOR_NAME
+            data_type: VARCHAR(256)
+          - name: REPORT_DATE
+            data_type: VARCHAR(256)
+          - name: VALUE
+            data_type: VARCHAR(256)
+          - name: UNIT
+            data_type: VARCHAR(256)
+          - name: BATCH_DATE
+            data_type: DATE
+          - name: _CONATA_SOURCE
+            data_type: VARCHAR(256)
+          - name: _CONATA_SOURCE_ROW_NUMBER
+            data_type: INTEGER
+          - name: _CONATA_PARTITION_KEY
+            data_type: VARCHAR(256)
+          - name: _CONATA_LOADED_AT
+            data_type: TIMESTAMP

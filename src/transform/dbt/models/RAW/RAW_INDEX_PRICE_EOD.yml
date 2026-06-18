@@ -1,0 +1,38 @@
+version: 2
+sources:
+  - name: RAW
+    description: Raw data source for RAW
+    schema: RAW
+    tables:
+      - name: RAW_INDEX_PRICE_EOD
+        description: Raw data source for RAW_INDEX_PRICE_EOD
+        meta:
+          dagster:
+            asset_key:
+              - RAW
+              - RAW_INDEX_PRICE_EOD
+        columns:
+          - name: INDEX_NAME
+            data_type: VARCHAR(256)
+          - name: TRADING_DATE
+            data_type: VARCHAR(256)
+          - name: OPEN
+            data_type: VARCHAR(256)
+          - name: HIGH
+            data_type: VARCHAR(256)
+          - name: LOW
+            data_type: VARCHAR(256)
+          - name: CLOSE
+            data_type: VARCHAR(256)
+          - name: VOLUME
+            data_type: VARCHAR(256)
+          - name: BATCH_DATE
+            data_type: DATE
+          - name: _CONATA_SOURCE
+            data_type: VARCHAR(256)
+          - name: _CONATA_SOURCE_ROW_NUMBER
+            data_type: INTEGER
+          - name: _CONATA_PARTITION_KEY
+            data_type: VARCHAR(256)
+          - name: _CONATA_LOADED_AT
+            data_type: TIMESTAMP

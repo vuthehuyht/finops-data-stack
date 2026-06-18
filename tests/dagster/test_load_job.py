@@ -14,7 +14,7 @@ def test_load_job_parameter_fields() -> None:
     from src.dagster.load_job import LoadJobParameter, TriggerType
 
     p = LoadJobParameter(
-        asset_key=dagster.AssetKey(["BRONZE", "RAW_STOCK_PRICE_EOD"]),
+        asset_key=dagster.AssetKey(["RAW", "RAW_STOCK_PRICE_EOD"]),
         table_name="RAW_STOCK_PRICE_EOD",
         schema="bronze",
         file_format="parquet",
@@ -38,7 +38,7 @@ def test_get_asset_key() -> None:
     from src.dagster.load_job import _get_asset_key
 
     key = _get_asset_key("RAW_STOCK_PRICE_EOD")
-    assert key.path == ["BRONZE", "RAW_STOCK_PRICE_EOD"]
+    assert key.path == ["RAW", "RAW_STOCK_PRICE_EOD"]
 
 
 def test_read_load_job_parameter_count() -> None:
@@ -62,7 +62,7 @@ def test_read_load_job_parameter_first_row() -> None:
     assert first.file_format == "parquet"
     assert first.trigger_type == TriggerType.Schedule
     assert first.trigger_parameter == "0 18 * * 1-5"
-    assert first.asset_key == dagster.AssetKey(["BRONZE", "RAW_STOCK_PRICE_EOD"])
+    assert first.asset_key == dagster.AssetKey(["RAW", "RAW_STOCK_PRICE_EOD"])
 
 
 def test_read_load_job_parameter_all_schedule() -> None:
@@ -84,7 +84,7 @@ def test_create_raw_data_asset_key() -> None:
     )
 
     param = LoadJobParameter(
-        asset_key=dagster.AssetKey(["BRONZE", "RAW_STOCK_PRICE_EOD"]),
+        asset_key=dagster.AssetKey(["RAW", "RAW_STOCK_PRICE_EOD"]),
         table_name="RAW_STOCK_PRICE_EOD",
         schema="bronze",
         file_format="parquet",
@@ -93,7 +93,7 @@ def test_create_raw_data_asset_key() -> None:
     )
     asset = _create_raw_data_asset(param)
     assert isinstance(asset, dagster.AssetsDefinition)
-    assert asset.key == dagster.AssetKey(["BRONZE", "RAW_STOCK_PRICE_EOD"])
+    assert asset.key == dagster.AssetKey(["RAW", "RAW_STOCK_PRICE_EOD"])
 
 
 def test_define_load_jobs_returns_bundle() -> None:
@@ -112,9 +112,9 @@ def test_define_load_jobs_asset_keys() -> None:
 
     bundle = define_load_jobs()
     keys = {a.key for a in bundle.assets}
-    assert dagster.AssetKey(["BRONZE", "RAW_STOCK_PRICE_EOD"]) in keys
-    assert dagster.AssetKey(["BRONZE", "RAW_BALANCE_SHEET"]) in keys
-    assert dagster.AssetKey(["BRONZE", "RAW_ANALYST_REPORTS"]) in keys
+    assert dagster.AssetKey(["RAW", "RAW_STOCK_PRICE_EOD"]) in keys
+    assert dagster.AssetKey(["RAW", "RAW_BALANCE_SHEET"]) in keys
+    assert dagster.AssetKey(["RAW", "RAW_ANALYST_REPORTS"]) in keys
 
 
 def test_define_load_jobs_schedule_names() -> None:

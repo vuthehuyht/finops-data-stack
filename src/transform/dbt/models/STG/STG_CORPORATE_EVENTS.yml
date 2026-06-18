@@ -1,0 +1,35 @@
+models:
+  - name: STG_CORPORATE_EVENTS
+    description: Cleaned/Staging model for raw_corporate_events
+    meta:
+      dagster:
+        asset_key:
+          - DWH
+          - BATCH
+          - STG_CORPORATE_EVENTS
+    columns:
+      - name: EVENT_ID
+        data_type: VARCHAR(256)
+        data_tests:
+          - not_null
+          - unique
+      - name: TICKER
+        data_type: VARCHAR(256)
+      - name: EVENT_TYPE
+        data_type: VARCHAR(256)
+      - name: EX_RIGHT_DATE
+        data_type: DATE
+      - name: RECORD_DATE
+        data_type: DATE
+      - name: EVENT_DETAILS
+        data_type: VARCHAR(256)
+      - name: BATCH_DATE
+        data_type: DATE
+      - name: _CONATA_SOURCE
+        data_type: VARCHAR(256)
+      - name: _CONATA_SOURCE_ROW_NUMBER
+        data_type: INTEGER
+      - name: _CONATA_PARTITION_KEY
+        data_type: VARCHAR(256)
+      - name: _CONATA_LOADED_AT
+        data_type: TIMESTAMP

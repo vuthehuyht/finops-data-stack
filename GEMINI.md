@@ -46,7 +46,7 @@ This file serves as the main context entrypoint for AI Agents. It provides a com
 - **Keywords**: SQL keywords and syntax (e.g., `SELECT`, `FROM`, `WHERE`, `JOIN`) must be in **UPPERCASE**.
 - **Indentation**: 2-space indentation (configured in `.editorconfig`).
 - **Formatting**: Use CTEs (Common Table Expressions) instead of nested subqueries. The final CTE must be named `final` or `select_final`.
-- **Naming**: Database columns and table aliases must be in lowercase `snake_case`. dbt models: `stg_<source>_<entity>` for staging, `fct_`/`dim_` for marts.
+- **Naming**: Database columns and table aliases must be in UPPERCASE. dbt models: `STG_<entity>` for staging (e.g. `STG_STOCK_PRICE_EOD`), `fct_`/`dim_` for marts.
 - **Testing**: Every model must have a `.yml` file with at least `unique` and `not_null` tests on the primary key.
 
 ---

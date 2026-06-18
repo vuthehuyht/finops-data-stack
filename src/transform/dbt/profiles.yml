@@ -1,0 +1,22 @@
+transform:
+  target: dev
+  outputs:
+    dev:
+      type: redshift
+      host: "{{ env_var('REDSHIFT_HOST', 'localhost') }}"
+      port: 5439
+      user: "{{ env_var('REDSHIFT_USER', 'awsuser') }}"
+      password: "{{ env_var('REDSHIFT_PASSWORD', '') }}"
+      dbname: "{{ env_var('REDSHIFT_DATABASE', 'dev') }}"
+      schema: dev_mart
+      threads: 16
+      keepalives_idle: 240
+    no_snowflake_access:
+      type: redshift
+      host: localhost
+      port: 5439
+      user: test
+      password: ''
+      dbname: test
+      schema: dev_mart
+      threads: 1

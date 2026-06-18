@@ -1,0 +1,30 @@
+version: 2
+sources:
+  - name: RAW
+    description: Raw data source for RAW
+    schema: RAW
+    tables:
+      - name: RAW_COMMODITIES_PRICE
+        description: Raw data source for RAW_COMMODITIES_PRICE
+        meta:
+          dagster:
+            asset_key:
+              - RAW
+              - RAW_COMMODITIES_PRICE
+        columns:
+          - name: COMMODITY_NAME
+            data_type: VARCHAR(256)
+          - name: DATE
+            data_type: VARCHAR(256)
+          - name: PRICE
+            data_type: VARCHAR(256)
+          - name: BATCH_DATE
+            data_type: DATE
+          - name: _CONATA_SOURCE
+            data_type: VARCHAR(256)
+          - name: _CONATA_SOURCE_ROW_NUMBER
+            data_type: INTEGER
+          - name: _CONATA_PARTITION_KEY
+            data_type: VARCHAR(256)
+          - name: _CONATA_LOADED_AT
+            data_type: TIMESTAMP

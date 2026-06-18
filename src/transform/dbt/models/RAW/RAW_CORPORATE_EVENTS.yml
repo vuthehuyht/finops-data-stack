@@ -1,0 +1,36 @@
+version: 2
+sources:
+  - name: RAW
+    description: Raw data source for RAW
+    schema: RAW
+    tables:
+      - name: RAW_CORPORATE_EVENTS
+        description: Raw data source for RAW_CORPORATE_EVENTS
+        meta:
+          dagster:
+            asset_key:
+              - RAW
+              - RAW_CORPORATE_EVENTS
+        columns:
+          - name: EVENT_ID
+            data_type: VARCHAR(256)
+          - name: TICKER
+            data_type: VARCHAR(256)
+          - name: EVENT_TYPE
+            data_type: VARCHAR(256)
+          - name: EX_RIGHT_DATE
+            data_type: VARCHAR(256)
+          - name: RECORD_DATE
+            data_type: VARCHAR(256)
+          - name: EVENT_DETAILS
+            data_type: VARCHAR(256)
+          - name: BATCH_DATE
+            data_type: DATE
+          - name: _CONATA_SOURCE
+            data_type: VARCHAR(256)
+          - name: _CONATA_SOURCE_ROW_NUMBER
+            data_type: INTEGER
+          - name: _CONATA_PARTITION_KEY
+            data_type: VARCHAR(256)
+          - name: _CONATA_LOADED_AT
+            data_type: TIMESTAMP

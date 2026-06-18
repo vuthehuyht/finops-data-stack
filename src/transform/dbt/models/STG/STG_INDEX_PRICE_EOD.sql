@@ -1,0 +1,26 @@
+{{
+  config(
+    materialized='incremental',
+    unique_key=['INDEX_NAME', 'TRADING_DATE'],
+    incremental_strategy='merge'
+  )
+}}
+
+SELECT
+  INDEX_NAME::VARCHAR(256) AS INDEX_NAME,
+  TRADING_DATE::DATE AS TRADING_DATE,
+  OPEN::NUMERIC(18, 4) AS OPEN,
+  HIGH::NUMERIC(18, 4) AS HIGH,
+  LOW::NUMERIC(18, 4) AS LOW,
+  CLOSE::NUMERIC(18, 4) AS CLOSE,
+  VOLUME::NUMERIC(18, 4) AS VOLUME,
+  BATCH_DATE::DATE AS BATCH_DATE,
+  _CONATA_SOURCE::VARCHAR(256) AS _CONATA_SOURCE,
+  _CONATA_SOURCE_ROW_NUMBER::INTEGER AS _CONATA_SOURCE_ROW_NUMBER,
+  _CONATA_PARTITION_KEY::VARCHAR(256) AS _CONATA_PARTITION_KEY,
+  _CONATA_LOADED_AT::TIMESTAMP AS _CONATA_LOADED_AT
+FROM {{ source('RAW', 'RAW_INDEX_PRICE_EOD') }}
+{% if is_incremental() %}
+  -- Lọc theo partition key khi chạy incremental
+  WHERE _CONATA_PARTITION_KEY = '{{ var("partition_key") }}'
+{% endif %}

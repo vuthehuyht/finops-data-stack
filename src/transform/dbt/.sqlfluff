@@ -1,0 +1,14 @@
+[sqlfluff]
+dialect = redshift
+templater = dbt
+ignore_paths = dbt_packages/,macros/,target/
+
+[sqlfluff:templater:dbt]
+project_dir = .
+profiles_dir = .
+profile = transform
+target = dev
+
+[sqlfluff:templater:dbt:context]
+partition_key = 2026-06-18
+batch_date = 2026-06-18

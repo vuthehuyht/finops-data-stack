@@ -16,7 +16,7 @@ Code comments, docstrings, and commit messages: **English only**.
 
 ## Project stage
 
-Skeleton (Phase 1) — `src/` chỉ có `__init__.py` rỗng, chưa có code thật. Phase 2 mới bắt đầu implement.
+Phase 2 — Core pipeline, dbt transformation, and metadata flow are actively being developed.
 Khi search/glob, dùng `src/`, `tests/`, `docs/`, `.agents/` làm root — bỏ qua `.venv/`.
 
 ## Dev commands

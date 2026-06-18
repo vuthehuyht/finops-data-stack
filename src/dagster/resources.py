@@ -43,6 +43,11 @@ class DbtConfigResource(dagster.ConfigurableResource):
 
     variables: dict[str, str] = Field(default_factory=dict)
     full_refresh: bool = Field(default=False)
+    no_data_test: bool = Field(default=False)
+    no_materialization: bool = Field(default=False)
+    use_prod_upstream: bool = Field(default=False)
+    days_offset_for_output_diff: int = Field(default=0)
+    empty: bool = Field(default=False)
 
 
 class LoadJobConfigResource(dagster.ConfigurableResource):
@@ -55,7 +60,7 @@ class LoadJobConfigResource(dagster.ConfigurableResource):
 
 
 dbt = DbtCliResource(
-    project_dir=os.fspath(_PROJECT_ROOT / "src" / "transform"),
+    project_dir=os.fspath(_PROJECT_ROOT / "src" / "transform" / "dbt"),
 )
 s3 = S3Resource(region_name="ap-southeast-1")
 s3bucket = S3BucketResource()

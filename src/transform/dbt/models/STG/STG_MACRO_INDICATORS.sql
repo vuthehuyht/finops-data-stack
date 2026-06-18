@@ -1,0 +1,23 @@
+{{
+  config(
+    materialized='incremental',
+    unique_key=['INDICATOR_NAME', 'REPORT_DATE'],
+    incremental_strategy='merge'
+  )
+}}
+
+SELECT
+  INDICATOR_NAME::VARCHAR(256) AS INDICATOR_NAME,
+  REPORT_DATE::DATE AS REPORT_DATE,
+  VALUE::NUMERIC(18, 4) AS VALUE,
+  UNIT::VARCHAR(256) AS UNIT,
+  BATCH_DATE::DATE AS BATCH_DATE,
+  _CONATA_SOURCE::VARCHAR(256) AS _CONATA_SOURCE,
+  _CONATA_SOURCE_ROW_NUMBER::INTEGER AS _CONATA_SOURCE_ROW_NUMBER,
+  _CONATA_PARTITION_KEY::VARCHAR(256) AS _CONATA_PARTITION_KEY,
+  _CONATA_LOADED_AT::TIMESTAMP AS _CONATA_LOADED_AT
+FROM {{ source('RAW', 'RAW_MACRO_INDICATORS') }}
+{% if is_incremental() %}
+  -- Lọc theo partition key khi chạy incremental
+  WHERE _CONATA_PARTITION_KEY = '{{ var("partition_key") }}'
+{% endif %}

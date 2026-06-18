@@ -1,0 +1,26 @@
+{{
+  config(
+    materialized='incremental',
+    unique_key=['TICKER', 'TRADING_DATE'],
+    incremental_strategy='merge'
+  )
+}}
+
+SELECT
+  TICKER::VARCHAR(256) AS TICKER,
+  TRADING_DATE::DATE AS TRADING_DATE,
+  BUY_VOL::NUMERIC(18, 4) AS BUY_VOL,
+  SELL_VOL::NUMERIC(18, 4) AS SELL_VOL,
+  BUY_VAL::NUMERIC(18, 4) AS BUY_VAL,
+  SELL_VAL::NUMERIC(18, 4) AS SELL_VAL,
+  NET_VAL::NUMERIC(18, 4) AS NET_VAL,
+  BATCH_DATE::DATE AS BATCH_DATE,
+  _CONATA_SOURCE::VARCHAR(256) AS _CONATA_SOURCE,
+  _CONATA_SOURCE_ROW_NUMBER::INTEGER AS _CONATA_SOURCE_ROW_NUMBER,
+  _CONATA_PARTITION_KEY::VARCHAR(256) AS _CONATA_PARTITION_KEY,
+  _CONATA_LOADED_AT::TIMESTAMP AS _CONATA_LOADED_AT
+FROM {{ source('RAW', 'RAW_FOREIGN_TRADING') }}
+{% if is_incremental() %}
+  -- Lọc theo partition key khi chạy incremental
+  WHERE _CONATA_PARTITION_KEY = '{{ var("partition_key") }}'
+{% endif %}

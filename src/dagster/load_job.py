@@ -64,7 +64,7 @@ class LoadJobBundle:
 
 
 def _get_asset_key(table_name: str) -> dagster.AssetKey:
-    return dagster_lib.asset_key(["BRONZE", table_name])
+    return dagster_lib.asset_key(["RAW", table_name])
 
 
 def _read_load_job_parameter(csv_file: str) -> Iterator[LoadJobParameter]:
@@ -87,7 +87,7 @@ def _create_raw_data_asset(parameter: LoadJobParameter) -> dagster.AssetsDefinit
 
     @dagster_lib.asset(
         key=parameter.asset_key,
-        group_name="BRONZE",
+        group_name="RAW",
         kinds={"python", "s3", "redshift"},
         description=(
             f"Load {parameter.table_name} ({parameter.file_format}) "

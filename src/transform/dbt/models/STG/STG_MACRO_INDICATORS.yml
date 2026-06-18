@@ -1,0 +1,37 @@
+models:
+  - name: STG_MACRO_INDICATORS
+    description: Cleaned/Staging model for raw_macro_indicators
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - INDICATOR_NAME
+            - REPORT_DATE
+    meta:
+      dagster:
+        asset_key:
+          - DWH
+          - BATCH
+          - STG_MACRO_INDICATORS
+    columns:
+      - name: INDICATOR_NAME
+        data_type: VARCHAR(256)
+        data_tests:
+          - not_null
+      - name: REPORT_DATE
+        data_type: DATE
+        data_tests:
+          - not_null
+      - name: VALUE
+        data_type: NUMERIC(18, 4)
+      - name: UNIT
+        data_type: VARCHAR(256)
+      - name: BATCH_DATE
+        data_type: DATE
+      - name: _CONATA_SOURCE
+        data_type: VARCHAR(256)
+      - name: _CONATA_SOURCE_ROW_NUMBER
+        data_type: INTEGER
+      - name: _CONATA_PARTITION_KEY
+        data_type: VARCHAR(256)
+      - name: _CONATA_LOADED_AT
+        data_type: TIMESTAMP

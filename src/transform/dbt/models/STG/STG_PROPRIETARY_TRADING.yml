@@ -1,0 +1,39 @@
+models:
+  - name: STG_PROPRIETARY_TRADING
+    description: Cleaned/Staging model for raw_proprietary_trading
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - TICKER
+            - TRADING_DATE
+    meta:
+      dagster:
+        asset_key:
+          - DWH
+          - BATCH
+          - STG_PROPRIETARY_TRADING
+    columns:
+      - name: TICKER
+        data_type: VARCHAR(256)
+        data_tests:
+          - not_null
+      - name: TRADING_DATE
+        data_type: DATE
+        data_tests:
+          - not_null
+      - name: BUY_VOL
+        data_type: NUMERIC(18, 4)
+      - name: SELL_VOL
+        data_type: NUMERIC(18, 4)
+      - name: NET_VAL
+        data_type: NUMERIC(18, 4)
+      - name: BATCH_DATE
+        data_type: DATE
+      - name: _CONATA_SOURCE
+        data_type: VARCHAR(256)
+      - name: _CONATA_SOURCE_ROW_NUMBER
+        data_type: INTEGER
+      - name: _CONATA_PARTITION_KEY
+        data_type: VARCHAR(256)
+      - name: _CONATA_LOADED_AT
+        data_type: TIMESTAMP

@@ -1,0 +1,39 @@
+models:
+  - name: STG_NEWS_ARTICLES
+    description: Cleaned/Staging model for raw_news_articles
+    meta:
+      dagster:
+        asset_key:
+          - DWH
+          - BATCH
+          - STG_NEWS_ARTICLES
+    columns:
+      - name: ARTICLE_ID
+        data_type: VARCHAR(256)
+        data_tests:
+          - not_null
+          - unique
+      - name: TICKER
+        data_type: VARCHAR(256)
+      - name: PUBLISH_TIME
+        data_type: TIMESTAMP
+      - name: TITLE
+        data_type: VARCHAR(256)
+      - name: SUMMARY
+        data_type: VARCHAR(256)
+      - name: CONTENT
+        data_type: VARCHAR(256)
+      - name: SOURCE
+        data_type: VARCHAR(256)
+      - name: URL
+        data_type: VARCHAR(256)
+      - name: BATCH_DATE
+        data_type: DATE
+      - name: _CONATA_SOURCE
+        data_type: VARCHAR(256)
+      - name: _CONATA_SOURCE_ROW_NUMBER
+        data_type: INTEGER
+      - name: _CONATA_PARTITION_KEY
+        data_type: VARCHAR(256)
+      - name: _CONATA_LOADED_AT
+        data_type: TIMESTAMP
