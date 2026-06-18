@@ -55,26 +55,41 @@ def test_company_profile_pipeline_fetch(
 # ---------------------------------------------------------------------------
 
 
+@patch("src.ingest.pipeline.corporate_events.Company")
 @patch("src.ingest.pipeline.corporate_events.VnStockClient")
-def test_corporate_events_pipeline_fetch(mock_client_class: MagicMock) -> None:
-    """Verify fetch calls company.events for each symbol."""
+def test_corporate_events_pipeline_fetch(
+    mock_client_class: MagicMock, mock_company_class: MagicMock
+) -> None:
+    """Verify fetch calls Company VCI events for each symbol and maps columns."""
     mock_client = MagicMock()
     mock_client_class.return_value = mock_client
-    mock_stock_obj = MagicMock()
-    mock_client.client.stock.return_value = mock_stock_obj
+    mock_client.call_api_with_retry.side_effect = lambda f: f()
+
+    mock_company = MagicMock()
+    mock_company_class.return_value = mock_company
 
     mock_df = pd.DataFrame(
-        {"event_type": ["DIVIDEND"], "ex_right_date": ["2026-07-01"]}
+        {
+            "id": ["123"],
+            "ticker": ["VNM"],
+            "category": ["DIVIDEND"],
+            "exright_date": ["2026-07-01"],
+            "record_date": ["2026-07-02"],
+            "event_title_vi": ["Tra co tuc 10%"],
+        }
     )
-    mock_client.call_api_with_retry.return_value = mock_df
+    mock_company.events.return_value = mock_df
 
     pipeline = CorporateEventsPipeline(batch_date="2026-06-18", symbols=["VNM"])
     result_df = pipeline.fetch()
 
-    mock_client.call_api_with_retry.assert_called_once_with(
-        mock_stock_obj.company.events
-    )
+    mock_company_class.assert_called_once_with(source="VCI", symbol="VNM")
+    assert result_df["event_id"].iloc[0] == "123"
     assert result_df["ticker"].iloc[0] == "VNM"
+    assert result_df["event_type"].iloc[0] == "DIVIDEND"
+    assert result_df["ex_right_date"].iloc[0] == "2026-07-01"
+    assert result_df["record_date"].iloc[0] == "2026-07-02"
+    assert result_df["event_details"].iloc[0] == "Tra co tuc 10%"
 
 
 # ---------------------------------------------------------------------------
@@ -169,21 +184,25 @@ def test_news_articles_defaults_to_vn30_when_no_symbols(
     assert called_symbols == DEFAULT_TICKER_SYMBOLS
 
 
+@patch("src.ingest.pipeline.corporate_events.Company")
 @patch("src.ingest.pipeline.corporate_events.VnStockClient")
 def test_corporate_events_defaults_to_vn30_when_no_symbols(
-    mock_client_class: MagicMock,
+    mock_client_class: MagicMock, mock_company_class: MagicMock
 ) -> None:
-    # Ensure fetch uses DEFAULT_TICKER_SYMBOLS when no symbols are explicitly specified
     """Verify fetch uses DEFAULT_TICKER_SYMBOLS when symbols=[]."""
     mock_client = MagicMock()
     mock_client_class.return_value = mock_client
-    mock_client.call_api_with_retry.return_value = pd.DataFrame()
+    mock_client.call_api_with_retry.side_effect = lambda f: f()
+
+    mock_company = MagicMock()
+    mock_company_class.return_value = mock_company
+    mock_company.events.return_value = pd.DataFrame()
 
     pipeline = CorporateEventsPipeline(batch_date="2026-06-18")
     pipeline.fetch()
 
     called_symbols = [
-        call.kwargs["symbol"] for call in mock_client.client.stock.call_args_list
+        call.kwargs["symbol"] for call in mock_company_class.call_args_list
     ]
     assert called_symbols == DEFAULT_TICKER_SYMBOLS
 
