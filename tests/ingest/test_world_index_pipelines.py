@@ -28,11 +28,61 @@ def test_macro_indicators_pipeline_fetch_raises_not_implemented() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_exchange_rates_pipeline_fetch_raises_not_implemented() -> None:
-    """Verify fetch raises NotImplementedError."""
-    pipeline = ExchangeRatesPipeline(batch_date="2026-06-18")
+@patch("src.ingest.pipeline.exchange_rates.YahooFinanceClient")
+def test_exchange_rates_pipeline_fetch_success(
+    mock_client_class: MagicMock,
+) -> None:
+    """Verify fetch queries all currency tickers and combines them."""
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
 
-    with pytest.raises(NotImplementedError):
+    # Mock history return value for each currency call
+    mock_df = pd.DataFrame(
+        {
+            "Date": [pd.Timestamp("2026-06-18 00:00:00")],
+            "Close": [25450.0],
+        }
+    )
+    mock_client.get_ticker_history.return_value = mock_df
+
+    pipeline = ExchangeRatesPipeline(batch_date="2026-06-18")
+    result_df = pipeline.fetch()
+
+    # Should call get_ticker_history 5 times
+    assert mock_client.get_ticker_history.call_count == 5
+    assert len(result_df) == 5
+    expected_pairs = {"USD/VND", "EUR/VND", "GBP/VND", "JPY/VND", "CNY/VND"}
+    assert set(result_df["pair"]) == expected_pairs
+    assert result_df["exchange_rate"].iloc[0] == "25450.0"
+
+
+
+@patch("src.ingest.pipeline.exchange_rates.YahooFinanceClient")
+def test_exchange_rates_pipeline_fetch_empty(
+    mock_client_class: MagicMock,
+) -> None:
+    """Verify fetch returns empty DataFrame if no data found."""
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
+    mock_client.get_ticker_history.return_value = pd.DataFrame()
+
+    pipeline = ExchangeRatesPipeline(batch_date="2026-06-18")
+    result_df = pipeline.fetch()
+
+    assert result_df.empty
+
+
+@patch("src.ingest.pipeline.exchange_rates.YahooFinanceClient")
+def test_exchange_rates_pipeline_fetch_error(
+    mock_client_class: MagicMock,
+) -> None:
+    """Verify fetch propagates exception if API client fails."""
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
+    mock_client.get_ticker_history.side_effect = Exception("API connection error")
+
+    pipeline = ExchangeRatesPipeline(batch_date="2026-06-18")
+    with pytest.raises(Exception, match="API connection error"):
         pipeline.fetch()
 
 
