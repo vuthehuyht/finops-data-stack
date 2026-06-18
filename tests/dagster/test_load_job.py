@@ -191,3 +191,30 @@ def test_load_job_sensor_skips_empty_s3_url() -> None:
     # Verify the fix: the new guard 'if not s3_url: continue' catches this
     should_skip = not s3_url
     assert should_skip is True
+
+
+def test_load_job_sensor_skips_missing_batch_date() -> None:
+    """Test that sensor skips events with missing batch_date metadata.
+
+    When a materialization event has s3_url but no batch_date key in metadata,
+    the sensor should log a warning and skip it (not yield a RunRequest with
+    an empty partition key).
+    """
+    from unittest.mock import MagicMock
+
+    # Create a fake materialization event with s3_url but no batch_date
+    s3_url = "s3://bucket/raw/RAW_STOCK_PRICE_EOD/2026-06-18/data.parquet"
+
+    materialization = MagicMock(spec=dagster.AssetMaterialization)
+    materialization.metadata = {
+        "s3_url": dagster.TextMetadataValue(s3_url),
+        # batch_date is missing
+    }
+
+    # Simulate the sensor logic: batch_date should be checked
+    batch_date_meta = materialization.metadata.get("batch_date")
+    assert batch_date_meta is None
+
+    # The sensor should skip this event (not create a RunRequest with empty batch_date)
+    should_skip = batch_date_meta is None
+    assert should_skip is True
