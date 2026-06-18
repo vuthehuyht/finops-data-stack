@@ -3,7 +3,7 @@
 import pandas as pd
 
 from src.ingest.client.vnstock_client import VnStockClient
-from src.ingest.pipeline.base import BaseIngestPipeline
+from src.ingest.pipeline.base import DEFAULT_TICKER_SYMBOLS, BaseIngestPipeline
 
 
 class IncomeStatementPipeline(BaseIngestPipeline):
@@ -38,8 +38,9 @@ class IncomeStatementPipeline(BaseIngestPipeline):
         client = VnStockClient()
         all_dfs = []
         target_year = int(self.batch_date.split("-")[0])
+        targets = self.symbols or DEFAULT_TICKER_SYMBOLS
 
-        for symbol in self.symbols:
+        for symbol in targets:
             try:
                 stock_obj = client.client.stock(symbol=symbol, source="TCBS")
                 if not hasattr(stock_obj, "finance"):

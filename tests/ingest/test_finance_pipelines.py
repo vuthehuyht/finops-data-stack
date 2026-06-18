@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 from src.ingest.pipeline.balance_sheet import BalanceSheetPipeline
+from src.ingest.pipeline.base import DEFAULT_TICKER_SYMBOLS
 from src.ingest.pipeline.cashflow_statement import CashflowStatementPipeline
 from src.ingest.pipeline.financial_ratios import FinancialRatiosPipeline
 from src.ingest.pipeline.income_statement import IncomeStatementPipeline
@@ -43,7 +44,7 @@ def test_balance_sheet_pipeline_fetch(mock_client_class: MagicMock) -> None:
 def test_balance_sheet_pipeline_skips_symbol_without_finance_attr(
     mock_client_class: MagicMock,
 ) -> None:
-    """Verify that symbols where stock_obj has no finance attribute are silently skipped."""
+    """Verify that symbols where stock_obj has no finance attribute are skipped."""
     mock_client = MagicMock()
     mock_client_class.return_value = mock_client
     # MagicMock(spec=[]) has no attributes → hasattr(obj, 'finance') is False
@@ -162,3 +163,84 @@ def test_financial_ratios_pipeline_returns_empty_when_all_empty(
     result_df = pipeline.fetch()
 
     assert result_df.empty
+
+
+# ---------------------------------------------------------------------------
+# DEFAULT_TICKER_SYMBOLS fallback tests
+# ---------------------------------------------------------------------------
+
+
+@patch("src.ingest.pipeline.balance_sheet.VnStockClient")
+def test_balance_sheet_defaults_to_vn30_when_no_symbols(
+    mock_client_class: MagicMock,
+) -> None:
+    """Verify fetch uses DEFAULT_TICKER_SYMBOLS when symbols=[]."""
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
+    mock_client.call_api_with_retry.return_value = pd.DataFrame()
+
+    pipeline = BalanceSheetPipeline(batch_date="2026-06-18")  # no symbols
+    pipeline.fetch()
+
+    called_symbols = [
+        call.kwargs["symbol"]
+        for call in mock_client.client.stock.call_args_list
+    ]
+    assert called_symbols == DEFAULT_TICKER_SYMBOLS
+
+
+@patch("src.ingest.pipeline.income_statement.VnStockClient")
+def test_income_statement_defaults_to_vn30_when_no_symbols(
+    mock_client_class: MagicMock,
+) -> None:
+    """Verify fetch uses DEFAULT_TICKER_SYMBOLS when symbols=[]."""
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
+    mock_client.call_api_with_retry.return_value = pd.DataFrame()
+
+    pipeline = IncomeStatementPipeline(batch_date="2026-06-18")
+    pipeline.fetch()
+
+    called_symbols = [
+        call.kwargs["symbol"]
+        for call in mock_client.client.stock.call_args_list
+    ]
+    assert called_symbols == DEFAULT_TICKER_SYMBOLS
+
+
+@patch("src.ingest.pipeline.cashflow_statement.VnStockClient")
+def test_cashflow_statement_defaults_to_vn30_when_no_symbols(
+    mock_client_class: MagicMock,
+) -> None:
+    """Verify fetch uses DEFAULT_TICKER_SYMBOLS when symbols=[]."""
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
+    mock_client.call_api_with_retry.return_value = pd.DataFrame()
+
+    pipeline = CashflowStatementPipeline(batch_date="2026-06-18")
+    pipeline.fetch()
+
+    called_symbols = [
+        call.kwargs["symbol"]
+        for call in mock_client.client.stock.call_args_list
+    ]
+    assert called_symbols == DEFAULT_TICKER_SYMBOLS
+
+
+@patch("src.ingest.pipeline.financial_ratios.VnStockClient")
+def test_financial_ratios_defaults_to_vn30_when_no_symbols(
+    mock_client_class: MagicMock,
+) -> None:
+    """Verify fetch uses DEFAULT_TICKER_SYMBOLS when symbols=[]."""
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
+    mock_client.call_api_with_retry.return_value = pd.DataFrame()
+
+    pipeline = FinancialRatiosPipeline(batch_date="2026-06-18")
+    pipeline.fetch()
+
+    called_symbols = [
+        call.kwargs["symbol"]
+        for call in mock_client.client.stock.call_args_list
+    ]
+    assert called_symbols == DEFAULT_TICKER_SYMBOLS
