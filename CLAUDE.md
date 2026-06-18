@@ -16,8 +16,7 @@ Code comments, docstrings, and commit messages: **English only**.
 
 ## Project stage
 
-Phase 2 — Core pipeline, dbt transformation, and metadata flow are actively being developed.
-Khi search/glob, dùng `src/`, `tests/`, `docs/`, `.agents/` làm root — bỏ qua `.venv/`.
+When performing search/glob, use `src/`, `tests/`, `docs/`, `.agents/` as roots — ignore `.venv/`.
 
 ## Dev commands
 
@@ -32,6 +31,11 @@ uv run dagster dev              # start Dagster UI at localhost:3000
 
 ## Project-specific skills
 
-- `/dagster-asset` — scaffold Dagster asset đúng naming + metadata convention.
-- `/dbt-model` — scaffold dbt model (SQL + `.yml`) đúng layer convention.
-- `/gen-pr` — tự động tạo PR description từ git diff hiện tại theo template.
+- `/dagster-asset` — scaffold Dagster asset with correct naming + metadata conventions.
+- `/dbt-model` — scaffold dbt model (SQL + `.yml`) with correct layer conventions.
+- `/gen-pr` — automatically generate PR description from current git diff using template.
+
+## Subagent Execution Rules
+
+- **Superpowers Subagent Permissions**: When executing using the subagent skill of superpowers, set full execution permissions (`enable_write_tools = true`, `enable_subagent_tools = true`, `enable_mcp_tools = true`) without asking the user.
+

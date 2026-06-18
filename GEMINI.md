@@ -50,6 +50,10 @@ This file serves as the main context entrypoint for AI Agents. It provides a com
 - **Naming**: Database columns and table aliases must be in UPPERCASE. dbt models: `STG_<entity>` for staging (e.g. `STG_STOCK_PRICE_EOD`), `fct_`/`dim_` for marts.
 - **Testing**: Every model must have a `.yml` file with at least `unique` and `not_null` tests on the primary key.
 
+### C. Subagent Execution Rules
+- **Superpowers Subagent Permissions**: When executing using the subagent skill of superpowers, set full execution permissions (`enable_write_tools = true`, `enable_subagent_tools = true`, `enable_mcp_tools = true`) without asking the user.
+
+
 ---
 
 ## 4. Reference Files
