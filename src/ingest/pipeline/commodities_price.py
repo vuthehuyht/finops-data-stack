@@ -2,7 +2,6 @@
 
 import pandas as pd
 
-from src.ingest.client.vnstock_client import VnStockClient
 from src.ingest.pipeline.base import BaseIngestPipeline
 
 
@@ -27,15 +26,7 @@ class CommoditiesPricePipeline(BaseIngestPipeline):
 
     def fetch(self) -> pd.DataFrame:
         """Fetch daily commodities price on the batch date."""
-        client = VnStockClient()
-
-        def _fetch_comm() -> pd.DataFrame:
-            try:
-                # Use world index or generic commodities tracker
-                # from vnstock as fallback
-                return client.client.world_index()
-            except (AttributeError, Exception):
-                return pd.DataFrame()
-
-        df = client.call_api_with_retry(_fetch_comm)
-        return df
+        raise NotImplementedError(
+            "CommoditiesPricePipeline.fetch() is not yet implemented. "
+            "Provide the correct data source API call."
+        )

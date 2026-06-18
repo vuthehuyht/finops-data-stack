@@ -2,7 +2,6 @@
 
 import pandas as pd
 
-from src.ingest.client.vnstock_client import VnStockClient
 from src.ingest.pipeline.base import BaseIngestPipeline
 
 
@@ -27,15 +26,7 @@ class InterestRatesPipeline(BaseIngestPipeline):
 
     def fetch(self) -> pd.DataFrame:
         """Fetch daily interest rates on the batch date."""
-        client = VnStockClient()
-
-        # Let's call the interest rates fetch logic
-        def _fetch_rates() -> pd.DataFrame:
-            try:
-                # Use world index or generic fx/fund tracker from vnstock as fallback
-                return client.client.world_index()
-            except (AttributeError, Exception):
-                return pd.DataFrame()
-
-        df = client.call_api_with_retry(_fetch_rates)
-        return df
+        raise NotImplementedError(
+            "InterestRatesPipeline.fetch() is not yet implemented. "
+            "Provide the correct data source API call."
+        )

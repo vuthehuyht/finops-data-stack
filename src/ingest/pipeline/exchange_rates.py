@@ -2,7 +2,6 @@
 
 import pandas as pd
 
-from src.ingest.client.vnstock_client import VnStockClient
 from src.ingest.pipeline.base import BaseIngestPipeline
 
 
@@ -27,14 +26,7 @@ class ExchangeRatesPipeline(BaseIngestPipeline):
 
     def fetch(self) -> pd.DataFrame:
         """Fetch daily currency exchange rates on the batch date."""
-        client = VnStockClient()
-
-        def _fetch_fx() -> pd.DataFrame:
-            try:
-                # Call world index or generic fx tracker from vnstock as fallback
-                return client.client.world_index()
-            except (AttributeError, Exception):
-                return pd.DataFrame()
-
-        df = client.call_api_with_retry(_fetch_fx)
-        return df
+        raise NotImplementedError(
+            "ExchangeRatesPipeline.fetch() is not yet implemented. "
+            "Provide the correct data source API call."
+        )

@@ -2,7 +2,6 @@
 
 import pandas as pd
 
-from src.ingest.client.vnstock_client import VnStockClient
 from src.ingest.pipeline.base import BaseIngestPipeline
 
 
@@ -28,16 +27,7 @@ class MacroIndicatorsPipeline(BaseIngestPipeline):
 
     def fetch(self) -> pd.DataFrame:
         """Fetch macro indicator logs on the batch date."""
-        client = VnStockClient()
-
-        # Macro data is usually fetched globally, not by company symbols
-        def _fetch_macro() -> pd.DataFrame:
-            try:
-                # Placeholder for vnstock macro indices or world indices
-                return client.client.world_index()
-            except (AttributeError, Exception):
-                # Return empty frame if no world indices available
-                return pd.DataFrame()
-
-        df = client.call_api_with_retry(_fetch_macro)
-        return df
+        raise NotImplementedError(
+            "MacroIndicatorsPipeline.fetch() is not yet implemented. "
+            "Provide the correct data source API call."
+        )
