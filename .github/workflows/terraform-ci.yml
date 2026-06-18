@@ -10,6 +10,9 @@ on:
     paths:
       - 'infrastructure/terraform/**'
 
+permissions:
+  contents: read
+
 jobs:
   terraform-ci:
     name: Terraform Lint & Validate
