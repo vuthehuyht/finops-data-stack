@@ -3,7 +3,7 @@
 import pandas as pd
 
 from src.ingest.client.vnstock_client import VnStockClient
-from src.ingest.pipeline.base import BaseIngestPipeline
+from src.ingest.pipeline.base import DEFAULT_TICKER_SYMBOLS, BaseIngestPipeline
 
 
 class StockPriceEodPipeline(BaseIngestPipeline):
@@ -35,14 +35,15 @@ class StockPriceEodPipeline(BaseIngestPipeline):
         """Fetch EOD prices for all configured symbols on the partition date."""
         client = VnStockClient()
         all_dfs = []
+        targets = self.symbols or DEFAULT_TICKER_SYMBOLS
 
         self.logger.info(
             "Fetching EOD price for %d symbols for batch_date %s",
-            len(self.symbols),
+            len(targets),
             self.batch_date,
         )
 
-        for symbol in self.symbols:
+        for symbol in targets:
             try:
                 # Price is for a single day: start_date=batch_date, end_date=batch_date
                 df = client.get_stock_price_eod(

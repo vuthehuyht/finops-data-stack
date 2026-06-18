@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
+from src.ingest.pipeline.base import DEFAULT_TICKER_SYMBOLS
 from src.ingest.pipeline.foreign_trading import ForeignTradingPipeline
 from src.ingest.pipeline.proprietary_trading import ProprietaryTradingPipeline
 
@@ -114,3 +115,44 @@ def test_proprietary_trading_pipeline_multiple_symbols_concatenated(
 
     assert len(result_df) == 2
     assert mock_client.call_api_with_retry.call_count == 2
+
+
+@patch("src.ingest.pipeline.foreign_trading.VnStockClient")
+def test_foreign_trading_defaults_to_vn30_when_no_symbols(
+    mock_client_class: MagicMock,
+) -> None:
+    # Ensure fetch uses DEFAULT_TICKER_SYMBOLS when no symbols are explicitly specified
+    """Verify fetch uses DEFAULT_TICKER_SYMBOLS when symbols=[]."""
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
+    mock_client.call_api_with_retry.return_value = pd.DataFrame()
+
+    pipeline = ForeignTradingPipeline(batch_date="2026-06-18")
+    pipeline.fetch()
+
+    called_symbols = [
+        call.kwargs["symbol"]
+        for call in mock_client.client.stock.call_args_list
+    ]
+    assert called_symbols == DEFAULT_TICKER_SYMBOLS
+
+
+@patch("src.ingest.pipeline.proprietary_trading.VnStockClient")
+def test_proprietary_trading_defaults_to_vn30_when_no_symbols(
+    mock_client_class: MagicMock,
+) -> None:
+    # Ensure fetch uses DEFAULT_TICKER_SYMBOLS when no symbols are explicitly specified
+    """Verify fetch uses DEFAULT_TICKER_SYMBOLS when symbols=[]."""
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
+    mock_client.call_api_with_retry.return_value = pd.DataFrame()
+
+    pipeline = ProprietaryTradingPipeline(batch_date="2026-06-18")
+    pipeline.fetch()
+
+    called_symbols = [
+        call.kwargs["symbol"]
+        for call in mock_client.client.stock.call_args_list
+    ]
+    assert called_symbols == DEFAULT_TICKER_SYMBOLS
+

@@ -4,12 +4,13 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 
+from src.ingest.pipeline.base import DEFAULT_TICKER_SYMBOLS
 from src.ingest.pipeline.stock_price_eod import StockPriceEodPipeline
 
 
 @patch("src.ingest.pipeline.stock_price_eod.VnStockClient")
 def test_stock_price_eod_pipeline_fetch(mock_client_class: MagicMock) -> None:
-    """Verify that fetch coordinates correct queries to VnStockClient for all symbols."""
+    """Verify that fetch queries VnStockClient correctly for all symbols."""
     mock_client = MagicMock()
     mock_client_class.return_value = mock_client
 
@@ -40,3 +41,24 @@ def test_stock_price_eod_pipeline_fetch(mock_client_class: MagicMock) -> None:
     assert "ticker" in result_df.columns
     assert result_df.loc[result_df["ticker"] == "TCB", "close"].values[0] == 48.5
     assert result_df.loc[result_df["ticker"] == "FPT", "close"].values[0] == 135.2
+
+
+@patch("src.ingest.pipeline.stock_price_eod.VnStockClient")
+def test_stock_price_eod_defaults_to_vn30_when_no_symbols(
+    mock_client_class: MagicMock,
+) -> None:
+    # Ensure fetch uses DEFAULT_TICKER_SYMBOLS when no symbols are explicitly specified
+    """Verify fetch uses DEFAULT_TICKER_SYMBOLS when symbols=[]."""
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
+    mock_client.get_stock_price_eod.return_value = pd.DataFrame()
+
+    pipeline = StockPriceEodPipeline(batch_date="2026-06-18")  # no symbols
+    pipeline.fetch()
+
+    called_symbols = [
+        call.kwargs["symbol"]
+        for call in mock_client.get_stock_price_eod.call_args_list
+    ]
+    assert called_symbols == DEFAULT_TICKER_SYMBOLS
+
