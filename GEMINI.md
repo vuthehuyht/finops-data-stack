@@ -22,7 +22,8 @@ This file serves as the main context entrypoint for AI Agents. It provides a com
 - **Directory Layout (Flywheel Architecture)**:
   - `src/common/` — Shared AWS Utils, DB Utils, Logging.
   - `src/dagster/` — Software-Defined Assets, Jobs, Sensors, Resources.
-  - `src/load/` — Ingestion layer (Crawl/API -> S3).
+  - `src/ingest/` — Ingestion layer (Crawl/API -> S3).
+  - `src/load/` — Load layer (S3 -> Redshift).
   - `src/transform/` — dbt project (transformation).
   - `src/ml/` — Machine Learning training and inference scripts.
   - `src/pipeline/` — End-to-end processing flows.

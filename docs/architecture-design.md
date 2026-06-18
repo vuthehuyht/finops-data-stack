@@ -73,7 +73,8 @@ finops-data-stack/
 ├── src/                       # Trái tim xử lý dữ liệu của hệ thống (Flywheel Core)
 │   ├── common/                # Tiện ích dùng chung (S3, Redshift, Logging utils)
 │   ├── dagster/               # Logic điều phối (Jobs, Sensors, Assets, Resources)
-│   ├── load/                  # Ingestion layer (Crawl/API code đẩy vào S3)
+│   ├── ingest/                # Ingestion layer (Crawl/API code đẩy vào S3)
+│   ├── load/                  # Load layer (Logic nạp từ S3 vào Redshift)
 │   ├── transform/             # Transformation layer (dbt project)
 │   │   └── dbt/               # Mã nguồn dbt (models, tests, macros)
 │   ├── pipeline/              # Định nghĩa các luồng xử lý end-to-end
@@ -83,7 +84,5 @@ finops-data-stack/
 ├── infrastructure/            # Hạ tầng đám mây (Terraform/CloudFormation)
 ├── tools/                     # Các công cụ hỗ trợ dev và CI/CD
 ├── pyproject.toml             # Quản lý dependency bằng uv
-└── README.md
-```ằng uv
 └── README.md
 ```
