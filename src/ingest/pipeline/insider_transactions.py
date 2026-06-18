@@ -2,12 +2,18 @@
 
 import pandas as pd
 
-from src.ingest.client.vnstock_client import VnStockClient
-from src.ingest.pipeline.base import DEFAULT_TICKER_SYMBOLS, BaseIngestPipeline
+from src.ingest.pipeline.base import BaseIngestPipeline
 
 
 class InsiderTransactionsPipeline(BaseIngestPipeline):
-    """Pipeline to ingest corporate insider trading logs into S3 Bronze."""
+    """Pipeline to ingest corporate insider trading logs into S3 Bronze.
+
+    NOTE: No reliable data source is currently available.
+    - vnstock3 TCBS: 404 Not Found
+    - vnstock3 VCI: 403 Forbidden
+    - vnstock v4 KBS: returns empty data for all symbols
+    Implement fetch() when a working source is identified.
+    """
 
     @property
     def table_name(self) -> str:
@@ -31,30 +37,8 @@ class InsiderTransactionsPipeline(BaseIngestPipeline):
 
     def fetch(self) -> pd.DataFrame:
         """Fetch insider transactions for symbols on the batch date."""
-        client = VnStockClient()
-        all_dfs = []
-        targets = self.symbols or DEFAULT_TICKER_SYMBOLS
-
-        for symbol in targets:
-            try:
-                stock_obj = client.client.stock(symbol=symbol, source="TCBS")
-                if not hasattr(stock_obj, "company"):
-                    continue
-
-                df = client.call_api_with_retry(stock_obj.company.insider_deals)
-                if not df.empty:
-                    if "TICKER" not in df.columns and "symbol" not in df.columns:
-                        df["ticker"] = symbol
-                    all_dfs.append(df)
-            except Exception as e:
-                self.logger.error(
-                    "Failed to fetch insider transactions for %s: %s",
-                    symbol,
-                    e,
-                )
-                raise e
-
-        if not all_dfs:
-            return pd.DataFrame()
-
-        return pd.concat(all_dfs, ignore_index=True)
+        raise NotImplementedError(
+            "InsiderTransactionsPipeline.fetch() is not yet implemented. "
+            "No working data source found: TCBS returns 404, VCI returns 403, "
+            "KBS returns empty data for all VN30 symbols."
+        )
