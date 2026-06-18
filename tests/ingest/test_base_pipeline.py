@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from src.ingest.pipeline.base import BaseIngestPipeline
+from src.ingest.pipeline.base import DEFAULT_TICKER_SYMBOLS, BaseIngestPipeline
 
 
 class DummyIngestPipeline(BaseIngestPipeline):
@@ -142,10 +142,11 @@ def test_base_pipeline_cleanup_on_failure(mock_upload: MagicMock) -> None:
     assert not os.path.exists(temp_files_created[0])
 
 
-from src.ingest.pipeline.base import DEFAULT_TICKER_SYMBOLS
-
-
 def test_default_ticker_symbols_contains_vn30() -> None:
     """DEFAULT_TICKER_SYMBOLS must have exactly 30 entries, all uppercase strings."""
     assert len(DEFAULT_TICKER_SYMBOLS) == 30
-    assert all(isinstance(s, str) and s == s.upper() for s in DEFAULT_TICKER_SYMBOLS)
+    assert len(DEFAULT_TICKER_SYMBOLS) == len(set(DEFAULT_TICKER_SYMBOLS))
+    assert all(
+        isinstance(s, str) and s != "" and s == s.upper()
+        for s in DEFAULT_TICKER_SYMBOLS
+    )
