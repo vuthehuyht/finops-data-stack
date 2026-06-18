@@ -8,6 +8,7 @@ import src.pipeline.dagster as dagster_lib
 from src.dagster import (
     dbt_assets,
     ddl_job,
+    ingest_job,
     load_job,
     resources,
     transform_job,
@@ -28,6 +29,7 @@ def _get_resources() -> dict[str, Any]:
 
 def _create_definitions() -> dagster.Definitions:
     """Create the Dagster definitions for the workspace."""
+    ingest = ingest_job.define_ingest_assets()
     load = load_job.define_load_jobs()
     silver = transform_job.define_silver_jobs()
     mart = transform_job.define_mart_jobs()
@@ -35,7 +37,7 @@ def _create_definitions() -> dagster.Definitions:
 
     return dagster_lib.definitions(
         code_location_name="finops",
-        assets=[*load.assets, dbt],
+        assets=[*ingest, *load.assets, dbt],
         jobs=[
             *load.jobs,
             *silver.jobs,

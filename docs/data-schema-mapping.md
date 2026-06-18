@@ -47,7 +47,7 @@ Dữ liệu văn bản phục vụ trích xuất cảm xúc thị trường (Sen
 | `raw_news_articles` | `article_id`, `ticker`, `publish_time`, `title`, `summary`, `content`, `source`, `url` | RSS Feeds / Web Scraping | Real-time / Daily |
 | `raw_corporate_events` | `event_id`, `ticker`, `event_type`, `ex_right_date`, `record_date`, `event_details` | VSD / CafeF | Daily |
 | `raw_insider_transactions`| `transaction_id`, `ticker`, `insider_name`, `position`, `action`, `registered_vol`, `executed_vol`, `date_start`, `date_end` | SSC / Vietstock | Daily |
-| `raw_analyst_reports` | `report_id`, `ticker`, `brokerage_firm`, `publish_date`, `recommendation`, `target_price`, `report_pdf_url` | SSI, VNDirect, MBS | Daily |
+| `raw_analyst_reports` | `report_id`, `ticker`, `brokerage_firm`, `publish_date`, `title`, `description`, `file_name` | FireAnt API | Daily |
 
 ## 5. Metadata Quản trị Dữ liệu (Raw Layer)
 Để phục vụ việc truy xuất nguồn gốc và quản lý phân vùng dữ liệu, tất cả các bảng ở tầng **Bronze (Raw)** bắt buộc phải có các trường metadata sau:

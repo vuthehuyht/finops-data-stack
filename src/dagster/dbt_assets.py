@@ -2,25 +2,26 @@
 
 from __future__ import annotations
 
+import datetime
 import functools
+import json
 import logging
 import os
 import pathlib
 import re
-import datetime
-import json
 from collections.abc import Iterator, Mapping
 from typing import Any
 
 import dagster
 import dagster_dbt
+from dagster import AssetExecutionContext
 from dagster_dbt import dagster_dbt_translator
 from slack_sdk.web.client import WebClient
 
+import src.dagster.environment as environment
 import src.pipeline.dagster as dagster_lib
 from src.dagster import resources
-import src.dagster.environment as environment
-from src.pipeline.dagster.k8s import kubernetes_cluster_name, on_k8s
+from src.pipeline.dagster.k8s import kubernetes_cluster_name
 
 _PROJECT_ROOT = pathlib.Path(__file__).parent.parent.parent
 DBT_PROJECT_DIR = _PROJECT_ROOT / "src" / "transform" / "dbt"
@@ -330,7 +331,7 @@ def _process_dbt_event(
         asset_key = dagster.AssetKey(
             dagster_event.output_name.split("__", 2 if is_prod_env else 3)
         )
-        
+
         metadata = {}
         try:
             metadata = get_dbt_asset_dependency().specs_by_key[asset_key].metadata
@@ -339,7 +340,7 @@ def _process_dbt_event(
 
         is_view = metadata.get("dagster-dbt/materialization_type", "") == "view"
         row_count = None if is_view else fetch_row_count(asset_key, redshift, context.log)
-        
+
         context.add_output_metadata(
             metadata={
                 "full_refresh": dbt_config.full_refresh,
@@ -399,7 +400,7 @@ def get_dbt_project_assets(
         exclude=exclude,
     )
     def dbt_project_assets(
-        context: dagster.AssetExecutionContext,
+        context,
         dbt: dagster_dbt.DbtCliResource,
         dbt_config: resources.DbtConfigResource,
         redshift: resources.RedshiftResource,
