@@ -114,6 +114,7 @@ class BaseIngestPipeline(abc.ABC):
         result_df = result_df[expected_cols]
 
         # Inject metadata columns
+        result_df["BATCH_DATE"] = self.batch_date
         result_df["_CONATA_SOURCE"] = self.source_uri_prefix
         result_df["_CONATA_SOURCE_ROW_NUMBER"] = range(1, len(result_df) + 1)
         result_df["_CONATA_PARTITION_KEY"] = self.batch_date

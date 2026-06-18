@@ -2,6 +2,7 @@
 
 import os
 from unittest.mock import MagicMock, patch
+
 import pandas as pd
 import pytest
 
@@ -49,6 +50,17 @@ def test_base_pipeline_standardize() -> None:
     assert standardized_df["_CONATA_PARTITION_KEY"].iloc[0] == "2026-06-18"
     assert "_CONATA_LOADED_AT" in standardized_df.columns
     assert isinstance(standardized_df["_CONATA_LOADED_AT"].dtype, pd.DatetimeTZDtype)
+
+
+def test_base_pipeline_standardize_injects_batch_date() -> None:
+    """Verify BATCH_DATE column is injected by standardize() matching batch_date."""
+    pipeline = DummyIngestPipeline(batch_date="2026-06-18")
+    raw_df = pd.DataFrame({"symbol": ["TCB"], "close": [48.5]})
+
+    standardized_df = pipeline.standardize(raw_df)
+
+    assert "BATCH_DATE" in standardized_df.columns
+    assert standardized_df["BATCH_DATE"].iloc[0] == "2026-06-18"
 
 
 def test_base_pipeline_standardize_missing_column() -> None:
