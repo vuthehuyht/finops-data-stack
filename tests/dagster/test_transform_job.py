@@ -1,6 +1,7 @@
 import datetime
 from unittest.mock import MagicMock, patch
 
+import pytest
 from dagster import (
     AssetKey,
     AssetMaterialization,
@@ -17,13 +18,30 @@ from src.dagster.transform_job import (
     SilverJobBundle,
     TransformJobParameter,
     TriggerType,
-    _create_dbt_model_asset,
     _create_sensor_for_jobs,
     _get_upstream_bronze_key,
     _make_transform_schedule,
     define_silver_jobs,
     read_transform_job_parameter,
 )
+
+
+@pytest.fixture(autouse=True)
+def mock_dbt_dependency():
+    silver_params = list(read_transform_job_parameter(_SILVER_JOB_DEFINITION_FILE))
+    specs = {}
+    for param in silver_params:
+        key = AssetKey([param.schema_suffix, param.table_name.upper()])
+        mock_spec = MagicMock()
+        mock_spec.deps = []
+        specs[key] = mock_spec
+        
+    mock_dbt_deps = MagicMock()
+    mock_dbt_deps.specs_by_key = specs
+    
+    with patch("src.dagster.dbt_assets.get_dbt_asset_dependency", return_value=mock_dbt_deps):
+        yield mock_dbt_deps
+
 
 
 def test_trigger_type_values() -> None:
@@ -63,23 +81,9 @@ def test_read_transform_job_parameter_all_sensor() -> None:
     assert all(p.trigger_type == TriggerType.Sensor for p in params)
 
 
-def test_create_dbt_model_asset_key() -> None:
-    param = TransformJobParameter(
-        schema_suffix="SILVER",
-        table_name="stg_stock_price_eod",
-        trigger_type=TriggerType.Sensor,
-        trigger_parameter="",
-    )
-    upstream = _get_upstream_bronze_key(param.table_name)
-    asset = _create_dbt_model_asset(param, upstream)
-    assert isinstance(asset, AssetsDefinition)
-    assert asset.key == AssetKey(["SILVER", "STG_STOCK_PRICE_EOD"])
-
-
 def test_define_silver_jobs_returns_bundle() -> None:
     bundle = define_silver_jobs()
     assert isinstance(bundle, SilverJobBundle)
-    assert len(bundle.assets) == 17
     assert len(bundle.jobs) == 17
     assert len(bundle.schedules) == 0  # all SENSOR, no schedules
     assert len(bundle.sensors) == 1  # one multi_asset_sensor
@@ -87,10 +91,10 @@ def test_define_silver_jobs_returns_bundle() -> None:
 
 def test_define_silver_jobs_asset_keys() -> None:
     bundle = define_silver_jobs()
-    keys = {a.key for a in bundle.assets}
-    assert AssetKey(["SILVER", "STG_STOCK_PRICE_EOD"]) in keys
-    assert AssetKey(["SILVER", "STG_BALANCE_SHEET"]) in keys
-    assert AssetKey(["SILVER", "STG_ANALYST_REPORTS"]) in keys
+    job_names = {j.name for j in bundle.jobs}
+    assert "transform_SILVER__STG_STOCK_PRICE_EOD_job" in job_names
+    assert "transform_SILVER__STG_BALANCE_SHEET_job" in job_names
+    assert "transform_SILVER__STG_ANALYST_REPORTS_job" in job_names
 
 
 def test_define_silver_jobs_sensor_name() -> None:
@@ -105,7 +109,7 @@ def test_transform_schedule_evaluates() -> None:
 
     mock_job = dagster_lib.define_asset_job("test_job", selection=[dummy_asset])
     schedule_def = _make_transform_schedule(
-        mock_job, "test_job", "0 0 * * *", AssetKey(["SILVER", "TEST"])
+        mock_job, "test_job", "0 0 * * *"
     )
     context = build_schedule_context(
         scheduled_execution_time=datetime.datetime(2026, 6, 17, 12, 0, 0)

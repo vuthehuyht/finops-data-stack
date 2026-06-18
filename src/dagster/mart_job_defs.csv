@@ -1,0 +1,7 @@
+schema_suffix,table_name,trigger_type,trigger_parameter
+MART,mart_stock_market_momentum,SENSOR,
+MART,mart_stock_fundamental_metrics,SENSOR,
+MART,mart_stock_sentiment_scores,SENSOR,
+MART,mart_macro_commodities_signals,SENSOR,
+MART,mart_insider_proprietary_flows,SENSOR,
+MART,fact_ml_feature_set,SENSOR,
