@@ -1,0 +1,18 @@
+table_name,schema,file_format,trigger_type,trigger_parameter
+raw_stock_price_eod,bronze,parquet,SCHEDULE,0 18 * * 1-5
+raw_index_price_eod,bronze,parquet,SCHEDULE,0 18 * * 1-5
+raw_foreign_trading,bronze,parquet,SCHEDULE,0 18 * * 1-5
+raw_proprietary_trading,bronze,parquet,SCHEDULE,0 18 * * 1-5
+raw_balance_sheet,bronze,parquet,SCHEDULE,0 6 * * 1
+raw_income_statement,bronze,parquet,SCHEDULE,0 6 * * 1
+raw_cashflow_statement,bronze,parquet,SCHEDULE,0 6 * * 1
+raw_financial_ratios,bronze,parquet,SCHEDULE,0 18 * * 1-5
+raw_company_profile,bronze,parquet,SCHEDULE,0 6 1 * *
+raw_macro_indicators,bronze,parquet,SCHEDULE,0 6 1 * *
+raw_interest_rates,bronze,parquet,SCHEDULE,0 7 * * 1-5
+raw_exchange_rates,bronze,parquet,SCHEDULE,0 7 * * 1-5
+raw_commodities_price,bronze,parquet,SCHEDULE,0 7 * * 1-5
+raw_news_articles,bronze,parquet,SCHEDULE,0 19 * * 1-5
+raw_corporate_events,bronze,parquet,SCHEDULE,0 18 * * 1-5
+raw_insider_transactions,bronze,parquet,SCHEDULE,0 18 * * 1-5
+raw_analyst_reports,bronze,parquet,SCHEDULE,0 7 * * 1-5
