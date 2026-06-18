@@ -28,10 +28,7 @@ def inject_secrets_from_aws() -> None:
     if os.getenv("REDSHIFT_PASSWORD"):
         return
 
-    logger.info(
-        "Retrieving database credentials from AWS Secrets Manager: %s",
-        secret_name,
-    )
+    logger.info("Retrieving database credentials from AWS Secrets Manager.")
 
     try:
         client = boto3.client("secretsmanager", region_name=region_name)
