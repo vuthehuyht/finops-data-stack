@@ -46,10 +46,8 @@ class IndexPriceEodPipeline(BaseIngestPipeline):
                     end_date=self.batch_date,
                 )
                 if not df.empty:
-                    if (
-                        "INDEX_NAME" not in df.columns
-                        and "index_name" not in df.columns
-                    ):
+                    df = df.rename(columns={"time": "trading_date"})
+                    if "index_name" not in df.columns:
                         df["index_name"] = index
                     all_dfs.append(df)
             except Exception as e:

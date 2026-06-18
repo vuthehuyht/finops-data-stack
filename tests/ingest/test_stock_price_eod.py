@@ -39,6 +39,8 @@ def test_stock_price_eod_pipeline_fetch(mock_client_class: MagicMock) -> None:
     # Verify merged result and symbol injection
     assert len(result_df) == 2
     assert "ticker" in result_df.columns
+    assert "trading_date" in result_df.columns
+    assert "time" not in result_df.columns
     assert result_df.loc[result_df["ticker"] == "TCB", "close"].values[0] == 48.5
     assert result_df.loc[result_df["ticker"] == "FPT", "close"].values[0] == 135.2
 
@@ -57,8 +59,6 @@ def test_stock_price_eod_defaults_to_vn30_when_no_symbols(
     pipeline.fetch()
 
     called_symbols = [
-        call.kwargs["symbol"]
-        for call in mock_client.get_stock_price_eod.call_args_list
+        call.kwargs["symbol"] for call in mock_client.get_stock_price_eod.call_args_list
     ]
     assert called_symbols == DEFAULT_TICKER_SYMBOLS
-

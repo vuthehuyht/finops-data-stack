@@ -52,8 +52,8 @@ class StockPriceEodPipeline(BaseIngestPipeline):
                     end_date=self.batch_date,
                 )
                 if not df.empty:
-                    # Inject symbol column if not returned in target schema
-                    if "TICKER" not in df.columns and "symbol" not in df.columns:
+                    df = df.rename(columns={"time": "trading_date"})
+                    if "ticker" not in df.columns:
                         df["ticker"] = symbol
                     all_dfs.append(df)
             except Exception as e:

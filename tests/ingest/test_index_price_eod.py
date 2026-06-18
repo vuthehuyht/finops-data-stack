@@ -33,6 +33,8 @@ def test_index_price_eod_fetch_with_custom_symbols(
     )
     assert len(result_df) == 2
     assert "index_name" in result_df.columns
+    assert "trading_date" in result_df.columns
+    assert "time" not in result_df.columns
 
 
 @patch("src.ingest.pipeline.index_price_eod.VnStockClient")
