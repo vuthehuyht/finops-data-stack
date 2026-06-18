@@ -41,3 +41,7 @@ trim_trailing_whitespace = false
 # Terraform configuration
 [*.tf]
 indent_size = 2
+
+# Shell scripts
+[*.sh]
+indent_size = 2
