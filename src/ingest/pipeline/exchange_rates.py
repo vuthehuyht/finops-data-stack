@@ -86,4 +86,3 @@ class ExchangeRatesPipeline(BaseIngestPipeline):
             return pd.DataFrame()
 
         return pd.concat(all_dfs, ignore_index=True)
-
