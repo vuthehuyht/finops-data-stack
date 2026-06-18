@@ -3,7 +3,7 @@
 import pandas as pd
 
 from src.ingest.client.vnstock_client import VnStockClient
-from src.ingest.pipeline.base import BaseIngestPipeline
+from src.ingest.pipeline.base import DEFAULT_TICKER_SYMBOLS, BaseIngestPipeline
 
 
 class CorporateEventsPipeline(BaseIngestPipeline):
@@ -32,8 +32,9 @@ class CorporateEventsPipeline(BaseIngestPipeline):
         """Fetch corporate events for symbols on the batch date."""
         client = VnStockClient()
         all_dfs = []
+        targets = self.symbols or DEFAULT_TICKER_SYMBOLS
 
-        for symbol in self.symbols:
+        for symbol in targets:
             try:
                 stock_obj = client.client.stock(symbol=symbol, source="TCBS")
                 if not hasattr(stock_obj, "company"):

@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.ingest.pipeline.analyst_reports import AnalystReportsPipeline
+from src.ingest.pipeline.base import DEFAULT_TICKER_SYMBOLS
 
 _BATCH_DATE = "2026-06-18"
 
@@ -96,28 +97,32 @@ def test_fetch_concatenates_reports_for_multiple_symbols(
 # ---------------------------------------------------------------------------
 
 
+@patch.dict(os.environ, {"FIREANT_EMAIL": "u@test.com", "FIREANT_PASSWORD": "pass"})
 @patch("src.ingest.pipeline.analyst_reports.FireAntClient")
-def test_fetch_returns_empty_dataframe_when_no_symbols(
-    mock_client_class: MagicMock, monkeypatch
+def test_analyst_reports_defaults_to_vn30_when_no_symbols(
+    mock_client_class: MagicMock,
 ) -> None:
-    """fetch() returns empty DataFrame immediately when symbols list is empty."""
-    monkeypatch.setenv("FIREANT_EMAIL", "u@test.com")
-    monkeypatch.setenv("FIREANT_PASSWORD", "pass")
-
+    # Ensure fetch uses DEFAULT_TICKER_SYMBOLS when no symbols are explicitly specified
+    """Verify fetch uses DEFAULT_TICKER_SYMBOLS when symbols=[]."""
     mock_client = MagicMock()
     mock_client_class.return_value = mock_client
+    mock_client.get_reports.return_value = []
 
-    result = _make_pipeline([]).fetch()
+    pipeline = AnalystReportsPipeline(batch_date="2026-06-18")
+    pipeline.fetch()
 
-    mock_client.get_reports.assert_not_called()
-    assert result.empty
+    called_symbols = [
+        call.kwargs["symbol"]
+        for call in mock_client.get_reports.call_args_list
+    ]
+    assert called_symbols == DEFAULT_TICKER_SYMBOLS
 
 
 @patch("src.ingest.pipeline.analyst_reports.FireAntClient")
 def test_fetch_returns_empty_dataframe_when_no_reports_returned(
     mock_client_class: MagicMock, monkeypatch
 ) -> None:
-    """fetch() returns empty DataFrame when FireAnt returns no reports for any symbol."""
+    """fetch() returns empty DataFrame when FireAnt returns no reports."""
     monkeypatch.setenv("FIREANT_EMAIL", "u@test.com")
     monkeypatch.setenv("FIREANT_PASSWORD", "pass")
 
@@ -139,7 +144,7 @@ def test_fetch_returns_empty_dataframe_when_no_reports_returned(
 def test_fetch_uses_symbol_as_ticker_when_api_symbol_is_missing(
     mock_client_class: MagicMock, monkeypatch
 ) -> None:
-    """fetch() falls back to the loop symbol when 'symbol' key is absent in the report."""
+    """fetch() falls back to loop symbol when 'symbol' is absent in report."""
     monkeypatch.setenv("FIREANT_EMAIL", "u@test.com")
     monkeypatch.setenv("FIREANT_PASSWORD", "pass")
 
@@ -183,7 +188,7 @@ def test_fetch_raises_when_client_raises(
 def test_fetch_passes_env_credentials_to_client(
     mock_client_class: MagicMock, monkeypatch
 ) -> None:
-    """fetch() reads FIREANT_EMAIL and FIREANT_PASSWORD from env and passes to client."""
+    """fetch() passes FIREANT_EMAIL and FIREANT_PASSWORD to client."""
     monkeypatch.setenv("FIREANT_EMAIL", "real@user.com")
     monkeypatch.setenv("FIREANT_PASSWORD", "secret123")
 

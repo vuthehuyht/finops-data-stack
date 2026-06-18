@@ -5,7 +5,7 @@ import os
 import pandas as pd
 
 from src.ingest.client.fireant_client import FireAntClient
-from src.ingest.pipeline.base import BaseIngestPipeline
+from src.ingest.pipeline.base import DEFAULT_TICKER_SYMBOLS, BaseIngestPipeline
 
 
 class AnalystReportsPipeline(BaseIngestPipeline):
@@ -38,8 +38,9 @@ class AnalystReportsPipeline(BaseIngestPipeline):
             password=os.environ["FIREANT_PASSWORD"],
         )
         all_rows: list[dict] = []
+        targets = self.symbols or DEFAULT_TICKER_SYMBOLS
 
-        for symbol in self.symbols:
+        for symbol in targets:
             try:
                 reports = client.get_reports(
                     symbol=symbol,
