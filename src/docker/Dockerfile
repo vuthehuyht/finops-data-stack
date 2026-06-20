@@ -1,7 +1,8 @@
 ARG PYTHON_VERSION=3.12
-FROM python:${PYTHON_VERSION}-slim-bookworm
 
-# Install uv from the official image
+# Stage 1: builder — install deps and bake dbt packages
+FROM python:${PYTHON_VERSION}-slim-bookworm AS builder
+
 COPY --from=ghcr.io/astral-sh/uv:0.6 /uv /usr/local/bin/uv
 
 WORKDIR /app
@@ -10,18 +11,25 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --no-dev --no-group dagster --no-group ml --frozen --no-cache
 
-# Expose venv binaries (dagster, dbt, etc.)
 ENV PATH="/app/.venv/bin:$PATH"
-ENV PYTHONPATH=/app
 
-# Copy source code
 COPY src/ ./src/
 
-# Pre-bake dbt packages into the image (avoids fetching packages at runtime)
+# Pre-bake dbt packages (avoids fetching at runtime)
 WORKDIR /app/src/transform/dbt
 RUN dbt deps --log-path logs && rm -rf .user.yml logs
 
+# Stage 2: runtime — clean image without uv binary
+FROM python:${PYTHON_VERSION}-slim-bookworm
+
 WORKDIR /app
 
-# Serve the Dagster code location as a gRPC server on port 3030
+COPY --from=builder /app/.venv /app/.venv
+COPY --from=builder /app/src /app/src
+
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH=/app
+
+EXPOSE 3030
+
 CMD ["dagster", "api", "grpc", "--port", "3030", "-h", "0.0.0.0", "--module-name", "src.dagster"]
