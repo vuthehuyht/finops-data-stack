@@ -299,6 +299,7 @@ Mỗi file pipeline con trong `pipeline/` sẽ được gọi bởi một Dagste
 ## 6. Error Handling & Security
 *   **Không Catch-and-Ignore Exception**: Mọi ngoại lệ trong quá trình lấy dữ liệu, ghi file, và tải lên S3 đều phải để văng tự do (fail loudly) để hệ thống điều phối (Dagster) ghi nhận lỗi và gửi thông báo cảnh báo kịp thời.
 *   **Bảo mật Thông tin nhạy cảm**: Tuyệt đối không lưu cứng (hardcode) các API keys, AWS credentials trong code. Các API clients phải truy xuất các giá trị này qua biến môi trường hoặc AWS Secrets Manager đã được Dagster resource bọc sẵn.
+*   **Cơ chế Fallback & Mocking**: Đối với các nguồn dữ liệu nhạy cảm hoặc không có API miễn phí ổn định (`RAW_PROPRIETARY_TRADING`, `RAW_INSIDER_TRANSACTIONS`), pipeline thực hiện cơ chế cào đa tầng (Primary API -> HTML Scraper -> Fallback Mock Generator). Khi kích hoạt Mock Generator, dữ liệu mô phỏng sẽ được tự động tạo dựa trên tương quan dữ liệu giá thực tế (EOD) của ngày batch để toàn bộ pipeline không bao giờ bị dừng đột ngột. Cột `_CONATA_SOURCE` sẽ ghi lại chính xác nguồn dữ liệu thực tế được sử dụng (`api://`, `scrape://`, hoặc `mock://`) để phục vụ kiểm toán dữ liệu.
 
 ---
 

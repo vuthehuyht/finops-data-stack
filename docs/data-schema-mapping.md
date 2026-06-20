@@ -14,7 +14,7 @@ Dữ liệu giao dịch hàng ngày phản ánh cung cầu của thị trường
 | `raw_stock_price_eod` | `ticker`, `trading_date`, `open`, `high`, `low`, `close`, `volume`, `value`, `adjusted_close` | `vnstock` (SSI/TCBS API) | Daily (EOD) |
 | `raw_index_price_eod` | `index_name`, `trading_date`, `open`, `high`, `low`, `close`, `volume` | `vnstock` | Daily (EOD) |
 | `raw_foreign_trading` | `ticker`, `trading_date`, `buy_vol`, `sell_vol`, `buy_val`, `sell_val`, `net_val` | `vnstock` | Daily (EOD) |
-| `raw_proprietary_trading`| `ticker`, `trading_date`, `buy_vol`, `sell_vol`, `net_val` | FiinTrade / Vietstock | Daily (EOD) |
+| `raw_proprietary_trading`| `ticker`, `trading_date`, `buy_vol`, `sell_vol`, `net_val` | VNDIRECT / SSI (Fallback: Mock) | Daily (EOD) |
 
 ## 2. Dữ liệu Cơ bản (Fundamental Data)
 Dữ liệu sức khỏe tài chính dùng để tính toán giá trị nội tại.
@@ -46,7 +46,7 @@ Dữ liệu văn bản phục vụ trích xuất cảm xúc thị trường (Sen
 | :--- | :--- | :--- | :--- |
 | `raw_news_articles` | `article_id`, `ticker`, `publish_time`, `title`, `summary`, `content`, `source`, `url` | RSS Feeds / Web Scraping | Real-time / Daily |
 | `raw_corporate_events` | `event_id`, `ticker`, `event_type`, `ex_right_date`, `record_date`, `event_details` | VSD / CafeF | Daily |
-| `raw_insider_transactions`| `transaction_id`, `ticker`, `insider_name`, `position`, `action`, `registered_vol`, `executed_vol`, `date_start`, `date_end` | SSC / Vietstock | Daily |
+| `raw_insider_transactions`| `ticker`, `deal_announce_date`, `deal_method`, `deal_action`, `deal_quantity`, `deal_price`, `deal_ratio` | vnstock / CafeF (Fallback: Mock) | Daily |
 | `raw_analyst_reports` | `report_id`, `ticker`, `brokerage_firm`, `publish_date`, `title`, `description`, `file_name` | FireAnt API | Daily |
 
 ## 5. Metadata Quản trị Dữ liệu (Raw Layer)
