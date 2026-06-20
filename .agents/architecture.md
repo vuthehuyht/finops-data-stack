@@ -37,15 +37,15 @@ Data Mesh / Lakehouse architecture on AWS, orchestrated by **Dagster** (Software
 ```text
 src/
 ├── common/      # Shared AWS Utils, DB Utils, Logging
-├── dagster/     # Assets, Jobs, Sensors, Resources
+├── dagster/     # Primary Dagster assets, jobs, sensors, resources
 ├── ingest/      # Ingestion layer (Crawl/API -> S3)
 ├── load/        # Load layer (S3 -> Redshift)
 ├── transform/   # dbt project (transformation)
-├── pipeline/    # End-to-end processing flows
-├── ml/          # Machine Learning (Train/Inference)
-├── docker/      # Dockerfiles
-└── k8s/         # Kubernetes manifests
+├── pipeline/    # Legacy orchestration helpers (src/pipeline/dagster/ predates src/dagster/)
+├── k8s/         # Kubernetes manifests
 ```
+
+*(Note: `src/ml/` and `src/docker/` are planned but not yet created.)*
 
 ## Metadata Governance (names only, see docs for detail)
 
