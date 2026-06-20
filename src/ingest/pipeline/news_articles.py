@@ -5,6 +5,17 @@ import pandas as pd
 from src.ingest.client.vnstock_client import VnStockClient
 from src.ingest.pipeline.base import DEFAULT_TICKER_SYMBOLS, BaseIngestPipeline
 
+# vnstock v4 VCI column → schema column
+_COLUMN_MAP = {
+    "id": "article_id",
+    "news_title": "title",
+    "news_sub_title": "summary",
+    "news_full_content": "content",
+    "news_source": "source",
+    "news_source_link": "url",
+    "public_date": "publish_time",
+}
+
 
 class NewsArticlesPipeline(BaseIngestPipeline):
     """Pipeline to ingest corporate news articles into S3 Bronze."""
@@ -38,19 +49,19 @@ class NewsArticlesPipeline(BaseIngestPipeline):
 
         for symbol in targets:
             try:
-                stock_obj = client.client.stock(symbol=symbol, source="TCBS")
-                if not hasattr(stock_obj, "company"):
+                df = client.get_company_news(symbol)
+                if df.empty:
                     continue
 
-                df = client.call_api_with_retry(stock_obj.company.news)
-                if not df.empty:
-                    if "TICKER" not in df.columns and "symbol" not in df.columns:
-                        df["ticker"] = symbol
-                    all_dfs.append(df)
+                df = df.rename(columns=_COLUMN_MAP)
+
+                # Inject ticker when VCI returns None
+                if "ticker" not in df.columns or df["ticker"].isna().all():
+                    df["ticker"] = symbol
+
+                all_dfs.append(df)
             except Exception as e:
-                self.logger.error(
-                    "Failed to fetch news for %s: %s", symbol, e
-                )
+                self.logger.error("Failed to fetch news for %s: %s", symbol, e)
                 raise e
 
         if not all_dfs:

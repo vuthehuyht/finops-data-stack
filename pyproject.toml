@@ -14,7 +14,7 @@ dependencies = [
     "dagster-dbt",
     "dagster-pandas",
     "dbt-redshift>=1.9.0",
-    "vnstock3>=1.0.0",
+    "vnstock>=4.0.4",
     "pandas>=2.2.0",
     "httpx>=0.27.0",
     "boto3>=1.34.0",

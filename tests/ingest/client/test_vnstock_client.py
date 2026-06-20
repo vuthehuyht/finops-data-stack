@@ -25,7 +25,7 @@ def test_vnstock_client_get_stock_price_eod_calls_correct_symbol_and_source(
         symbol="TCB", start_date="2026-06-18", end_date="2026-06-18"
     )
 
-    mock_vnstock.stock.assert_called_once_with(symbol="TCB", source="TCBS")
+    mock_vnstock.stock.assert_called_once_with(symbol="TCB", source="VCI")
 
 
 @patch("src.ingest.client.vnstock_client.Vnstock")
@@ -54,10 +54,10 @@ def test_vnstock_client_get_stock_price_eod_calls_quote_history_with_dates(
 
 
 @patch("src.ingest.client.vnstock_client.Vnstock")
-def test_vnstock_client_get_stock_price_eod_default_source_is_tcbs(
+def test_vnstock_client_get_stock_price_eod_default_source_is_vci(
     mock_vnstock_class: MagicMock,
 ) -> None:
-    """Verify get_stock_price_eod defaults to source='TCBS' when not specified."""
+    """Verify get_stock_price_eod defaults to source='VCI' when not specified."""
     mock_vnstock = MagicMock()
     mock_vnstock_class.return_value = mock_vnstock
     mock_vnstock.stock.return_value = MagicMock()
@@ -68,7 +68,7 @@ def test_vnstock_client_get_stock_price_eod_default_source_is_tcbs(
     )
 
     _, call_kwargs = mock_vnstock.stock.call_args
-    assert call_kwargs["source"] == "TCBS"
+    assert call_kwargs["source"] == "VCI"
 
 
 @patch("src.ingest.client.vnstock_client.Vnstock")
@@ -82,11 +82,11 @@ def test_vnstock_client_get_stock_price_eod_accepts_custom_source(
 
     client = VnStockClient(request_delay_seconds=0.0)
     client.get_stock_price_eod(
-        symbol="VNM", start_date="2026-06-18", end_date="2026-06-18", source="SSI"
+        symbol="VNM", start_date="2026-06-18", end_date="2026-06-18", source="KBS"
     )
 
     _, call_kwargs = mock_vnstock.stock.call_args
-    assert call_kwargs["source"] == "SSI"
+    assert call_kwargs["source"] == "KBS"
 
 
 @patch("src.ingest.client.vnstock_client.Vnstock")
@@ -112,3 +112,40 @@ def test_vnstock_client_inherits_base_client(_mock_vnstock_class: MagicMock) -> 
     """Verify VnStockClient is a subclass of BaseClient."""
     client = VnStockClient()
     assert isinstance(client, BaseClient)
+
+
+@patch("src.ingest.client.vnstock_client.Vnstock")
+def test_vnstock_client_get_company_news_returns_dataframe(
+    mock_vnstock_class: MagicMock,
+) -> None:
+    """Verify get_company_news returns the DataFrame from company.news()."""
+    mock_vnstock = MagicMock()
+    mock_vnstock_class.return_value = mock_vnstock
+    mock_stock_obj = MagicMock()
+    mock_vnstock.stock.return_value = mock_stock_obj
+
+    mock_df = pd.DataFrame({"id": ["abc123"], "news_title": ["Test news"]})
+    mock_stock_obj.company.news.return_value = mock_df
+
+    client = VnStockClient(request_delay_seconds=0.0)
+    result = client.get_company_news("TCB")
+
+    mock_vnstock.stock.assert_called_once_with(symbol="TCB", source="VCI")
+    mock_stock_obj.company.news.assert_called_once()
+    assert result.equals(mock_df)
+
+
+@patch("src.ingest.client.vnstock_client.Vnstock")
+def test_vnstock_client_get_company_news_propagates_error(
+    mock_vnstock_class: MagicMock,
+) -> None:
+    """Verify get_company_news propagates API errors."""
+    mock_vnstock = MagicMock()
+    mock_vnstock_class.return_value = mock_vnstock
+    mock_stock_obj = MagicMock()
+    mock_vnstock.stock.return_value = mock_stock_obj
+    mock_stock_obj.company.news.side_effect = ConnectionError("404 Not Found")
+
+    client = VnStockClient(request_delay_seconds=0.0)
+    with pytest.raises(ConnectionError, match="404 Not Found"):
+        client.get_company_news("TCB")
