@@ -55,6 +55,11 @@ class StockPriceEodPipeline(BaseIngestPipeline):
                     df = df.rename(columns={"time": "trading_date"})
                     if "ticker" not in df.columns:
                         df["ticker"] = symbol
+                    # vnstock v4 VCI/KBS does not return value or adjusted_close
+                    if "value" not in df.columns:
+                        df["value"] = None
+                    if "adjusted_close" not in df.columns:
+                        df["adjusted_close"] = None
                     all_dfs.append(df)
             except Exception as e:
                 self.logger.error("Failed to fetch EOD price for %s: %s", symbol, e)

@@ -2,8 +2,7 @@
 
 import pandas as pd
 
-from src.ingest.client.vnstock_client import VnStockClient
-from src.ingest.pipeline.base import DEFAULT_TICKER_SYMBOLS, BaseIngestPipeline
+from src.ingest.pipeline.base import BaseIngestPipeline
 
 
 class ProprietaryTradingPipeline(BaseIngestPipeline):
@@ -28,35 +27,14 @@ class ProprietaryTradingPipeline(BaseIngestPipeline):
         ]
 
     def fetch(self) -> pd.DataFrame:
-        """Fetch proprietary trading logs for symbols on the batch date."""
-        client = VnStockClient()
-        all_dfs = []
-        targets = self.symbols or DEFAULT_TICKER_SYMBOLS
+        """Fetch proprietary trading logs for symbols on the batch date.
 
-        for symbol in targets:
-            try:
-                stock_obj = client.client.stock(symbol=symbol, source="TCBS")
-                if not hasattr(stock_obj, "trading"):
-                    continue
-
-                df = client.call_api_with_retry(
-                    stock_obj.trading.proprietary_flow,
-                    start=self.batch_date,
-                    end=self.batch_date,
-                )
-                if not df.empty:
-                    if "TICKER" not in df.columns and "symbol" not in df.columns:
-                        df["ticker"] = symbol
-                    all_dfs.append(df)
-            except Exception as e:
-                self.logger.error(
-                    "Failed to fetch proprietary trading for %s: %s",
-                    symbol,
-                    e,
-                )
-                raise e
-
-        if not all_dfs:
-            return pd.DataFrame()
-
-        return pd.concat(all_dfs, ignore_index=True)
+        Not implemented: vnstock v4 prop_trade() is a stub (not yet released),
+        and TCBS public API endpoints for this data return 404.
+        A paid source (FiinTrade / Vietstock) is required.
+        """
+        raise NotImplementedError(
+            "ProprietaryTradingPipeline.fetch() requires a paid data source "
+            "(FiinTrade or Vietstock). vnstock v4 prop_trade() is not yet implemented "
+            "for any supported source (VCI, KBS)."
+        )
