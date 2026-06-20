@@ -314,7 +314,7 @@ Mỗi file pipeline con trong `pipeline/` sẽ được gọi bởi một Dagste
 *   `test_fireant_client.py`: Mocks `requests` to verify login auth flow and paginated report fetching.
 
 **Pipeline tests** (`tests/ingest/`):
-*   `test_base_pipeline.py`: Uses a concrete test subclass of `BaseIngestPipeline` to verify: column uppercasing, `schema_columns` filtering, missing-column fill-with-None, `_CONATA_*` metadata injection, and S3 upload path format (boto3 mocked via `moto`).
+*   `test_base_pipeline.py`: Uses a concrete test subclass of `BaseIngestPipeline` to verify: column uppercasing, `schema_columns` filtering, missing-column fill-with-None, `_CONATA_*` metadata injection, and S3 upload path format (boto3 mocked via `unittest.mock.patch`).
 *   Per-pipeline files (`test_stock_price_eod_pipeline.py`, `test_balance_sheet_pipeline.py`, etc.): Each verifies the `fetch()` implementation for that pipeline using mocked clients.
 
 ### Lệnh thực thi
