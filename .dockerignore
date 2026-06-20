@@ -1,0 +1,17 @@
+.venv/
+.venv312/
+__pycache__/
+*.pyc
+*.pyo
+.git/
+.github/
+docs/
+tests/
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+src/transform/dbt/dbt_packages/
+src/transform/dbt/logs/
+src/transform/dbt/.user.yml
