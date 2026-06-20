@@ -1,6 +1,6 @@
 # FinOps Data Stack — Coding Rules
 
-> Coding conventions for `src/`. The project is currently at skeleton stage — these are conventions set in advance (to-be), to be reviewed once the first real code lands (Phase 2 in `docs/architecture-design.md`).
+> Coding conventions for `src/`.
 
 ## Python style
 
