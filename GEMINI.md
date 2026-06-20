@@ -22,7 +22,8 @@ This file serves as the main context entrypoint for AI Agents. It provides a com
 - **Directory Layout (Flywheel Architecture)**:
   - `src/common/` — Shared AWS Utils, DB Utils, Logging.
   - `src/dagster/` — Software-Defined Assets, Jobs, Sensors, Resources.
-  - `src/load/` — Ingestion layer (Crawl/API -> S3).
+  - `src/ingest/` — Ingestion layer (Crawl/API -> S3).
+  - `src/load/` — Load layer (S3 -> Redshift).
   - `src/transform/` — dbt project (transformation).
   - `src/ml/` — Machine Learning training and inference scripts.
   - `src/pipeline/` — End-to-end processing flows.
@@ -48,6 +49,10 @@ This file serves as the main context entrypoint for AI Agents. It provides a com
 - **Formatting**: Use CTEs (Common Table Expressions) instead of nested subqueries. The final CTE must be named `final` or `select_final`.
 - **Naming**: Database columns and table aliases must be in UPPERCASE. dbt models: `STG_<entity>` for staging (e.g. `STG_STOCK_PRICE_EOD`), `fct_`/`dim_` for marts.
 - **Testing**: Every model must have a `.yml` file with at least `unique` and `not_null` tests on the primary key.
+
+### C. Subagent Execution Rules
+- **Superpowers Subagent Permissions**: When executing using the subagent skill of superpowers, set full execution permissions (`enable_write_tools = true`, `enable_subagent_tools = true`, `enable_mcp_tools = true`) without asking the user.
+
 
 ---
 

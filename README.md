@@ -24,7 +24,8 @@ finops-data-stack/
 ├── src/                       # Flywheel Core (Mã nguồn xử lý dữ liệu)
 │   ├── common/                # AWS Utils, DB Utils, Logging
 │   ├── dagster/               # Logic điều phối (Assets, Jobs, Sensors)
-│   ├── load/                  # Ingestion layer (Crawl/API -> S3)
+│   ├── ingest/                # Ingestion layer (Crawl/API -> S3)
+│   ├── load/                  # Load layer (Logic nạp từ S3 vào Redshift)
 │   ├── transform/             # dbt Project (Transformation)
 │   ├── pipeline/              # Luồng xử lý end-to-end
 │   ├── ml/                    # Machine Learning (Train/Inference)

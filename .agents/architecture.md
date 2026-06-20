@@ -38,7 +38,8 @@ Data Mesh / Lakehouse architecture on AWS, orchestrated by **Dagster** (Software
 src/
 ├── common/      # Shared AWS Utils, DB Utils, Logging
 ├── dagster/     # Assets, Jobs, Sensors, Resources
-├── load/        # Ingestion layer (Crawl/API -> S3)
+├── ingest/      # Ingestion layer (Crawl/API -> S3)
+├── load/        # Load layer (S3 -> Redshift)
 ├── transform/   # dbt project (transformation)
 ├── pipeline/    # End-to-end processing flows
 ├── ml/          # Machine Learning (Train/Inference)

@@ -28,6 +28,7 @@ storage/
 target/
 dbt_packages/
 logs/
+.user.yml
 
 # ML
 *.tar.gz

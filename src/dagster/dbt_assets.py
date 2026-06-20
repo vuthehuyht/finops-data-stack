@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+import datetime
 import functools
+import json
 import logging
 import os
 import pathlib
 import re
-import datetime
-import json
 from collections.abc import Iterator, Mapping
 from typing import Any
 
@@ -17,10 +17,10 @@ import dagster_dbt
 from dagster_dbt import dagster_dbt_translator
 from slack_sdk.web.client import WebClient
 
+import src.dagster.environment as environment
 import src.pipeline.dagster as dagster_lib
 from src.dagster import resources
-import src.dagster.environment as environment
-from src.pipeline.dagster.k8s import kubernetes_cluster_name, on_k8s
+from src.pipeline.dagster.k8s import kubernetes_cluster_name
 
 _PROJECT_ROOT = pathlib.Path(__file__).parent.parent.parent
 DBT_PROJECT_DIR = _PROJECT_ROOT / "src" / "transform" / "dbt"
@@ -218,7 +218,9 @@ def _build_dbt_args(
     }
 
     if dbt_config.days_offset_for_output_diff is not None:
-        variables["days_offset_for_output_diff"] = dbt_config.days_offset_for_output_diff
+        variables["days_offset_for_output_diff"] = (
+            dbt_config.days_offset_for_output_diff
+        )
     if dbt_config.variables:
         variables.update(dbt_config.variables)
 
@@ -242,8 +244,12 @@ def _build_dbt_args(
         dbt_args.append("--empty")
 
     if dbt_config.use_prod_upstream and not environment.is_prod():
-        prod_compile_path = f"{os.environ.get('DBT_TARGET_PATH', 'target')}/prod_compile_artifacts"
-        context.log.info("Compiling dbt projects for prod to refer prod tables for upstream dependencies.")
+        prod_compile_path = (
+            f"{os.environ.get('DBT_TARGET_PATH', 'target')}/prod_compile_artifacts"
+        )
+        context.log.info(
+            "Compiling dbt projects for prod to refer prod tables for upstream dependencies."
+        )
         _compile_dbt(context, dbt, prod_compile_path)
         dbt_args += [
             "--defer",
@@ -279,7 +285,9 @@ def send_full_refresh_notification(
         slack_token = os.getenv("DAGSTER_SLACK_API_TOKEN")
         if not slack_token:
             if logger:
-                logger.warning("DAGSTER_SLACK_API_TOKEN not set, skipping Slack notification.")
+                logger.warning(
+                    "DAGSTER_SLACK_API_TOKEN not set, skipping Slack notification."
+                )
             return
         slack = WebClient(slack_token)
         plain_text = f"{asset_key.parts[-1]} has been fully refreshed."
@@ -322,15 +330,19 @@ def _process_dbt_event(
         ):
             yield dagster_event
         elif isinstance(dagster_event, dagster.AssetMaterialization):
-            context.log.info(f"Skipping AssetMaterialization event: {dagster_event.asset_key.to_user_string()}.")
+            context.log.info(
+                f"Skipping AssetMaterialization event: {dagster_event.asset_key.to_user_string()}."
+            )
         elif isinstance(dagster_event, dagster.Output):
-            context.log.info(f"Skipping Output event: {dagster_event.output_name.replace('__', '/')}.")
+            context.log.info(
+                f"Skipping Output event: {dagster_event.output_name.replace('__', '/')}."
+            )
     elif isinstance(dagster_event, dagster.Output):
         is_prod_env = os.getenv("DAGSTER_WORKSPACE_ENVIRONMENT") == "prod"
         asset_key = dagster.AssetKey(
             dagster_event.output_name.split("__", 2 if is_prod_env else 3)
         )
-        
+
         metadata = {}
         try:
             metadata = get_dbt_asset_dependency().specs_by_key[asset_key].metadata
@@ -338,8 +350,10 @@ def _process_dbt_event(
             pass
 
         is_view = metadata.get("dagster-dbt/materialization_type", "") == "view"
-        row_count = None if is_view else fetch_row_count(asset_key, redshift, context.log)
-        
+        row_count = (
+            None if is_view else fetch_row_count(asset_key, redshift, context.log)
+        )
+
         context.add_output_metadata(
             metadata={
                 "full_refresh": dbt_config.full_refresh,
@@ -352,14 +366,22 @@ def _process_dbt_event(
         )
 
         table_name = metadata.get("dagster/table_name", asset_key.path[-1])
-        expected_updates_per_day = get_expected_update_count_before_materialize(metadata) if metadata else 1
-        update_count = fetch_update_count_from_entity_status_table(table_name, redshift, context)
+        expected_updates_per_day = (
+            get_expected_update_count_before_materialize(metadata) if metadata else 1
+        )
+        update_count = fetch_update_count_from_entity_status_table(
+            table_name, redshift, context
+        )
 
         if should_materialize(expected_updates_per_day, update_count):
-            context.log.info(f"should_materialize({expected_updates_per_day}, {update_count}) == True")
+            context.log.info(
+                f"should_materialize({expected_updates_per_day}, {update_count}) == True"
+            )
             yield dagster_event
         else:
-            context.log.info(f"Skipped because should_materialize({expected_updates_per_day}, {update_count}) == False")
+            context.log.info(
+                f"Skipped because should_materialize({expected_updates_per_day}, {update_count}) == False"
+            )
     else:
         yield dagster_event
 

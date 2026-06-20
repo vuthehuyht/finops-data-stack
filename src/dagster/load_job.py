@@ -196,7 +196,17 @@ def _create_load_sensor(
             if s3_meta is None:
                 continue
             s3_url = str(s3_meta.value)
-            batch_date = s3_url.rstrip("/").rsplit("/", 1)[-1]
+            if not s3_url:
+                continue
+            batch_date_meta = materialization.metadata.get("batch_date")
+            if batch_date_meta is None:
+                context.log.warning(
+                    "Asset %s materialized without batch_date metadata. "
+                    "Skipping load trigger.",
+                    key,
+                )
+                continue
+            batch_date = str(batch_date_meta.value)
             job = input_to_job[key]
             asset = input_to_asset[key]
             yield dagster.RunRequest(
