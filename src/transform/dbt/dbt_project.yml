@@ -35,6 +35,11 @@ vars:
   batch_date: ""
   dagster_job_name: ""
 
+sources:
+  transform:
+    RAW:
+      +schema: "{{ env_var('REDSHIFT_SCHEMA_RAW', 'RAW') }}"
+
 models:
   +persist_docs:
     relation: true

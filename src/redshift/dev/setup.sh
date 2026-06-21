@@ -19,7 +19,7 @@ uv run python ddl_executor.py \
     \"schema_name_function\": \"${REDSHIFT_SCHEMA_FUNCTION:-DB_UTILS}\",
     \"schema_name_operation\": \"${REDSHIFT_SCHEMA_OPERATION:-OPERATION}\",
     \"schema_name_raw\": \"${REDSHIFT_SCHEMA_RAW:-RAW}\",
-    \"schema_name_dwh\": \"${REDSHIFT_SCHEMA_DWH:-DWH}\",
+    \"schema_name_staging\": \"${REDSHIFT_STAGING_SCHEMA:-DEV_STAGING}\",
     \"schema_name_mart\": \"${REDSHIFT_SCHEMA_MART:-MART}\",
     \"schema_name_logs\": \"${REDSHIFT_SCHEMA_LOGS:-LOGS}\"
   }" \
