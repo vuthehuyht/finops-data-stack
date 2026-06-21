@@ -40,8 +40,6 @@ models:
     relation: true
     columns: true
   transform:
-    +pre-hook: |
-      {{ add_query_tag() }}
     +tmp_relation_type: table
     STG:
       +schema: "{{ env_var('REDSHIFT_STAGING_SCHEMA', 'DEV_STAGING') }}"
