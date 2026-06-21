@@ -8,7 +8,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.6 /uv /usr/local/bin/uv
 WORKDIR /app
 
 # Install Python dependencies — exclude dev, dagster (webserver UI), and ml groups
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --no-dev --no-group dagster --no-group ml --frozen --no-cache
 
 ENV PATH="/app/.venv/bin:$PATH"
