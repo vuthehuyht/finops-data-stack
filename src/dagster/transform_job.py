@@ -338,9 +338,7 @@ def _create_sensor_for_mart_jobs(
                         run_key=run_key,
                         run_config=RunConfig(
                             resources={
-                                "dbt_config": DbtConfigResource(
-                                    variables=dbt_vars
-                                )
+                                "dbt_config": DbtConfigResource(variables=dbt_vars)
                             }
                         ),
                     )
@@ -403,4 +401,3 @@ def define_mart_jobs() -> MartJobBundle:
         )
 
     return bundle
-

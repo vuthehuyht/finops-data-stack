@@ -35,13 +35,14 @@ def mock_dbt_dependency():
         mock_spec = MagicMock()
         mock_spec.deps = []
         specs[key] = mock_spec
-        
+
     mock_dbt_deps = MagicMock()
     mock_dbt_deps.specs_by_key = specs
-    
-    with patch("src.dagster.dbt_assets.get_dbt_asset_dependency", return_value=mock_dbt_deps):
-        yield mock_dbt_deps
 
+    with patch(
+        "src.dagster.dbt_assets.get_dbt_asset_dependency", return_value=mock_dbt_deps
+    ):
+        yield mock_dbt_deps
 
 
 def test_trigger_type_values() -> None:
@@ -108,9 +109,7 @@ def test_transform_schedule_evaluates() -> None:
         pass
 
     mock_job = dagster_lib.define_asset_job("test_job", selection=[dummy_asset])
-    schedule_def = _make_transform_schedule(
-        mock_job, "test_job", "0 0 * * *"
-    )
+    schedule_def = _make_transform_schedule(mock_job, "test_job", "0 0 * * *")
     context = build_schedule_context(
         scheduled_execution_time=datetime.datetime(2026, 6, 17, 12, 0, 0)
     )

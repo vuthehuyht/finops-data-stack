@@ -112,8 +112,7 @@ def test_analyst_reports_defaults_to_vn30_when_no_symbols(
     pipeline.fetch()
 
     called_symbols = [
-        call.kwargs["symbol"]
-        for call in mock_client.get_reports.call_args_list
+        call.kwargs["symbol"] for call in mock_client.get_reports.call_args_list
     ]
     assert called_symbols == DEFAULT_TICKER_SYMBOLS
 

@@ -10,9 +10,7 @@ def test_is_prod() -> None:
     ):
         assert environment.is_prod() is True
 
-    with unittest.mock.patch.dict(
-        os.environ, {"DAGSTER_WORKSPACE_ENVIRONMENT": "dev"}
-    ):
+    with unittest.mock.patch.dict(os.environ, {"DAGSTER_WORKSPACE_ENVIRONMENT": "dev"}):
         assert environment.is_prod() is False
 
     with unittest.mock.patch.dict(os.environ, {}, clear=True):

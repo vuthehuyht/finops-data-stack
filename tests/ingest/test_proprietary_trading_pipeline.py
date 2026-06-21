@@ -90,7 +90,7 @@ def test_proprietary_trading_pipeline_mock_fallback(mocker) -> None:
 
     # Mock requests.get to fail for all APIs
     mocker.patch("requests.get", side_effect=Exception("API Down"))
-    
+
     # Mock vnstock Quote history to return a valid DataFrame to test EOD-based mock
     mock_df_hist = pd.DataFrame([{"volume": 1000000, "close": 30.5}])
     mock_quote_instance = MagicMock()
