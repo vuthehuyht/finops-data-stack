@@ -34,6 +34,9 @@ jobs:
     needs: check-dbt-paths
     if: github.event_name != 'pull_request' || needs.check-dbt-paths.outputs.dbt_related == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
 
     services:
       postgres:
