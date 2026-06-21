@@ -457,5 +457,5 @@ def get_dbt_project_assets(
 # Asset Job executing all dbt assets
 dbt_build_job = dagster_lib.define_asset_job(
     name="dbt_build_job",
-    selection=dagster.AssetSelection.assets("dbt_project_assets"),
+    selection=dagster.AssetSelection.assets(get_dbt_project_assets()),
 )
