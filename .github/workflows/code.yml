@@ -50,12 +50,11 @@ jobs:
 
       # Ruff checks with Reviewdog annotations
       - name: Ruff Check with Reviewdog
-        uses: reviewdog/action-ruff@v1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          reporter: github-pr-review
-          filter_mode: diff_context
-          fail_on_error: true
+        env:
+          REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          uv run ruff check --output-format=concise src/ tests/ | \
+            reviewdog -efm="%f:%l:%c: %m" -name="ruff" -reporter=github-pr-review -filter-mode=diff_context -fail-on-error
 
       # Python static type check with mypy within uv virtualenv
       - name: Run mypy with Reviewdog
@@ -84,7 +83,7 @@ jobs:
 
       # Markdown documents format verification
       - name: Markdownlint with Reviewdog
-        uses: reviewdog/action-markdownlint@v3
+        uses: reviewdog/action-markdownlint@v0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-review
