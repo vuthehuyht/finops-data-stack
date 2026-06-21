@@ -16,7 +16,6 @@ import src.pipeline.dagster as dagster_lib
 from src.dagster.transform_job import (
     _STAGING_JOB_DEFINITION_FILE,
     SilverJobBundle,
-    TransformJobParameter,
     TriggerType,
     _create_sensor_for_jobs,
     _get_upstream_bronze_key,

@@ -1,4 +1,5 @@
 {%- macro add_query_tag() -%}
+{%- if target.type == 'redshift' -%}
   {% set query_tag = {} %}
   {% set materialized = config.get('materialized') %}
   {{ update_query_tag(query_tag, 'dagster_job_name', var('dagster_job_name')) }}
@@ -7,6 +8,7 @@
   {{ update_query_tag(query_tag, 'schema', this.schema) }}
   {{ update_query_tag(query_tag, 'identifier', this.identifier) }}
   {% do run_query("SET query_group TO '" ~ query_tag | tojson | replace("'", "''") ~ "'") %}
+{%- endif -%}
 {%- endmacro -%}
 
 
