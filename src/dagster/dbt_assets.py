@@ -1,7 +1,5 @@
 """dbt assets configuration for Redshift."""
 
-from __future__ import annotations
-
 import datetime
 import functools
 import json
@@ -14,7 +12,6 @@ from typing import Any
 
 import dagster
 import dagster_dbt
-from dagster import AssetExecutionContext
 from dagster_dbt import dagster_dbt_translator
 from slack_sdk.web.client import WebClient
 
@@ -422,7 +419,7 @@ def get_dbt_project_assets(
         exclude=exclude,
     )
     def dbt_project_assets(
-        context: AssetExecutionContext,
+        context: dagster.AssetExecutionContext,
         dbt: dagster_dbt.DbtCliResource,
         dbt_config: resources.DbtConfigResource,
         redshift: resources.RedshiftResource,

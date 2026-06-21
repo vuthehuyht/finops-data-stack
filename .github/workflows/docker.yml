@@ -1,4 +1,4 @@
-name: Check Docker
+﻿name: Check Docker
 
 on:
   pull_request:
@@ -65,7 +65,7 @@ jobs:
       - name: Verify that the Dagster workspace can be loaded
         run: |
           docker run --rm finops-data-stack:ci \
-            python -c "from src.dagster.workspace import defs; print(f'Loaded {len(list(defs.get_all_asset_specs()))} assets')"
+            python -c "from src.dagster.workspace import defs; print(f'Loaded {len(list(defs.assets_defs_by_key))} assets')"
 
       - name: Verify that the Dagster gRPC server can start
         run: |
