@@ -8,9 +8,10 @@
   {{ update_query_tag(query_tag, 'schema', this.schema) }}
   {{ update_query_tag(query_tag, 'identifier', this.identifier) }}
   {% do run_query("SET query_group TO '" ~ query_tag | tojson | replace("'", "''") ~ "'") %}
+{%- else -%}
+  SELECT 1
 {%- endif -%}
 {%- endmacro -%}
-
 
 {%- macro update_query_tag(query_tag, key, value) -%}
   {% if value is not none %}
