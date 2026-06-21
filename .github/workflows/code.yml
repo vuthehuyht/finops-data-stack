@@ -114,6 +114,13 @@ jobs:
           tool_name: ruff format
           fail_level: any
 
+      # Generate dbt manifest so tests that import dbt_assets can find manifest.json
+      - name: Generate dbt manifest
+        working-directory: src/transform/dbt
+        run: |
+          uv run dbt deps --profiles-dir . --log-path /tmp/dbt-logs
+          uv run dbt parse --profiles-dir . --log-path /tmp/dbt-logs
+
       # Run unit test suite
       - name: Run pytest (Python Unit Tests)
         run: uv run pytest tests/
