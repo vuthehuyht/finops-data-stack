@@ -2,19 +2,9 @@ name: Check Docker
 
 on:
   pull_request:
-    paths:
-      - 'src/docker/**'
-      - '.github/workflows/docker.yml'
-      - 'pyproject.toml'
-      - 'uv.lock'
   push:
     branches:
       - main
-    paths:
-      - 'src/docker/**'
-      - '.github/workflows/docker.yml'
-      - 'pyproject.toml'
-      - 'uv.lock'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

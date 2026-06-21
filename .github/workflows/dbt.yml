@@ -85,7 +85,7 @@ jobs:
           reviewdog_version: 'v0.20.1'
 
       - name: Run Redshift DDL Setup
-        run: ./src/redshift/dev/setup.sh --skip_confirmation
+        run: bash ./src/redshift/dev/setup.sh --skip_confirmation
 
       - name: Fetch Main dbt Manifest & Run dbt Build (Incremental)
         id: dbt_build
@@ -133,4 +133,4 @@ jobs:
 
       - name: Run Redshift DDL Teardown
         if: always()
-        run: ./src/redshift/dev/teardown.sh --skip_confirmation
+        run: bash ./src/redshift/dev/teardown.sh --skip_confirmation
