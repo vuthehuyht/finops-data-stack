@@ -2,7 +2,7 @@ version: 2
 sources:
   - name: RAW
     description: Raw data source for RAW
-    schema: RAW
+    schema: "{{ env_var('REDSHIFT_SCHEMA_RAW', 'RAW') }}"
     tables:
       - name: RAW_EXCHANGE_RATES
         description: Raw data source for RAW_EXCHANGE_RATES
