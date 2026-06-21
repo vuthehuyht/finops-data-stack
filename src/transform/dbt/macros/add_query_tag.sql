@@ -3,7 +3,6 @@
   {% set materialized = config.get('materialized') %}
   {{ update_query_tag(query_tag, 'dagster_job_name', var('dagster_job_name')) }}
   {{ update_query_tag(query_tag, 'materialized', materialized) }}
-  {{ update_query_tag(query_tag, 'full_refresh', flags.FULL_REFRESH) }}
   {{ update_query_tag(query_tag, 'database', this.database) }}
   {{ update_query_tag(query_tag, 'schema', this.schema) }}
   {{ update_query_tag(query_tag, 'identifier', this.identifier) }}

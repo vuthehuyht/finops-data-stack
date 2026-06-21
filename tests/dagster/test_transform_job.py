@@ -1,4 +1,4 @@
-import datetime
+﻿import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -14,7 +14,7 @@ from dagster import (
 
 import src.pipeline.dagster as dagster_lib
 from src.dagster.transform_job import (
-    _SILVER_JOB_DEFINITION_FILE,
+    _STAGING_JOB_DEFINITION_FILE,
     SilverJobBundle,
     TransformJobParameter,
     TriggerType,
@@ -28,7 +28,7 @@ from src.dagster.transform_job import (
 
 @pytest.fixture(autouse=True)
 def mock_dbt_dependency():
-    silver_params = list(read_transform_job_parameter(_SILVER_JOB_DEFINITION_FILE))
+    silver_params = list(read_transform_job_parameter(_STAGING_JOB_DEFINITION_FILE))
     specs = {}
     for param in silver_params:
         key = AssetKey([param.schema_suffix, param.table_name.upper()])
@@ -56,7 +56,7 @@ def test_get_upstream_bronze_key() -> None:
 
 
 def test_get_upstream_bronze_key_all_models() -> None:
-    params = list(read_transform_job_parameter(_SILVER_JOB_DEFINITION_FILE))
+    params = list(read_transform_job_parameter(_STAGING_JOB_DEFINITION_FILE))
     for p in params:
         key = _get_upstream_bronze_key(p.table_name)
         assert key.path[0] == "RAW"
@@ -64,21 +64,21 @@ def test_get_upstream_bronze_key_all_models() -> None:
 
 
 def test_read_transform_job_parameter_count() -> None:
-    params = list(read_transform_job_parameter(_SILVER_JOB_DEFINITION_FILE))
+    params = list(read_transform_job_parameter(_STAGING_JOB_DEFINITION_FILE))
     assert len(params) == 17
 
 
 def test_read_transform_job_parameter_first_row() -> None:
-    params = list(read_transform_job_parameter(_SILVER_JOB_DEFINITION_FILE))
+    params = list(read_transform_job_parameter(_STAGING_JOB_DEFINITION_FILE))
     first = params[0]
-    assert first.schema_suffix == "SILVER"
+    assert first.schema_suffix == "STAGING"
     assert first.table_name == "stg_stock_price_eod"
     assert first.trigger_type == TriggerType.Sensor
     assert first.trigger_parameter == ""
 
 
 def test_read_transform_job_parameter_all_sensor() -> None:
-    params = list(read_transform_job_parameter(_SILVER_JOB_DEFINITION_FILE))
+    params = list(read_transform_job_parameter(_STAGING_JOB_DEFINITION_FILE))
     assert all(p.trigger_type == TriggerType.Sensor for p in params)
 
 
@@ -93,9 +93,9 @@ def test_define_silver_jobs_returns_bundle() -> None:
 def test_define_silver_jobs_asset_keys() -> None:
     bundle = define_silver_jobs()
     job_names = {j.name for j in bundle.jobs}
-    assert "transform_SILVER__STG_STOCK_PRICE_EOD_job" in job_names
-    assert "transform_SILVER__STG_BALANCE_SHEET_job" in job_names
-    assert "transform_SILVER__STG_ANALYST_REPORTS_job" in job_names
+    assert "transform_STAGING__STG_STOCK_PRICE_EOD_job" in job_names
+    assert "transform_STAGING__STG_BALANCE_SHEET_job" in job_names
+    assert "transform_STAGING__STG_ANALYST_REPORTS_job" in job_names
 
 
 def test_define_silver_jobs_sensor_name() -> None:
@@ -104,7 +104,7 @@ def test_define_silver_jobs_sensor_name() -> None:
 
 
 def test_transform_schedule_evaluates() -> None:
-    @dagster_lib.asset(key=AssetKey(["SILVER", "TEST"]))
+    @dagster_lib.asset(key=AssetKey(["STAGING", "TEST"]))
     def dummy_asset() -> None:
         pass
 
@@ -120,17 +120,17 @@ def test_transform_schedule_evaluates() -> None:
 
 
 def test_transform_sensor_evaluates() -> None:
-    @dagster_lib.asset(key=AssetKey(["SILVER", "STG_TEST"]))
+    @dagster_lib.asset(key=AssetKey(["STAGING", "STG_TEST"]))
     def dummy_asset() -> None:
         pass
 
     mock_job = dagster_lib.define_asset_job(
-        "transform_SILVER__STG_TEST_job", selection=[dummy_asset]
+        "transform_STAGING__STG_TEST_job", selection=[dummy_asset]
     )
     sensor_jobs = [mock_job]
     all_upstream_keys = [AssetKey(["RAW", "RAW_TEST"])]
     asset_to_upstream = {
-        AssetKey(["SILVER", "STG_TEST"]): AssetKey(["RAW", "RAW_TEST"])
+        AssetKey(["STAGING", "STG_TEST"]): AssetKey(["RAW", "RAW_TEST"])
     }
 
     sensor_def = _create_sensor_for_jobs(
@@ -165,5 +165,5 @@ def test_transform_sensor_evaluates() -> None:
 
     assert len(results) == 1
     run_request = results[0]
-    assert run_request.job_name == "transform_SILVER__STG_TEST_job"
+    assert run_request.job_name == "transform_STAGING__STG_TEST_job"
     assert run_request.run_key == "RAW__RAW_TEST_2026-06-17"
