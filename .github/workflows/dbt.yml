@@ -1,0 +1,136 @@
+name: Check dbt & DDL
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-dbt-paths:
+    runs-on: ubuntu-latest
+    outputs:
+      dbt_related: ${{ steps.filter.outputs.targets }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Check for changes under dbt or redshift paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            targets:
+              - .github/workflows/dbt.yml
+              - src/redshift/**
+              - src/transform/dbt/**
+              - uv.lock
+              - pyproject.toml
+
+  check-dbt:
+    needs: check-dbt-paths
+    if: github.event_name != 'pull_request' || needs.check-dbt-paths.outputs.dbt_related == 'true'
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        ports:
+          - 5439:5432
+        env:
+          POSTGRES_DB: dev
+          POSTGRES_USER: awsuser
+          POSTGRES_PASSWORD: mock_password
+
+    env:
+      # Redshift simulator config using Postgres
+      REDSHIFT_HOST: localhost
+      REDSHIFT_PORT: 5439
+      REDSHIFT_DATABASE: dev
+      REDSHIFT_USER: awsuser
+      REDSHIFT_PASSWORD: mock_password
+      DBT_TYPE: postgres
+
+      # Dynamic schema prefixes to prevent parallel runs collision
+      REDSHIFT_SCHEMA_RAW: CI_RAW_${{ github.run_number }}
+      REDSHIFT_SCHEMA_DWH: CI_DWH_${{ github.run_number }}
+      REDSHIFT_SCHEMA_MART: CI_MART_${{ github.run_number }}
+      REDSHIFT_SCHEMA_LOGS: CI_LOGS_${{ github.run_number }}
+      REDSHIFT_SCHEMA_FUNCTION: CI_DB_UTILS_${{ github.run_number }}
+      REDSHIFT_SCHEMA_OPERATION: CI_OPERATION_${{ github.run_number }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history for git diff checking
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv & Sync Dependencies
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          uv sync --frozen
+
+      # Setup Reviewdog binary
+      - name: Setup Reviewdog
+        uses: reviewdog/action-setup@v1
+        with:
+          reviewdog_version: 'v0.20.1'
+
+      - name: Run Redshift DDL Setup
+        run: ./src/redshift/dev/setup.sh --skip_confirmation
+
+      - name: Fetch Main dbt Manifest & Run dbt Build (Incremental)
+        id: dbt_build
+        run: |
+          git fetch origin main:main
+          # Store current workspace changes if any
+          git stash -u || true
+          
+          # Checkout main to compile target manifest
+          git checkout main
+          cd src/transform/dbt
+          uv run dbt deps
+          uv run dbt parse --target-path /tmp/main_manifest
+          
+          # Switch back to the PR branch
+          cd ../../..
+          git checkout -
+          git stash pop || true
+          
+          # Build modified models only based on main state
+          cd src/transform/dbt
+          uv run dbt build --select "@state:modified" --state /tmp/main_manifest
+
+      - name: SQLFluff Lint with Reviewdog (Modified SQL Only)
+        env:
+          REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git fetch origin main:main
+          CHANGED_SQL=$(git diff --name-only --diff-filter=AM main HEAD -- 'src/transform/dbt/**/*.sql' | sed 's|src/transform/dbt/||' | tr '\n' ' ')
+          if [ -n "$CHANGED_SQL" ]; then
+            echo "Linting modified SQL files: $CHANGED_SQL"
+            cd src/transform/dbt
+            # Output in parsable format and feed to Reviewdog
+            uv run sqlfluff lint --format=parsable $CHANGED_SQL | \
+              reviewdog \
+                -tee \
+                -efm='%f:%l:%c: %m' \
+                -reporter=github-pr-review \
+                -filter-mode=diff_context \
+                -name='sqlfluff' \
+                -fail-on-error
+          else
+            echo "No SQL files changed."
+          fi
+
+      - name: Run Redshift DDL Teardown
+        if: always()
+        run: ./src/redshift/dev/teardown.sh --skip_confirmation

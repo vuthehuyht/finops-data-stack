@@ -1,0 +1,117 @@
+name: Check Code
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-code:
+    runs-on: ubuntu-latest
+
+    services:
+      localstack:
+        image: localstack/localstack:latest
+        ports:
+          - 4566:4566
+        env:
+          SERVICES: s3
+
+    env:
+      AWS_DEFAULT_REGION: ap-southeast-1
+      AWS_ACCESS_KEY_ID: mock
+      AWS_SECRET_ACCESS_KEY: mock
+      AWS_ENDPOINT_URL: http://localhost:4566
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv & Sync Dependencies
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          uv sync --frozen
+
+      # Setup Reviewdog binary
+      - name: Setup Reviewdog
+        uses: reviewdog/action-setup@v1
+        with:
+          reviewdog_version: 'v0.20.1'
+
+      # Ruff checks with Reviewdog annotations
+      - name: Ruff Check with Reviewdog
+        uses: reviewdog/action-ruff@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-review
+          filter_mode: diff_context
+          fail_on_error: true
+
+      # Python static type check with mypy within uv virtualenv
+      - name: Run mypy with Reviewdog
+        env:
+          REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          uv run mypy src/ | reviewdog -f=mypy -reporter=github-pr-review -filter-mode=diff_context -fail-on-error
+
+      # Yaml linting using official GHA Reviewdog Action
+      - name: Yamllint with Reviewdog
+        uses: reviewdog/action-yamllint@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-review
+          filter_mode: diff_context
+          fail_on_error: true
+
+      # Shell scripting analysis
+      - name: Shellcheck with Reviewdog
+        uses: reviewdog/action-shellcheck@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-review
+          filter_mode: diff_context
+          fail_on_error: true
+
+      # Markdown documents format verification
+      - name: Markdownlint with Reviewdog
+        uses: reviewdog/action-markdownlint@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-review
+          filter_mode: diff_context
+          fail_on_error: true
+
+      # GitHub Actions Workflows syntax check
+      - name: Actionlint with Reviewdog
+        uses: reviewdog/action-actionlint@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-review
+          filter_mode: diff_context
+          fail_on_error: true
+
+      # Ruff Format Suggester
+      - name: Run Ruff Format check
+        run: uv run ruff format --check src/ tests/
+
+      - name: Suggest formatting fixes
+        if: failure()
+        uses: reviewdog/action-suggester@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          tool_name: ruff format
+          fail_on_error: true
+
+      # Run unit test suite
+      - name: Run pytest (Python Unit Tests)
+        run: uv run pytest tests/

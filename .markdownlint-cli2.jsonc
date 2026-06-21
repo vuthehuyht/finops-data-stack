@@ -1,0 +1,22 @@
+{
+  "config": {
+    "no-hard-tabs": {
+      "code_blocks": false
+    },
+    "line-length": {
+      // Report exceptionally long lines only.
+      "line_length": 200,
+      "code_blocks": false,
+      "tables": false
+    },
+    "no-inline-html": false
+  },
+  "globs": [
+    "**/*.md"
+  ],
+  "ignores": [
+    "**/.venv/**",
+    "**/dbt_packages/**",
+    ".github/pull_request_template.md"
+  ]
+}

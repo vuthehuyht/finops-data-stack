@@ -2,7 +2,7 @@ transform:
   target: dev
   outputs:
     dev:
-      type: redshift
+      type: "{{ env_var('DBT_TYPE', 'redshift') }}"
       host: "{{ env_var('REDSHIFT_HOST', 'localhost') }}"
       port: 5439
       user: "{{ env_var('REDSHIFT_USER', 'awsuser') }}"
