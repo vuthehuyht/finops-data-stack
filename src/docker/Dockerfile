@@ -17,7 +17,7 @@ COPY src/ ./src/
 
 # Pre-bake dbt packages (avoids fetching at runtime)
 WORKDIR /app/src/transform/dbt
-RUN dbt deps --log-path logs && rm -rf .user.yml logs
+RUN dbt deps --log-path logs && dbt parse --log-path logs && rm -rf .user.yml logs
 
 # Stage 2: runtime — clean image without uv binary
 FROM python:${PYTHON_VERSION}-slim-bookworm

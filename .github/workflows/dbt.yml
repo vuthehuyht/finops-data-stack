@@ -121,6 +121,7 @@ jobs:
             echo "Linting modified SQL files: $CHANGED_SQL"
             cd src/transform/dbt
             # Output in parsable format and feed to Reviewdog
+            # shellcheck disable=SC2086
             uv run sqlfluff lint --format=parsable $CHANGED_SQL | \
               reviewdog \
                 -tee \

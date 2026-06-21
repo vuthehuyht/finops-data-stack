@@ -2,10 +2,6 @@
   "no-hard-tabs": {
     "code_blocks": false
   },
-  "line-length": {
-    "line_length": 200,
-    "code_blocks": false,
-    "tables": false
-  },
+  "line-length": false,
   "no-inline-html": false
 }
