@@ -1,11 +1,10 @@
-﻿import datetime
+import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
 from dagster import (
     AssetKey,
     AssetMaterialization,
-    AssetsDefinition,
     EventLogRecord,
     MetadataValue,
     build_multi_asset_sensor_context,
