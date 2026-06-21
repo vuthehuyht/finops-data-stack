@@ -1,4 +1,4 @@
-﻿"""Dagster jobs for dbt Silver layer transformations using dbt assets."""
+"""Dagster jobs for dbt Silver layer transformations using dbt assets."""
 
 import csv
 import enum

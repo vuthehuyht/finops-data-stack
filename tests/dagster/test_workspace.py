@@ -1,4 +1,4 @@
-﻿import os
+import os
 import unittest.mock
 from importlib import reload
 from unittest.mock import MagicMock, patch
