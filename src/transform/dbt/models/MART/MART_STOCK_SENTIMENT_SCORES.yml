@@ -1,0 +1,64 @@
+models:
+  - name: MART_STOCK_SENTIMENT_SCORES
+    description: >
+      News volume, analyst coverage signals, and corporate event flags per ticker
+      per day. NLP-based sentiment scores (DAILY_NEWS_SENTIMENT_SCORE,
+      SENTIMENT_MOMENTUM_7D) are NULL until an NLP enrichment pipeline populates
+      them in the Silver layer. Granularity: Ticker + Date.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - TICKER
+            - DATE
+    meta:
+      dagster:
+        asset_key:
+          - MART
+          - MART_STOCK_SENTIMENT_SCORES
+    columns:
+      - name: TICKER
+        data_type: VARCHAR(256)
+        data_tests:
+          - not_null
+      - name: DATE
+        data_type: DATE
+        data_tests:
+          - not_null
+      - name: NEWS_COUNT
+        data_type: INTEGER
+        description: Number of news articles published for this ticker on this day
+      - name: DAILY_NEWS_SENTIMENT_SCORE
+        data_type: NUMERIC(18, 4)
+        description: Average NLP sentiment score (-1 to 1); NULL until NLP pipeline available
+      - name: SENTIMENT_MOMENTUM_7D
+        data_type: NUMERIC(18, 4)
+        description: 7-day rolling average of daily sentiment score
+      - name: NEWS_VELOCITY
+        data_type: NUMERIC(18, 4)
+        description: Ratio of today's news count to 30-day rolling average
+      - name: ANALYST_REPORT_COUNT
+        data_type: INTEGER
+        description: Number of analyst reports published on this day
+      - name: ANALYST_BUY_COUNT
+        data_type: INTEGER
+        description: Number of BUY/OUTPERFORM/OVERWEIGHT recommendations on this day
+      - name: AVG_ANALYST_TARGET_PRICE
+        data_type: NUMERIC(18, 4)
+      - name: CORPORATE_EVENT_COUNT
+        data_type: INTEGER
+      - name: DIVIDEND_EVENT_COUNT
+        data_type: INTEGER
+      - name: DATACORE_CREATE_DATETIME
+        data_type: TIMESTAMP
+      - name: DATACORE_CREATE_PROGRAM
+        data_type: VARCHAR(256)
+      - name: DATACORE_CREATE_BY
+        data_type: VARCHAR(256)
+      - name: DATACORE_UPDATE_DATETIME
+        data_type: TIMESTAMP
+      - name: DATACORE_UPDATE_PROGRAM
+        data_type: VARCHAR(256)
+      - name: DATACORE_UPDATE_BY
+        data_type: VARCHAR(256)
+      - name: BATCH_DATE
+        data_type: DATE

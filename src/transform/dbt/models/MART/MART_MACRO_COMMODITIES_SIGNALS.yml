@@ -1,0 +1,75 @@
+models:
+  - name: MART_MACRO_COMMODITIES_SIGNALS
+    description: >
+      Macro-economic and commodity price signals at daily granularity (no ticker
+      dimension). Interest rates, USD/VND exchange rate, key commodity prices
+      (Brent, WTI, Gold, Steel, Gasoline Singapore, Baltic index), and derived
+      features (real interest rate, crack spread, price momentum).
+      Granularity: Date.
+    data_tests:
+      - not_null:
+          column_name: DATE
+    meta:
+      dagster:
+        asset_key:
+          - MART
+          - MART_MACRO_COMMODITIES_SIGNALS
+    columns:
+      - name: DATE
+        data_type: DATE
+        data_tests:
+          - not_null
+          - unique
+      - name: FED_RATE
+        data_type: NUMERIC(18, 4)
+        description: US Fed proxy rate (^IRX — 13-week T-bill yield)
+      - name: TREASURY_10Y
+        data_type: NUMERIC(18, 4)
+        description: US 10-year Treasury yield (^TNX)
+      - name: TREASURY_5Y
+        data_type: NUMERIC(18, 4)
+        description: US 5-year Treasury yield (^FVX)
+      - name: REAL_INTEREST_RATE
+        data_type: NUMERIC(18, 4)
+        description: nominal_interest_rate (Fed) - CPI inflation
+      - name: USD_VND_RATE
+        data_type: NUMERIC(18, 4)
+      - name: EXCHANGE_RATE_VOLATILITY_30D
+        data_type: NUMERIC(18, 6)
+        description: 30-day std dev of daily USD/VND return
+      - name: CPI_VALUE
+        data_type: NUMERIC(18, 4)
+      - name: POLICY_RATE
+        data_type: NUMERIC(18, 4)
+      - name: BRENT_CRUDE_PRICE
+        data_type: NUMERIC(18, 4)
+      - name: WTI_PRICE
+        data_type: NUMERIC(18, 4)
+      - name: GOLD_PRICE
+        data_type: NUMERIC(18, 4)
+      - name: STEEL_HRC_PRICE
+        data_type: NUMERIC(18, 4)
+      - name: GASOLINE_SINGAPORE_PRICE
+        data_type: NUMERIC(18, 4)
+      - name: BALTIC_DIRTY_TANKER_INDEX
+        data_type: NUMERIC(18, 4)
+      - name: BRENT_PRICE_MOMENTUM_1M
+        data_type: NUMERIC(18, 6)
+        description: (brent_today / brent_30d_ago) - 1
+      - name: CRACK_SPREAD_PROXY
+        data_type: NUMERIC(18, 4)
+        description: gasoline_singapore_price - brent_crude_price
+      - name: DATACORE_CREATE_DATETIME
+        data_type: TIMESTAMP
+      - name: DATACORE_CREATE_PROGRAM
+        data_type: VARCHAR(256)
+      - name: DATACORE_CREATE_BY
+        data_type: VARCHAR(256)
+      - name: DATACORE_UPDATE_DATETIME
+        data_type: TIMESTAMP
+      - name: DATACORE_UPDATE_PROGRAM
+        data_type: VARCHAR(256)
+      - name: DATACORE_UPDATE_BY
+        data_type: VARCHAR(256)
+      - name: BATCH_DATE
+        data_type: DATE

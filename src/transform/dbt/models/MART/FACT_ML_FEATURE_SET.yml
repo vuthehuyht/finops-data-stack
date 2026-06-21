@@ -1,0 +1,172 @@
+models:
+  - name: FACT_ML_FEATURE_SET
+    description: >
+      Wide flat table for ML model consumption. Built by LEFT JOINing all
+      sub-mart tables (MART_STOCK_MARKET_MOMENTUM, MART_STOCK_FUNDAMENTAL_METRICS,
+      MART_STOCK_SENTIMENT_SCORES, MART_MACRO_COMMODITIES_SIGNALS,
+      MART_INSIDER_PROPRIETARY_FLOWS) on TICKER + TRADING_DATE.
+      WARNING: LABEL_* columns must be used ONLY as ML targets, never as input
+      features — doing so causes data leakage.
+      Granularity: Ticker + Trading Date.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - TICKER
+            - TRADING_DATE
+    meta:
+      dagster:
+        asset_key:
+          - MART
+          - FACT_ML_FEATURE_SET
+    columns:
+      - name: TICKER
+        data_type: VARCHAR(256)
+        data_tests:
+          - not_null
+      - name: TRADING_DATE
+        data_type: DATE
+        data_tests:
+          - not_null
+      # Market momentum
+      - name: PRICE_MOMENTUM_1M
+        data_type: NUMERIC(18, 6)
+      - name: PRICE_MOMENTUM_3M
+        data_type: NUMERIC(18, 6)
+      - name: VOLATILITY_30D
+        data_type: NUMERIC(18, 6)
+      - name: RELATIVE_STRENGTH_VS_VNINDEX
+        data_type: NUMERIC(18, 6)
+      - name: MOVING_AVERAGE_20D
+        data_type: NUMERIC(18, 4)
+      - name: MOVING_AVERAGE_50D
+        data_type: NUMERIC(18, 4)
+      - name: MOVING_AVERAGE_200D
+        data_type: NUMERIC(18, 4)
+      # Fundamentals
+      - name: REVENUE_GROWTH_YOY
+        data_type: NUMERIC(18, 6)
+      - name: NET_PROFIT_GROWTH_YOY
+        data_type: NUMERIC(18, 6)
+      - name: GROSS_MARGIN
+        data_type: NUMERIC(18, 6)
+      - name: NET_MARGIN
+        data_type: NUMERIC(18, 6)
+      - name: OPERATING_MARGIN
+        data_type: NUMERIC(18, 6)
+      - name: ROE
+        data_type: NUMERIC(18, 6)
+      - name: ROA
+        data_type: NUMERIC(18, 6)
+      - name: ASSET_GROWTH_YOY
+        data_type: NUMERIC(18, 6)
+      - name: DEBT_TO_EQUITY
+        data_type: NUMERIC(18, 6)
+      - name: CURRENT_RATIO
+        data_type: NUMERIC(18, 6)
+      - name: CASH_TO_ASSETS
+        data_type: NUMERIC(18, 6)
+      - name: EQUITY_MULTIPLIER
+        data_type: NUMERIC(18, 6)
+      - name: PE_RATIO
+        data_type: NUMERIC(18, 4)
+      - name: PB_RATIO
+        data_type: NUMERIC(18, 4)
+      - name: OPERATING_CASH_FLOW_TO_NET_INCOME
+        data_type: NUMERIC(18, 6)
+      - name: FREE_CASH_FLOW
+        data_type: NUMERIC(18, 4)
+      - name: CASH_FLOW_TO_DEBT
+        data_type: NUMERIC(18, 6)
+      # Sentiment
+      - name: NEWS_COUNT
+        data_type: INTEGER
+      - name: DAILY_NEWS_SENTIMENT_SCORE
+        data_type: NUMERIC(18, 4)
+      - name: SENTIMENT_MOMENTUM_7D
+        data_type: NUMERIC(18, 4)
+      - name: NEWS_VELOCITY
+        data_type: NUMERIC(18, 4)
+      - name: ANALYST_REPORT_COUNT
+        data_type: INTEGER
+      - name: ANALYST_BUY_COUNT
+        data_type: INTEGER
+      - name: AVG_ANALYST_TARGET_PRICE
+        data_type: NUMERIC(18, 4)
+      - name: CORPORATE_EVENT_COUNT
+        data_type: INTEGER
+      - name: DIVIDEND_EVENT_COUNT
+        data_type: INTEGER
+      # Macro & commodities
+      - name: FED_RATE
+        data_type: NUMERIC(18, 4)
+      - name: TREASURY_10Y
+        data_type: NUMERIC(18, 4)
+      - name: TREASURY_5Y
+        data_type: NUMERIC(18, 4)
+      - name: REAL_INTEREST_RATE
+        data_type: NUMERIC(18, 4)
+      - name: USD_VND_RATE
+        data_type: NUMERIC(18, 4)
+      - name: EXCHANGE_RATE_VOLATILITY_30D
+        data_type: NUMERIC(18, 6)
+      - name: CPI_VALUE
+        data_type: NUMERIC(18, 4)
+      - name: BRENT_CRUDE_PRICE
+        data_type: NUMERIC(18, 4)
+      - name: WTI_PRICE
+        data_type: NUMERIC(18, 4)
+      - name: GOLD_PRICE
+        data_type: NUMERIC(18, 4)
+      - name: STEEL_HRC_PRICE
+        data_type: NUMERIC(18, 4)
+      - name: GASOLINE_SINGAPORE_PRICE
+        data_type: NUMERIC(18, 4)
+      - name: BALTIC_DIRTY_TANKER_INDEX
+        data_type: NUMERIC(18, 4)
+      - name: BRENT_PRICE_MOMENTUM_1M
+        data_type: NUMERIC(18, 6)
+      - name: CRACK_SPREAD_PROXY
+        data_type: NUMERIC(18, 4)
+      # Insider & flow
+      - name: FOREIGN_BUY_RATIO_10D
+        data_type: NUMERIC(18, 6)
+      - name: NET_FOREIGN_FLOW_1M
+        data_type: NUMERIC(18, 4)
+      - name: NET_FOREIGN_FLOW_MOMENTUM_1M
+        data_type: NUMERIC(18, 6)
+      - name: PROP_TRADING_NET_VAL_5D
+        data_type: NUMERIC(18, 4)
+      - name: PROP_VS_FOREIGN_CORRELATION_10D
+        data_type: NUMERIC(18, 6)
+      - name: INSIDER_SENTIMENT_SIGNAL
+        data_type: SMALLINT
+      - name: INSIDER_BUY_VOLUME_RATIO
+        data_type: NUMERIC(18, 6)
+      # Target labels — ML target ONLY, never use as input features
+      - name: LABEL_NEXT_5D_RETURN
+        data_type: NUMERIC(18, 6)
+        description: "(close_next_5d / close_today) - 1. TARGET ONLY — data leakage if used as feature."
+      - name: LABEL_NEXT_20D_RETURN
+        data_type: NUMERIC(18, 6)
+        description: "(close_next_20d / close_today) - 1. TARGET ONLY."
+      - name: LABEL_IS_UPTREND_30D
+        data_type: SMALLINT
+        description: "1 if 20d forward return > 5%, else 0. TARGET ONLY."
+      - name: LABEL_MAX_DRAWDOWN_NEXT_10D
+        data_type: NUMERIC(18, 6)
+        description: "(max_close_next_10d / close_today) - 1. TARGET ONLY."
+      # Metadata
+      - name: DATACORE_CREATE_DATETIME
+        data_type: TIMESTAMP
+      - name: DATACORE_CREATE_PROGRAM
+        data_type: VARCHAR(256)
+      - name: DATACORE_CREATE_BY
+        data_type: VARCHAR(256)
+      - name: DATACORE_UPDATE_DATETIME
+        data_type: TIMESTAMP
+      - name: DATACORE_UPDATE_PROGRAM
+        data_type: VARCHAR(256)
+      - name: DATACORE_UPDATE_BY
+        data_type: VARCHAR(256)
+      - name: BATCH_DATE
+        data_type: DATE

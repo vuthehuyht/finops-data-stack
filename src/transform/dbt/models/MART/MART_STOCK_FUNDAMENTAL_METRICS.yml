@@ -1,0 +1,85 @@
+models:
+  - name: MART_STOCK_FUNDAMENTAL_METRICS
+    description: >
+      Financial ratios derived from quarterly Balance Sheet, Income Statement, and
+      Cash Flow Statement, joined with daily Financial Ratios (market cap).
+      Quarterly data is taken as the latest snapshot per ticker (forward-filled
+      semantics). Granularity: Ticker + Date.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - TICKER
+            - DATE
+    meta:
+      dagster:
+        asset_key:
+          - MART
+          - MART_STOCK_FUNDAMENTAL_METRICS
+    columns:
+      - name: TICKER
+        data_type: VARCHAR(256)
+        data_tests:
+          - not_null
+      - name: DATE
+        data_type: DATE
+        data_tests:
+          - not_null
+      - name: REVENUE_GROWTH_YOY
+        data_type: NUMERIC(18, 6)
+        description: "(revenue_curr / revenue_4q_ago) - 1"
+      - name: NET_PROFIT_GROWTH_YOY
+        data_type: NUMERIC(18, 6)
+      - name: GROSS_MARGIN
+        data_type: NUMERIC(18, 6)
+        description: gross_profit / revenue
+      - name: NET_MARGIN
+        data_type: NUMERIC(18, 6)
+      - name: OPERATING_MARGIN
+        data_type: NUMERIC(18, 6)
+      - name: ROE
+        data_type: NUMERIC(18, 6)
+        description: net_profit_after_tax / equity
+      - name: ROA
+        data_type: NUMERIC(18, 6)
+        description: net_profit_after_tax / total_assets
+      - name: ASSET_GROWTH_YOY
+        data_type: NUMERIC(18, 6)
+      - name: DEBT_TO_EQUITY
+        data_type: NUMERIC(18, 6)
+        description: (short_term_debt + long_term_debt) / equity
+      - name: CURRENT_RATIO
+        data_type: NUMERIC(18, 6)
+        description: current_assets / total_liabilities
+      - name: CASH_TO_ASSETS
+        data_type: NUMERIC(18, 6)
+      - name: EQUITY_MULTIPLIER
+        data_type: NUMERIC(18, 6)
+        description: total_assets / equity
+      - name: PE_RATIO
+        data_type: NUMERIC(18, 4)
+        description: market_cap / net_profit_after_tax (trailing)
+      - name: PB_RATIO
+        data_type: NUMERIC(18, 4)
+        description: market_cap / equity
+      - name: OPERATING_CASH_FLOW_TO_NET_INCOME
+        data_type: NUMERIC(18, 6)
+      - name: FREE_CASH_FLOW
+        data_type: NUMERIC(18, 4)
+        description: cfo - capex
+      - name: CASH_FLOW_TO_DEBT
+        data_type: NUMERIC(18, 6)
+        description: cfo / (short_term_debt + long_term_debt)
+      - name: DATACORE_CREATE_DATETIME
+        data_type: TIMESTAMP
+      - name: DATACORE_CREATE_PROGRAM
+        data_type: VARCHAR(256)
+      - name: DATACORE_CREATE_BY
+        data_type: VARCHAR(256)
+      - name: DATACORE_UPDATE_DATETIME
+        data_type: TIMESTAMP
+      - name: DATACORE_UPDATE_PROGRAM
+        data_type: VARCHAR(256)
+      - name: DATACORE_UPDATE_BY
+        data_type: VARCHAR(256)
+      - name: BATCH_DATE
+        data_type: DATE

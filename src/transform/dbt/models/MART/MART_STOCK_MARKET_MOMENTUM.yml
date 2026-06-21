@@ -1,0 +1,56 @@
+models:
+  - name: MART_STOCK_MARKET_MOMENTUM
+    description: >
+      Price momentum, volatility, and moving average features derived from
+      STG_STOCK_PRICE_EOD and STG_INDEX_PRICE_EOD. Granularity: Ticker + Date.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - TICKER
+            - TRADING_DATE
+    meta:
+      dagster:
+        asset_key:
+          - MART
+          - MART_STOCK_MARKET_MOMENTUM
+    columns:
+      - name: TICKER
+        data_type: VARCHAR(256)
+        data_tests:
+          - not_null
+      - name: TRADING_DATE
+        data_type: DATE
+        data_tests:
+          - not_null
+      - name: PRICE_MOMENTUM_1M
+        data_type: NUMERIC(18, 6)
+        description: "(close / close_30d_ago) - 1"
+      - name: PRICE_MOMENTUM_3M
+        data_type: NUMERIC(18, 6)
+        description: "(close / close_90d_ago) - 1"
+      - name: VOLATILITY_30D
+        data_type: NUMERIC(18, 6)
+        description: Standard deviation of daily returns over 30 trading days
+      - name: RELATIVE_STRENGTH_VS_VNINDEX
+        data_type: NUMERIC(18, 6)
+        description: Stock avg daily return (20d) minus VNINDEX avg daily return (20d)
+      - name: MOVING_AVERAGE_20D
+        data_type: NUMERIC(18, 4)
+      - name: MOVING_AVERAGE_50D
+        data_type: NUMERIC(18, 4)
+      - name: MOVING_AVERAGE_200D
+        data_type: NUMERIC(18, 4)
+      - name: DATACORE_CREATE_DATETIME
+        data_type: TIMESTAMP
+      - name: DATACORE_CREATE_PROGRAM
+        data_type: VARCHAR(256)
+      - name: DATACORE_CREATE_BY
+        data_type: VARCHAR(256)
+      - name: DATACORE_UPDATE_DATETIME
+        data_type: TIMESTAMP
+      - name: DATACORE_UPDATE_PROGRAM
+        data_type: VARCHAR(256)
+      - name: DATACORE_UPDATE_BY
+        data_type: VARCHAR(256)
+      - name: BATCH_DATE
+        data_type: DATE
