@@ -1,4 +1,4 @@
-models:
+﻿models:
   - name: STG_EXCHANGE_RATES
     description: Cleaned/Staging model for raw_exchange_rates
     data_tests:
@@ -9,8 +9,7 @@ models:
     meta:
       dagster:
         asset_key:
-          - DWH
-          - BATCH
+          - STAGING
           - STG_EXCHANGE_RATES
     columns:
       - name: PAIR

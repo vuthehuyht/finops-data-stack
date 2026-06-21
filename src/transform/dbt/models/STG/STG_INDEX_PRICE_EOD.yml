@@ -1,4 +1,4 @@
-models:
+﻿models:
   - name: STG_INDEX_PRICE_EOD
     description: Cleaned/Staging model for raw_index_price_eod
     data_tests:
@@ -9,8 +9,7 @@ models:
     meta:
       dagster:
         asset_key:
-          - DWH
-          - BATCH
+          - STAGING
           - STG_INDEX_PRICE_EOD
     columns:
       - name: INDEX_NAME

@@ -44,10 +44,10 @@ models:
       {{ add_query_tag() }}
     +tmp_relation_type: table
     STG:
-      +schema: {{ env_var('REDSHIFT_STAGING_SCHEMA', 'DEV_STAGING') }}
+      +schema: "{{ env_var('REDSHIFT_STAGING_SCHEMA', 'DEV_STAGING') }}"
       +group: STG
       +tags: ['staging']
     MART:
-      +schema: {{ env_var('REDSHIFT_MART_SCHEMA', 'DEV_MART') }}
+      +schema: "{{ env_var('REDSHIFT_MART_SCHEMA', 'DEV_MART') }}"
       +group: MART
       +tags: ['mart']

@@ -67,8 +67,8 @@ jobs:
 
       # Dynamic schema prefixes to prevent parallel runs collision
       REDSHIFT_SCHEMA_RAW: CI_RAW_${{ github.run_number }}
-      REDSHIFT_SCHEMA_DWH: CI_DWH_${{ github.run_number }}
-      REDSHIFT_SCHEMA_MART: CI_MART_${{ github.run_number }}
+      REDSHIFT_STAGING_SCHEMA: CI_STG_${{ github.run_number }}
+      REDSHIFT_MART_SCHEMA: CI_MART_${{ github.run_number }}
       REDSHIFT_SCHEMA_LOGS: CI_LOGS_${{ github.run_number }}
       REDSHIFT_SCHEMA_FUNCTION: CI_DB_UTILS_${{ github.run_number }}
       REDSHIFT_SCHEMA_OPERATION: CI_OPERATION_${{ github.run_number }}

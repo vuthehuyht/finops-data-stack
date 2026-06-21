@@ -1,4 +1,4 @@
-models:
+﻿models:
   - name: STG_MACRO_INDICATORS
     description: Cleaned/Staging model for raw_macro_indicators
     data_tests:
@@ -9,8 +9,7 @@ models:
     meta:
       dagster:
         asset_key:
-          - DWH
-          - BATCH
+          - STAGING
           - STG_MACRO_INDICATORS
     columns:
       - name: INDICATOR_NAME

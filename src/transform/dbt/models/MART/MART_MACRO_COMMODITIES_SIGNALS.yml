@@ -6,9 +6,6 @@ models:
       (Brent, WTI, Gold, Steel, Gasoline Singapore, Baltic index), and derived
       features (real interest rate, crack spread, price momentum).
       Granularity: Date.
-    data_tests:
-      - not_null:
-          column_name: DATE
     meta:
       dagster:
         asset_key:

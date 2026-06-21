@@ -10,119 +10,127 @@
 -- Insider transactions span a date range (DATE_START to DATE_END); they are
 -- attributed to DATE_START for simplicity.
 
-WITH foreign_flow AS (
-    SELECT
-        TICKER,
-        TRADING_DATE,
-        BUY_VOL,
-        SELL_VOL,
-        BUY_VAL,
-        SELL_VAL,
-        NET_VAL,
-        -- 10-day rolling foreign buy ratio
-        SUM(BUY_VAL) OVER (
-            PARTITION BY TICKER ORDER BY TRADING_DATE
-            ROWS BETWEEN 9 PRECEDING AND CURRENT ROW
-        ) AS buy_val_10d,
-        SUM(BUY_VAL + SELL_VAL) OVER (
-            PARTITION BY TICKER ORDER BY TRADING_DATE
-            ROWS BETWEEN 9 PRECEDING AND CURRENT ROW
-        ) AS total_trading_val_10d,
-        -- 1-month (20-day) net foreign flow for momentum
-        SUM(NET_VAL) OVER (
-            PARTITION BY TICKER ORDER BY TRADING_DATE
-            ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
-        ) AS net_foreign_val_1m,
-        LAG(SUM(NET_VAL) OVER (
-            PARTITION BY TICKER ORDER BY TRADING_DATE
-            ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
-        ), 20) OVER (PARTITION BY TICKER ORDER BY TRADING_DATE) AS net_foreign_val_1m_prev
-    FROM {{ ref('STG_FOREIGN_TRADING') }}
+WITH FOREIGN_FLOW AS (
+  SELECT
+    TICKER,
+    TRADING_DATE,
+    BUY_VOL,
+    SELL_VOL,
+    BUY_VAL,
+    SELL_VAL,
+    NET_VAL,
+    -- 10-day rolling foreign buy ratio
+    SUM(BUY_VAL) OVER (
+      PARTITION BY TICKER ORDER BY TRADING_DATE
+      ROWS BETWEEN 9 PRECEDING AND CURRENT ROW
+    ) AS BUY_VAL_10D,
+    SUM(BUY_VAL + SELL_VAL) OVER (
+      PARTITION BY TICKER ORDER BY TRADING_DATE
+      ROWS BETWEEN 9 PRECEDING AND CURRENT ROW
+    ) AS TOTAL_TRADING_VAL_10D,
+    -- 1-month (20-day) net foreign flow for momentum
+    SUM(NET_VAL) OVER (
+      PARTITION BY TICKER ORDER BY TRADING_DATE
+      ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
+    ) AS NET_FOREIGN_VAL_1M,
+    LAG(SUM(NET_VAL) OVER (
+      PARTITION BY TICKER ORDER BY TRADING_DATE
+      ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
+    ), 20) OVER (PARTITION BY TICKER ORDER BY TRADING_DATE) AS NET_FOREIGN_VAL_1M_PREV
+  FROM {{ ref('STG_FOREIGN_TRADING') }}
 ),
 
-proprietary_flow AS (
-    SELECT
-        TICKER,
-        TRADING_DATE,
-        NET_VAL AS prop_net_val,
-        BUY_VOL AS prop_buy_vol,
-        SELL_VOL AS prop_sell_vol,
-        -- 5-day rolling sum of proprietary net value
-        SUM(NET_VAL) OVER (
-            PARTITION BY TICKER ORDER BY TRADING_DATE
-            ROWS BETWEEN 4 PRECEDING AND CURRENT ROW
-        ) AS prop_net_val_5d
-    FROM {{ ref('STG_PROPRIETARY_TRADING') }}
+PROPRIETARY_FLOW AS (
+  SELECT
+    TICKER,
+    TRADING_DATE,
+    NET_VAL AS PROP_NET_VAL,
+    BUY_VOL AS PROP_BUY_VOL,
+    SELL_VOL AS PROP_SELL_VOL,
+    -- 5-day rolling sum of proprietary net value
+    SUM(NET_VAL) OVER (
+      PARTITION BY TICKER ORDER BY TRADING_DATE
+      ROWS BETWEEN 4 PRECEDING AND CURRENT ROW
+    ) AS PROP_NET_VAL_5D
+  FROM {{ ref('STG_PROPRIETARY_TRADING') }}
 ),
 
 -- Correlation between prop and foreign net value over 10 days
-prop_foreign_joined AS (
-    SELECT
-        p.TICKER,
-        p.TRADING_DATE,
-        p.prop_net_val,
-        f.NET_VAL AS foreign_net_val
-    FROM proprietary_flow p
-    LEFT JOIN foreign_flow f
-        ON p.TICKER = p.TICKER AND p.TRADING_DATE = f.TRADING_DATE
+PROP_FOREIGN_JOINED AS (
+  SELECT
+    P.TICKER,
+    P.TRADING_DATE,
+    P.PROP_NET_VAL,
+    F.NET_VAL AS FOREIGN_NET_VAL
+  FROM PROPRIETARY_FLOW AS P
+  LEFT JOIN FOREIGN_FLOW AS F
+    ON
+      P.TICKER = F.TICKER
+      AND P.TRADING_DATE = F.TRADING_DATE
 ),
 
-prop_foreign_corr AS (
-    SELECT
-        TICKER,
-        TRADING_DATE,
-        CORR(prop_net_val, foreign_net_val) OVER (
-            PARTITION BY TICKER ORDER BY TRADING_DATE
-            ROWS BETWEEN 9 PRECEDING AND CURRENT ROW
-        ) AS prop_vs_foreign_correlation_10d
-    FROM prop_foreign_joined
+PROP_FOREIGN_CORR AS (
+  SELECT
+    TICKER,
+    TRADING_DATE,
+    CORR(PROP_NET_VAL, FOREIGN_NET_VAL) OVER (
+      PARTITION BY TICKER ORDER BY TRADING_DATE
+      ROWS BETWEEN 9 PRECEDING AND CURRENT ROW
+    ) AS PROP_VS_FOREIGN_CORRELATION_10D
+  FROM PROP_FOREIGN_JOINED
 ),
 
-insider_signals AS (
-    -- Aggregate insider transactions by ticker and announcement date
-    SELECT
-        TICKER,
-        DATE_START                               AS TRADING_DATE,
-        SUM(CASE WHEN UPPER(ACTION) = 'BUY'  THEN EXECUTED_VOL ELSE 0 END) AS insider_buy_vol,
-        SUM(CASE WHEN UPPER(ACTION) = 'SELL' THEN EXECUTED_VOL ELSE 0 END) AS insider_sell_vol,
-        SUM(EXECUTED_VOL)                        AS insider_total_vol,
-        -- -1 net sell, +1 net buy, 0 neutral
-        SIGN(
-            SUM(CASE WHEN UPPER(ACTION) = 'BUY'  THEN EXECUTED_VOL ELSE 0 END) -
-            SUM(CASE WHEN UPPER(ACTION) = 'SELL' THEN EXECUTED_VOL ELSE 0 END)
-        )                                        AS insider_sentiment_signal
-    FROM {{ ref('STG_INSIDER_TRANSACTIONS') }}
-    GROUP BY 1, 2
+INSIDER_SIGNALS AS (
+  -- Aggregate insider transactions by ticker and announcement date
+  SELECT
+    TICKER,
+    DATE_START AS TRADING_DATE,
+    SUM(CASE WHEN UPPER(ACTION) = 'BUY' THEN EXECUTED_VOL ELSE 0 END) AS INSIDER_BUY_VOL,
+    SUM(CASE WHEN UPPER(ACTION) = 'SELL' THEN EXECUTED_VOL ELSE 0 END) AS INSIDER_SELL_VOL,
+    SUM(EXECUTED_VOL) AS INSIDER_TOTAL_VOL,
+    -- -1 net sell, +1 net buy, 0 neutral
+    SIGN(
+      SUM(CASE WHEN UPPER(ACTION) = 'BUY' THEN EXECUTED_VOL ELSE 0 END)
+      - SUM(CASE WHEN UPPER(ACTION) = 'SELL' THEN EXECUTED_VOL ELSE 0 END)
+    ) AS INSIDER_SENTIMENT_SIGNAL
+  FROM {{ ref('STG_INSIDER_TRANSACTIONS') }}
+  GROUP BY 1, 2
 )
 
 SELECT
-    ff.TICKER::VARCHAR(256)                        AS TICKER,
-    ff.TRADING_DATE::DATE                          AS TRADING_DATE,
-    -- Foreign flow signals
-    CASE WHEN ff.total_trading_val_10d > 0
-        THEN ff.buy_val_10d / ff.total_trading_val_10d
-    END::NUMERIC(18, 6)                            AS FOREIGN_BUY_RATIO_10D,
-    ff.net_foreign_val_1m::NUMERIC(18, 4)          AS NET_FOREIGN_FLOW_1M,
-    -- 1-month momentum in foreign flow (current vs prior period)
-    CASE WHEN ff.net_foreign_val_1m_prev != 0
-        THEN ff.net_foreign_val_1m / ABS(ff.net_foreign_val_1m_prev) - 1
-    END::NUMERIC(18, 6)                            AS NET_FOREIGN_FLOW_MOMENTUM_1M,
-    -- Proprietary trading signals
-    pf.prop_net_val_5d::NUMERIC(18, 4)             AS PROP_TRADING_NET_VAL_5D,
-    pfc.prop_vs_foreign_correlation_10d::NUMERIC(18, 6) AS PROP_VS_FOREIGN_CORRELATION_10D,
-    -- Insider trading signals (NULL on days with no transactions)
-    ins.insider_sentiment_signal::SMALLINT         AS INSIDER_SENTIMENT_SIGNAL,
-    CASE WHEN ins.insider_total_vol > 0
-        THEN ins.insider_buy_vol / ins.insider_total_vol
-    END::NUMERIC(18, 6)                            AS INSIDER_BUY_VOLUME_RATIO,
-    CURRENT_TIMESTAMP::TIMESTAMP                   AS DATACORE_CREATE_DATETIME,
-    '{{ var("dagster_job_name") }}'::VARCHAR(256)  AS DATACORE_CREATE_PROGRAM,
-    'DAGSTER'::VARCHAR(256)                        AS DATACORE_CREATE_BY,
-    CURRENT_TIMESTAMP::TIMESTAMP                   AS DATACORE_UPDATE_DATETIME,
-    '{{ var("dagster_job_name") }}'::VARCHAR(256)  AS DATACORE_UPDATE_PROGRAM,
-    'DAGSTER'::VARCHAR(256)                        AS DATACORE_UPDATE_BY,
-    '{{ var("batch_date") }}'::DATE                AS BATCH_DATE
-FROM foreign_flow ff
-LEFT JOIN proprietary_flow     pf  ON ff.TICKER = pf.TICKER AND ff.TRADING_DATE = pf.TRADING_DATE
-LEFT JOIN prop_foreign_corr    pfc ON ff.TICKER = pfc.TICKER AND ff.TRADING_DATE = pfc.TRADING_DATE
-LEFT JOIN insider_signals      ins ON ff.TICKER = ins.TICKER AND ff.TRADING_DATE = ins.TRADING_DATE
+  FF.TICKER::VARCHAR(256) AS TICKER,
+  FF.TRADING_DATE::DATE AS TRADING_DATE,
+  -- Foreign flow signals
+  CASE
+    WHEN FF.TOTAL_TRADING_VAL_10D > 0
+      THEN FF.BUY_VAL_10D / FF.TOTAL_TRADING_VAL_10D
+  END::NUMERIC(18, 6) AS FOREIGN_BUY_RATIO_10D,
+  FF.NET_FOREIGN_VAL_1M::NUMERIC(18, 4) AS NET_FOREIGN_FLOW_1M,
+  -- 1-month momentum in foreign flow (current vs prior period)
+  CASE
+    WHEN FF.NET_FOREIGN_VAL_1M_PREV != 0
+      THEN FF.NET_FOREIGN_VAL_1M / ABS(FF.NET_FOREIGN_VAL_1M_PREV) - 1
+  END::NUMERIC(18, 6) AS NET_FOREIGN_FLOW_MOMENTUM_1M,
+  -- Proprietary trading signals
+  PF.PROP_NET_VAL_5D::NUMERIC(18, 4) AS PROP_TRADING_NET_VAL_5D,
+  PFC.PROP_VS_FOREIGN_CORRELATION_10D::NUMERIC(18, 6) AS PROP_VS_FOREIGN_CORRELATION_10D,
+  -- Insider trading signals (NULL on days with no transactions)
+  INS.INSIDER_SENTIMENT_SIGNAL::SMALLINT AS INSIDER_SENTIMENT_SIGNAL,
+  CASE
+    WHEN INS.INSIDER_TOTAL_VOL > 0
+      THEN INS.INSIDER_BUY_VOL / INS.INSIDER_TOTAL_VOL
+  END::NUMERIC(18, 6) AS INSIDER_BUY_VOLUME_RATIO,
+  {{ datacore_common_metadata() }}
+FROM FOREIGN_FLOW AS FF
+LEFT JOIN PROPRIETARY_FLOW AS PF
+  ON
+    FF.TICKER = PF.TICKER
+    AND FF.TRADING_DATE = PF.TRADING_DATE
+LEFT JOIN PROP_FOREIGN_CORR AS PFC
+  ON
+    FF.TICKER = PFC.TICKER
+    AND FF.TRADING_DATE = PFC.TRADING_DATE
+LEFT JOIN INSIDER_SIGNALS AS INS
+  ON
+    FF.TICKER = INS.TICKER
+    AND FF.TRADING_DATE = INS.TRADING_DATE

@@ -2,7 +2,8 @@
   config(
     materialized='incremental',
     unique_key='REPORT_ID',
-    incremental_strategy='merge'
+    incremental_strategy='merge',
+    merge_exclude_columns=['DATACORE_CREATE_DATETIME', 'DATACORE_CREATE_PROGRAM', 'DATACORE_CREATE_BY']
   )
 }}
 
@@ -14,13 +15,9 @@ SELECT
   RECOMMENDATION::VARCHAR(256) AS RECOMMENDATION,
   TARGET_PRICE::NUMERIC(18, 4) AS TARGET_PRICE,
   REPORT_PDF_URL::VARCHAR(256) AS REPORT_PDF_URL,
-  BATCH_DATE::DATE AS BATCH_DATE,
-  _CONATA_SOURCE::VARCHAR(256) AS _CONATA_SOURCE,
-  _CONATA_SOURCE_ROW_NUMBER::INTEGER AS _CONATA_SOURCE_ROW_NUMBER,
-  _CONATA_PARTITION_KEY::VARCHAR(256) AS _CONATA_PARTITION_KEY,
-  _CONATA_LOADED_AT::TIMESTAMP AS _CONATA_LOADED_AT
+  {{ datacore_common_metadata() }}
 FROM {{ source('RAW', 'RAW_ANALYST_REPORTS') }}
 {% if is_incremental() %}
-  -- Lọc theo partition key khi chạy incremental
+  -- Filter by partition key for incremental run
   WHERE _CONATA_PARTITION_KEY = '{{ var("partition_key") }}'
 {% endif %}

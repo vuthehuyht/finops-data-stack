@@ -1,0 +1,9 @@
+{%- macro datacore_common_metadata() -%}
+  CURRENT_TIMESTAMP() AS DATACORE_CREATE_DATETIME,
+  CAST('{{ var("dagster_job_name") }}' AS VARCHAR) AS DATACORE_CREATE_PROGRAM,
+  CURRENT_USER() AS DATACORE_CREATE_BY,
+  CURRENT_TIMESTAMP() AS DATACORE_UPDATE_DATETIME,
+  CAST('{{ var("dagster_job_name") }}' AS VARCHAR) AS DATACORE_UPDATE_PROGRAM,
+  CURRENT_USER() AS DATACORE_UPDATE_BY,
+  {{ current_batch_date() }} AS BATCH_DATE
+{%- endmacro -%}

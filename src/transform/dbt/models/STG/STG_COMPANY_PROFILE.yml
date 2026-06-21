@@ -1,11 +1,10 @@
-models:
+﻿models:
   - name: STG_COMPANY_PROFILE
     description: Cleaned/Staging model for raw_company_profile
     meta:
       dagster:
         asset_key:
-          - DWH
-          - BATCH
+          - STAGING
           - STG_COMPANY_PROFILE
     columns:
       - name: TICKER

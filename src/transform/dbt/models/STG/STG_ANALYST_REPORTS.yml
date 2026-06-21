@@ -1,11 +1,10 @@
-models:
+﻿models:
   - name: STG_ANALYST_REPORTS
     description: Cleaned/Staging model for raw_analyst_reports
     meta:
       dagster:
         asset_key:
-          - DWH
-          - BATCH
+          - STAGING
           - STG_ANALYST_REPORTS
     columns:
       - name: REPORT_ID

@@ -1,11 +1,10 @@
-models:
+﻿models:
   - name: STG_CORPORATE_EVENTS
     description: Cleaned/Staging model for raw_corporate_events
     meta:
       dagster:
         asset_key:
-          - DWH
-          - BATCH
+          - STAGING
           - STG_CORPORATE_EVENTS
     columns:
       - name: EVENT_ID

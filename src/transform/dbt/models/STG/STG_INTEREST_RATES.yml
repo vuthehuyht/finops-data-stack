@@ -1,4 +1,4 @@
-models:
+﻿models:
   - name: STG_INTEREST_RATES
     description: Cleaned/Staging model for raw_interest_rates
     data_tests:
@@ -9,8 +9,7 @@ models:
     meta:
       dagster:
         asset_key:
-          - DWH
-          - BATCH
+          - STAGING
           - STG_INTEREST_RATES
     columns:
       - name: RATE_TYPE
