@@ -70,6 +70,17 @@ jobs:
       - name: Verify that the Dagster gRPC server can start
         run: |
           docker run -d --name dagster-grpc-test -p 3030:3030 finops-data-stack:ci
-          timeout 30 bash -c 'until docker exec dagster-grpc-test dagster api grpc-health-check -p 3030; do sleep 1; done'
+          if ! timeout 60 bash -c 'until dagster api grpc-health-check -p 3030 2>/dev/null; do
+            if ! docker inspect --format="{{.State.Running}}" dagster-grpc-test 2>/dev/null | grep -q true; then
+              echo "Container exited unexpectedly. Logs:"
+              docker logs dagster-grpc-test
+              exit 1
+            fi
+            sleep 2
+          done'; then
+            echo "Timed out waiting for gRPC server. Logs:"
+            docker logs dagster-grpc-test
+            exit 1
+          fi
           docker stop dagster-grpc-test
           docker rm dagster-grpc-test
