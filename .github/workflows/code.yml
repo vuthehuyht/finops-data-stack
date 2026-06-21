@@ -54,14 +54,14 @@ jobs:
           REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           uv run ruff check --output-format=concise src/ tests/ | \
-            reviewdog -efm="%f:%l:%c: %m" -name="ruff" -reporter=github-pr-review -filter-mode=diff_context -fail-level=any
+            reviewdog -efm="%f:%l:%c: %m" -name="ruff" -reporter=github-pr-review -filter-mode=diff_context -fail-on-error
 
       # Python static type check with mypy within uv virtualenv
       - name: Run mypy with Reviewdog
         env:
           REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          uv run mypy src/ | reviewdog -f=mypy -reporter=github-pr-review -filter-mode=diff_context -fail-level=any
+          uv run mypy src/ | reviewdog -f=mypy -reporter=github-pr-review -filter-mode=diff_context -fail-on-error
 
       # Yaml linting using official GHA Reviewdog Action
       - name: Yamllint with Reviewdog

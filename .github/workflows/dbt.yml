@@ -128,7 +128,7 @@ jobs:
                 -reporter=github-pr-review \
                 -filter-mode=diff_context \
                 -name='sqlfluff' \
-                -fail-level=any
+                -fail-on-error
           else
             echo "No SQL files changed."
           fi
