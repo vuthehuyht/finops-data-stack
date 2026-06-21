@@ -93,7 +93,7 @@ jobs:
           git fetch origin main:main
           # Store current workspace changes if any
           git stash -u || true
-          
+
           # Checkout main to compile target manifest
           git checkout main
           cd src/transform/dbt
@@ -106,7 +106,7 @@ jobs:
           git restore src/transform/dbt/package-lock.yml
           git checkout -
           git stash pop || true
-          
+
           # Build modified models only based on main state
           cd src/transform/dbt
           uv run dbt build --select "@state:modified" --state /tmp/main_manifest
@@ -128,7 +128,7 @@ jobs:
                 -reporter=github-pr-review \
                 -filter-mode=diff_context \
                 -name='sqlfluff' \
-                -fail-on-error
+                -fail-level=any
           else
             echo "No SQL files changed."
           fi
