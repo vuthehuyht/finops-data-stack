@@ -97,6 +97,7 @@ jobs:
           # Checkout main to compile target manifest
           git checkout main
           cd src/transform/dbt
+          rm -f package-lock.yml
           uv run dbt deps
           uv run dbt parse --target-path /tmp/main_manifest
           
