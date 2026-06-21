@@ -70,7 +70,7 @@ jobs:
       - name: Verify that the Dagster gRPC server can start
         run: |
           docker run -d --name dagster-grpc-test -p 3030:3030 finops-data-stack:ci
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             if docker exec dagster-grpc-test dagster api grpc-health-check -p 3030 2>/dev/null; then
               echo "gRPC server is healthy"
               docker stop dagster-grpc-test
