@@ -10,6 +10,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+defaults:
+  run:
+    shell: bash
+
 permissions:
   contents: read
 
@@ -37,6 +41,7 @@ jobs:
     needs: check-dbt-paths
     if: github.event_name != 'pull_request' || needs.check-dbt-paths.outputs.dbt_related == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: read
       pull-requests: write
@@ -68,11 +73,17 @@ jobs:
       REDSHIFT_SCHEMA_FUNCTION: CI_DB_UTILS_${{ github.run_number }}
       REDSHIFT_SCHEMA_OPERATION: CI_OPERATION_${{ github.run_number }}
 
+      # dbt variables used in all build/test steps
+      # yamllint disable-line rule:line-length
+      VARS: '{"partition_key": "2024-01-01", "batch_date": "2024-01-01", "dagster_job_name": "CI_DBT_JOB"}'
+      # yamllint disable-line rule:line-length
+      DBT_WARN_ERROR_OPTIONS: '{"error": "all", "warn": ["NoNodesForSelectionCriteria", "NoNodesSelected", "NothingToDo", "UnversionedBreakingChange"]}'
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Fetch all history for git diff checking
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -93,29 +104,65 @@ jobs:
       - name: Run Redshift DDL Setup
         run: bash ./src/redshift/dev/setup.sh --skip_confirmation
 
-      - name: Fetch Main dbt Manifest & Run dbt Build (Incremental)
+      - name: Install dbt packages
+        working-directory: src/transform/dbt
+        run: |
+          rm -f package-lock.yml
+          uv run dbt deps --profiles-dir .
+
+      - name: Verify that all models in the dbt project are buildable
+        working-directory: src/transform/dbt
         id: dbt_build
         run: |
-          git fetch origin main:main
-          # Store current workspace changes if any
-          git stash -u || true
+          uv run dbt build --profiles-dir . --vars "${VARS}" \
+            --full-refresh --exclude-resource-type unit_test | tee dbt_build_output.log
 
-          # Checkout main to compile target manifest
-          git checkout main
-          cd src/transform/dbt
-          rm -f package-lock.yml
-          uv run dbt deps
-          uv run dbt parse --target-path /tmp/main_manifest
+      - name: Check compiled query on failure
+        if: failure() && steps.dbt_build.outcome == 'failure'
+        working-directory: src/transform/dbt
+        run: |
+          if [ -f "dbt_build_output.log" ]; then
+            output=$(cat dbt_build_output.log)
+            if [[ "${output}" == *'compiled code at'* ]]; then
+              path=$(echo "${output}" | sed -n "s/.*compiled code at //p")
+              echo "Compiled query is available at ${path}"
+              cat "${path}" || echo "Failed to read compiled query file"
+            else
+              echo "No compiled query found."
+            fi
+          else
+            echo "No dbt log found."
+          fi
 
-          # Switch back to the PR branch
-          cd ../../..
-          git restore src/transform/dbt/package-lock.yml
-          git checkout -
-          git stash pop || true
+      - name: Verify that unit tests succeed
+        working-directory: src/transform/dbt
+        run: |
+          uv run dbt test --profiles-dir . --vars "${VARS}" \
+            --select 'test_type:unit'
 
-          # Build modified models only based on main state
-          cd src/transform/dbt
-          uv run dbt build --select "@state:modified" --state /tmp/main_manifest
+      - name: Verify that all incremental models in the dbt project are buildable
+        working-directory: src/transform/dbt
+        id: dbt_incremental_build
+        run: |
+          uv run dbt build --profiles-dir . --vars "${VARS}" \
+            --select 'config.materialized:incremental' | tee dbt_incremental_output.log
+
+      - name: Check compiled query on failure (incremental)
+        if: failure() && steps.dbt_incremental_build.outcome == 'failure'
+        working-directory: src/transform/dbt
+        run: |
+          if [ -f "dbt_incremental_output.log" ]; then
+            output=$(cat dbt_incremental_output.log)
+            if [[ "${output}" == *'compiled code at'* ]]; then
+              path=$(echo "${output}" | sed -n "s/.*compiled code at //p")
+              echo "Compiled query is available at ${path}"
+              cat "${path}" || echo "Failed to read compiled query file"
+            else
+              echo "No compiled query found."
+            fi
+          else
+            echo "No dbt log found."
+          fi
 
       - name: SQLFluff Lint with Reviewdog (Modified SQL Only)
         env:
@@ -126,7 +173,6 @@ jobs:
           if [ -n "$CHANGED_SQL" ]; then
             echo "Linting modified SQL files: $CHANGED_SQL"
             cd src/transform/dbt
-            # Output in parsable format and feed to Reviewdog
             # shellcheck disable=SC2086
             uv run sqlfluff lint --format=parsable $CHANGED_SQL | \
               reviewdog \

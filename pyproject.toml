@@ -50,7 +50,7 @@ ml = [
 ]
 
 [tool.dagster]
-module_name = "src.dagster"
+module_name = "src.dagster.workspace"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]

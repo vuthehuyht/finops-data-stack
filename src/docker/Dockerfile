@@ -32,4 +32,4 @@ ENV PYTHONPATH=/app
 
 EXPOSE 3030
 
-CMD ["dagster", "api", "grpc", "--port", "3030", "-h", "0.0.0.0", "--module-name", "src.dagster"]
+CMD ["dagster", "api", "grpc", "--port", "3030", "-h", "0.0.0.0", "--module-name", "src.dagster.workspace"]
