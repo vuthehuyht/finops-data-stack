@@ -3,9 +3,9 @@
 import os
 import unittest.mock
 
+import dagster
 import pytest
 
-import dagster
 from src.pipeline.dagster import k8s
 
 

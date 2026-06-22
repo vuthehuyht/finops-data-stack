@@ -1,6 +1,7 @@
 """Tests for `resources.py`."""
 
 import dagster
+
 from src.pipeline.dagster.metrics import PrometheusResource
 from src.pipeline.dagster.resources import prometheus_resource
 

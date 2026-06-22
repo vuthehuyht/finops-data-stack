@@ -40,6 +40,7 @@ dev = [
     "pytest-mock>=3.15.1",
     "sqlfluff>=3.0.0",
     "sqlfluff-templater-dbt>=3.0.0",
+    "pre-commit>=4.6.0",
 ]
 dagster = [
     "dagster-webserver>=1.7.0",

@@ -2,13 +2,14 @@
 
 import time
 from unittest.mock import Mock
+
 import pytest
 
 from src.ingest.client.base_client import BaseClient
 
 
 def test_base_client_retry_success_eventually() -> None:
-    """Verify that BaseClient retries on failure and returns when eventually successful."""
+    """Verify that BaseClient retries on failure and returns when successful."""
     client = BaseClient(request_delay_seconds=0.0)  # disable delay for fast test
     mock_func = Mock()
 

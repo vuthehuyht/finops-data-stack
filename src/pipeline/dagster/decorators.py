@@ -6,14 +6,9 @@ import random
 from collections.abc import Callable, Iterable, Mapping, Sequence, Set
 from typing import Any, overload
 
+import dagster
 import dagster_dbt
 import dagster_dbt.dbt_manifest
-from dagster_aws.s3 import S3Resource
-from dagster_k8s import k8s_job_executor
-from dagster_k8s.job import USER_DEFINED_K8S_CONFIG_KEY
-from dagster_k8s.utils import sanitize_k8s_label
-
-import dagster
 from dagster import (
     AssetCheckKey,
     AssetCheckResult,
@@ -54,6 +49,11 @@ from dagster._core.definitions.metadata import (
     ArbitraryMetadataMapping,
     RawMetadataValue,
 )
+from dagster_aws.s3 import S3Resource
+from dagster_k8s import k8s_job_executor
+from dagster_k8s.job import USER_DEFINED_K8S_CONFIG_KEY
+from dagster_k8s.utils import sanitize_k8s_label
+
 from src.common.dict_util import deep_merge_dicts, list_concat_merger
 from src.k8s.manifest.utils import (
     default_container_env,

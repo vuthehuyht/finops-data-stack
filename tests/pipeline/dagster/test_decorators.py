@@ -4,9 +4,6 @@ from collections.abc import Iterable
 from typing import Any
 
 import pytest
-from dagster_k8s.job import USER_DEFINED_K8S_CONFIG_KEY
-from pytest_mock import MockerFixture
-
 from dagster import (
     Field,
     JobDefinition,
@@ -18,6 +15,9 @@ from dagster import (
     config_mapping,
     daily_partitioned_config,
 )
+from dagster_k8s.job import USER_DEFINED_K8S_CONFIG_KEY
+from pytest_mock import MockerFixture
+
 from src.k8s.manifest.utils import default_container_env
 from src.pipeline import dagster as dagster_lib
 

@@ -5,11 +5,6 @@ from collections.abc import Iterable, Mapping, MutableMapping
 from typing import Any, cast
 
 import prometheus_client
-from dagster_aws.s3 import S3Resource
-from dagster_k8s import k8s_job_executor
-
-import src.pipeline.dagster.hooks
-import src.pipeline.dagster.metrics
 from dagster import (
     AssetsDefinition,
     AssetSpec,
@@ -33,6 +28,11 @@ from dagster._core.definitions.repository_definition import (
 from dagster._core.definitions.unresolved_asset_job_definition import (
     UnresolvedAssetJobDefinition,
 )
+from dagster_aws.s3 import S3Resource
+from dagster_k8s import k8s_job_executor
+
+import src.pipeline.dagster.hooks
+import src.pipeline.dagster.metrics
 from src.pipeline.dagster.k8s import io_manager, on_k8s
 from src.pipeline.dagster.resources import prometheus_resource
 

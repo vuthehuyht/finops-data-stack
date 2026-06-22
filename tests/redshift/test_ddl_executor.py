@@ -43,9 +43,7 @@ def test_render_ddl_queries() -> None:
     ]
 
     with patch("builtins.open", m_open):
-        rendered_queries = _render_ddl_queries(
-            ["file1.sql", "file2.sql"], parameters
-        )
+        rendered_queries = _render_ddl_queries(["file1.sql", "file2.sql"], parameters)
 
     assert len(rendered_queries) == 2
     assert rendered_queries[0] == ("file1.sql", "CREATE SCHEMA S1;")
@@ -88,7 +86,7 @@ def test_execute_ddl_queries_success(
 
     file_queries = [
         ("file1.sql", "CREATE SCHEMA S1;"),
-        ("file2.sql", "CREATE TABLE S1.t1 (id INT);")
+        ("file2.sql", "CREATE TABLE S1.t1 (id INT);"),
     ]
     execute_ddl_queries(
         file_queries=file_queries,

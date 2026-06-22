@@ -9,16 +9,15 @@ import os
 from collections.abc import Iterator, MutableMapping
 from typing import Any
 
+import dagster
 from dagster_aws.s3.io_manager import s3_pickle_io_manager
 
-import dagster
 from src.common import dict_util
 
 try:
+    from dagster._core.executor.step_delegating import StepHandlerContext
     from dagster_k8s.executor import K8sStepHandler
     from dagster_k8s.job import USER_DEFINED_K8S_CONFIG_KEY
-
-    from dagster._core.executor.step_delegating import StepHandlerContext
 
     def launch_step(
         self: K8sStepHandler,

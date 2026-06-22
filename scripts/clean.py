@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 Script to clean cache and temporary files supporting Makefile, cross-platform.
 """
@@ -36,7 +35,7 @@ def clean_project():
 
     # Recursively find and delete __pycache__ and *.egg-info
     deleted_count = 0
-    for root, dirs, files in os.walk("."):
+    for root, dirs, _files in os.walk("."):
         # Skip directories like .git and .venv to avoid scanning unnecessarily
         if ".git" in dirs:
             dirs.remove(".git")

@@ -1,8 +1,8 @@
 """Unit tests for ProprietaryTradingPipeline."""
 
-import pytest
-import pandas as pd
 from unittest.mock import MagicMock
+
+import pandas as pd
 
 from src.ingest.pipeline.proprietary_trading import ProprietaryTradingPipeline
 
