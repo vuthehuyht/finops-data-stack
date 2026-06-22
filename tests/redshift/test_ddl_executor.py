@@ -6,7 +6,7 @@ import jinja2
 import pytest
 
 from src.redshift.ddl_executor import (
-    _make_concatenated_ddl_query_string,
+    _render_ddl_queries,
     _render_query,
     confirm_execution,
     execute_ddl_queries,
@@ -28,10 +28,10 @@ def test_render_query_missing_param_raises_error() -> None:
         _render_query(query_template, {})
 
 
-def test_make_concatenated_ddl_query_string() -> None:
-    """Test reading multiple templates and joining them into one query."""
+def test_render_ddl_queries() -> None:
+    """Test reading multiple templates and rendering them."""
     file_contents = [
-        "CREATE SCHEMA {{ s1 }};\n",
+        "CREATE SCHEMA {{ s1 }};",
         "CREATE TABLE {{ s2 }}.t1 (id INT);",
     ]
     parameters = {"s1": "S1", "s2": "S2"}
@@ -43,12 +43,13 @@ def test_make_concatenated_ddl_query_string() -> None:
     ]
 
     with patch("builtins.open", m_open):
-        concatenated = _make_concatenated_ddl_query_string(
+        rendered_queries = _render_ddl_queries(
             ["file1.sql", "file2.sql"], parameters
         )
 
-    expected = "CREATE SCHEMA S1\n;\nCREATE TABLE S2.t1 (id INT)"
-    assert concatenated == expected
+    assert len(rendered_queries) == 2
+    assert rendered_queries[0] == ("file1.sql", "CREATE SCHEMA S1;")
+    assert rendered_queries[1] == ("file2.sql", "CREATE TABLE S2.t1 (id INT);")
 
 
 @pytest.mark.parametrize(
@@ -85,16 +86,20 @@ def test_execute_ddl_queries_success(
     mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
     mock_get_conn.return_value.__enter__.return_value = mock_conn
 
-    queries = "CREATE SCHEMA S1; CREATE TABLE S1.t1 (id INT);"
+    file_queries = [
+        ("file1.sql", "CREATE SCHEMA S1;"),
+        ("file2.sql", "CREATE TABLE S1.t1 (id INT);")
+    ]
     execute_ddl_queries(
-        queries=queries,
+        file_queries=file_queries,
         skip_confirmation=True,
-        total_files=2,
         parameters={},
     )
 
-    # Verify that cursor execute was called and transaction committed
-    mock_cursor.execute.assert_called_once_with(queries)
+    # Verify that cursor execute was called for each query
+    assert mock_cursor.execute.call_count == 2
+    mock_cursor.execute.assert_any_call("CREATE SCHEMA S1;")
+    mock_cursor.execute.assert_any_call("CREATE TABLE S1.t1 (id INT);")
     mock_conn.commit.assert_called_once()
     mock_conn.rollback.assert_not_called()
 
@@ -111,18 +116,17 @@ def test_execute_ddl_queries_failure_rolls_back(
     mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
     mock_get_conn.return_value.__enter__.return_value = mock_conn
 
-    queries = "BAD SQL STATEMENT;"
+    file_queries = [("file1.sql", "BAD SQL STATEMENT;")]
 
     with pytest.raises(Exception, match="Redshift syntax error"):
         execute_ddl_queries(
-            queries=queries,
+            file_queries=file_queries,
             skip_confirmation=True,
-            total_files=1,
             parameters={},
         )
 
     # Verify cursor executed, commit was not called, and rollback was called
-    mock_cursor.execute.assert_called_once_with(queries)
+    mock_cursor.execute.assert_called_once_with("BAD SQL STATEMENT;")
     mock_conn.commit.assert_not_called()
     mock_conn.rollback.assert_called_once()
 
@@ -136,9 +140,8 @@ def test_execute_ddl_queries_user_cancelled(
     """Test interactive cancellation exits program immediately."""
     with pytest.raises(SystemExit) as excinfo:
         execute_ddl_queries(
-            queries="CREATE SCHEMA S1;",
+            file_queries=[("file1.sql", "CREATE SCHEMA S1;")],
             skip_confirmation=False,
-            total_files=1,
             parameters={},
         )
 
