@@ -19,33 +19,19 @@ clean-targets:
   - "target"
   - "dbt_packages"
 
-query-comment:
-  comment: >
-    Executed by FinOps Data Stack.
-    {% set comment_dict = {} -%}
-    {%- if node is not none -%}
-      {%- do comment_dict.update(node_id=node.unique_id) -%}
-    {% else %}
-      {%- do comment_dict.update(connection_name=connection_name) -%}
-    {%- endif -%}
-    {{ tojson(comment_dict) }}
-
 vars:
   partition_key: ""
   batch_date: ""
   dagster_job_name: ""
 
 models:
-  +persist_docs:
-    relation: true
-    columns: true
   transform:
     +tmp_relation_type: table
     STG:
-      +schema: "{{ env_var('REDSHIFT_STAGING_SCHEMA', 'DEV_STAGING') }}"
+      +schema: "{{ env_var('REDSHIFT_STAGING_SCHEMA', 'staging') }}"
       +group: STG
       +tags: ['staging']
     MART:
-      +schema: "{{ env_var('REDSHIFT_MART_SCHEMA', 'DEV_MART') }}"
+      +schema: "{{ env_var('REDSHIFT_MART_SCHEMA', 'mart') }}"
       +group: MART
       +tags: ['mart']

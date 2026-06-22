@@ -7,10 +7,12 @@ transform:
       port: 5439
       user: "{{ env_var('REDSHIFT_USER', 'awsuser') }}"
       password: "{{ env_var('REDSHIFT_PASSWORD', '') }}"
-      dbname: "{{ env_var('REDSHIFT_DATABASE', 'dev') }}"
-      schema: dev_mart
+      dbname: "{{ env_var('REDSHIFT_DATABASE', '') }}"
+      schema: "{{ env_var('REDSHIFT_SCHEMA_RAW', 'raw') }}"
       threads: 16
-      keepalives_idle: 240
+      connect_retries: 3
+      reuse_connections: true
+      client_session_keep_alive: true
     no_snowflake_access:
       type: redshift
       host: localhost
