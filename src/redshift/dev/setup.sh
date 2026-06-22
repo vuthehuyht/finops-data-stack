@@ -15,10 +15,10 @@ if [[ -f "${ROOT_DIR}/.env" ]]; then
   set +a
 fi
 
-ADDITIONAL_OPTIONS=''
+ADDITIONAL_OPTIONS=()
 for argument in "$@"; do
   if [[ "${argument}" = '--skip_confirmation' ]]; then
-    ADDITIONAL_OPTIONS="${ADDITIONAL_OPTIONS} ${argument}"
+    ADDITIONAL_OPTIONS+=("${argument}")
   fi
 done
 
@@ -29,6 +29,6 @@ uv run python ddl_executor.py \
     \"schema_name_staging\": \"${REDSHIFT_STAGING_SCHEMA:-STAGING}\",
     \"schema_name_mart\": \"${REDSHIFT_SCHEMA_MART:-MART}\"
   }" \
-  ${ADDITIONAL_OPTIONS} \
+  "${ADDITIONAL_OPTIONS[@]}" \
   ddl/dev/setup.sql.jinja \
   ddl/raw/*.sql.jinja
