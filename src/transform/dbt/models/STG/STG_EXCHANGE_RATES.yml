@@ -1,4 +1,4 @@
-models:
+﻿models:
   - name: STG_EXCHANGE_RATES
     description: Cleaned/Staging model for raw_exchange_rates
     data_tests:
@@ -9,8 +9,7 @@ models:
     meta:
       dagster:
         asset_key:
-          - DWH
-          - BATCH
+          - STAGING
           - STG_EXCHANGE_RATES
     columns:
       - name: PAIR
@@ -25,11 +24,15 @@ models:
         data_type: NUMERIC(18, 4)
       - name: BATCH_DATE
         data_type: DATE
-      - name: _CONATA_SOURCE
-        data_type: VARCHAR(256)
-      - name: _CONATA_SOURCE_ROW_NUMBER
-        data_type: INTEGER
-      - name: _CONATA_PARTITION_KEY
-        data_type: VARCHAR(256)
-      - name: _CONATA_LOADED_AT
+      - name: DATACORE_CREATE_DATETIME
         data_type: TIMESTAMP
+      - name: DATACORE_CREATE_PROGRAM
+        data_type: VARCHAR(256)
+      - name: DATACORE_CREATE_BY
+        data_type: VARCHAR(256)
+      - name: DATACORE_UPDATE_DATETIME
+        data_type: TIMESTAMP
+      - name: DATACORE_UPDATE_PROGRAM
+        data_type: VARCHAR(256)
+      - name: DATACORE_UPDATE_BY
+        data_type: VARCHAR(256)

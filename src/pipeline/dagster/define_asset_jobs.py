@@ -4,8 +4,6 @@ from collections.abc import Mapping, Set
 from typing import Any, overload
 
 import dagster
-import src.pipeline.dagster.decorators
-import src.pipeline.dagster.hooks
 from dagster import (
     ConfigMapping,
     ExecutorDefinition,
@@ -22,6 +20,9 @@ from dagster._core.definitions.metadata import RawMetadataValue
 from dagster._core.definitions.unresolved_asset_job_definition import (
     UnresolvedAssetJobDefinition,
 )
+
+import src.pipeline.dagster.decorators
+import src.pipeline.dagster.hooks
 from src.pipeline.dagster.k8s import on_k8s
 
 

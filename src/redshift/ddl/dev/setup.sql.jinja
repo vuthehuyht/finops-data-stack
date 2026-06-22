@@ -1,16 +1,16 @@
 -- Recreate Redshift schemas for development.
 
 -- 1. Raw Data schema
-DROP SCHEMA IF EXISTS {{ schema_name_raw }} CASCADE;
-CREATE SCHEMA {{ schema_name_raw }};
-COMMENT ON SCHEMA {{ schema_name_raw }} IS 'Schema for raw ingested data';
+DROP SCHEMA IF EXISTS "{{ schema_name_raw }}" CASCADE;
+CREATE SCHEMA "{{ schema_name_raw }}";
+COMMENT ON SCHEMA "{{ schema_name_raw }}" IS 'Schema for raw ingested data';
 
--- 2. Data Warehouse schema
-DROP SCHEMA IF EXISTS {{ schema_name_dwh }} CASCADE;
-CREATE SCHEMA {{ schema_name_dwh }};
-COMMENT ON SCHEMA {{ schema_name_dwh }} IS 'Schema for integrated and cleaned data';
+-- 2. Staging schema
+DROP SCHEMA IF EXISTS "{{ schema_name_staging }}" CASCADE;
+CREATE SCHEMA "{{ schema_name_staging }}";
+COMMENT ON SCHEMA "{{ schema_name_staging }}" IS 'Schema for integrated and cleaned data';
 
 -- 3. Mart Data schema
-DROP SCHEMA IF EXISTS {{ schema_name_mart }} CASCADE;
-CREATE SCHEMA {{ schema_name_mart }};
-COMMENT ON SCHEMA {{ schema_name_mart }} IS 'Schema for analytical marts and ML features';
+DROP SCHEMA IF EXISTS "{{ schema_name_mart }}" CASCADE;
+CREATE SCHEMA "{{ schema_name_mart }}";
+COMMENT ON SCHEMA "{{ schema_name_mart }}" IS 'Schema for analytical marts and ML features';

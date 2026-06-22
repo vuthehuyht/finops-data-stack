@@ -2,7 +2,7 @@ version: 2
 sources:
   - name: RAW
     description: Raw data source for RAW
-    schema: RAW
+    schema: "{{ env_var('REDSHIFT_SCHEMA_RAW', 'raw') }}"
     tables:
       - name: RAW_INDEX_PRICE_EOD
         description: Raw data source for RAW_INDEX_PRICE_EOD

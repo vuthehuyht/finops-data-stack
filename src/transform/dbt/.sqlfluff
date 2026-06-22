@@ -2,6 +2,27 @@
 dialect = redshift
 templater = dbt
 ignore_paths = dbt_packages/,macros/,target/
+max_line_length = 120
+exclude_rules = RF04,ST10,ST06
+
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = upper
+
+[sqlfluff:rules:capitalisation.identifiers]
+capitalisation_policy = upper
+
+[sqlfluff:rules:capitalisation.functions]
+capitalisation_policy = upper
+
+[sqlfluff:rules:capitalisation.literals]
+capitalisation_policy = upper
+
+[sqlfluff:rules:capitalisation.types]
+capitalisation_policy = upper
+
+[sqlfluff:indentation]
+indent_unit = space
+tab_space_size = 2
 
 [sqlfluff:templater:dbt]
 project_dir = .

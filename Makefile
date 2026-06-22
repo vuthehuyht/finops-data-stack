@@ -18,6 +18,9 @@ help:
 setup:
 	@echo "Installing dependencies with uv..."
 	uv sync
+	@echo "Installing pre-commit hooks..."
+	uv run pip install pre-commit
+	uv run pre-commit install
 	@echo "Dependencies installed successfully."
 	@uv run python scripts/setup_dev.py
 

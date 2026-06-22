@@ -1,5 +1,5 @@
 groups:
-  - name: CLEANED
+  - name: STG
     owner:
       name: DATACORE
   - name: MART

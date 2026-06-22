@@ -31,8 +31,8 @@ def test_transform_job_defs_csv() -> None:
 
             schema_suffix, table_name, trigger_type, trigger_parameter = row
 
-            assert schema_suffix == "SILVER", (
-                f"Row {i}: schema_suffix must be 'SILVER'. Found '{schema_suffix}'"
+            assert schema_suffix == "STAGING", (
+                f"Row {i}: schema_suffix must be 'STAGING'. Found '{schema_suffix}'"
             )
             assert table_name.startswith("stg_"), (
                 f"Row {i}: table_name '{table_name}' must start with 'stg_'"

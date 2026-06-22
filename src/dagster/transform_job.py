@@ -29,7 +29,7 @@ from src.dagster.resources import DbtConfigResource
 
 _TIMEZONE = "Asia/Ho_Chi_Minh"
 _FETCH_LIMIT = 30
-_SILVER_JOB_DEFINITION_FILE = os.path.abspath(
+_STAGING_JOB_DEFINITION_FILE = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "transform_job_defs.csv")
 )
 
@@ -173,7 +173,7 @@ def define_silver_jobs() -> SilverJobBundle:
 
     dbt_deps = dbt_assets.get_dbt_asset_dependency()
 
-    for param in read_transform_job_parameter(_SILVER_JOB_DEFINITION_FILE):
+    for param in read_transform_job_parameter(_STAGING_JOB_DEFINITION_FILE):
         # Match AssetKey format: SILVER/STG_STOCK_PRICE_EOD
         asset_key = AssetKey([param.schema_suffix, param.table_name.upper()])
 
@@ -338,9 +338,7 @@ def _create_sensor_for_mart_jobs(
                         run_key=run_key,
                         run_config=RunConfig(
                             resources={
-                                "dbt_config": DbtConfigResource(
-                                    variables=dbt_vars
-                                )
+                                "dbt_config": DbtConfigResource(variables=dbt_vars)
                             }
                         ),
                     )
@@ -403,4 +401,3 @@ def define_mart_jobs() -> MartJobBundle:
         )
 
     return bundle
-

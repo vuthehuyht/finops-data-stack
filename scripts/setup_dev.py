@@ -1,7 +1,8 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
-Script to initialize dev_local environment (creates placeholder .env, terraform.tfvars, and dbt profiles.yml).
+Script to initialize dev_local environment.
+
+Creates placeholder .env, terraform.tfvars, and dbt profiles.yml.
 """
 
 import io
@@ -31,7 +32,10 @@ def setup_dev_local():
                 f.write("REDSHIFT_DATABASE=dev\n")
                 f.write("REDSHIFT_USER=awsuser\n")
                 f.write("REDSHIFT_PASSWORD=\n")
-            print("Successfully created template .env file. Please update configurations as needed.")
+            print(
+                "Successfully created template .env file. "
+                "Please update configurations as needed."
+            )
         except Exception as e:
             print(f"Error creating .env file: {e}")
     else:
@@ -47,7 +51,10 @@ def setup_dev_local():
             os.makedirs(tfvars_dir, exist_ok=True)
             with open(tfvars_path, "w", encoding="utf-8") as f:
                 f.write("# Terraform variables configuration for dev_local\n")
-                f.write('allowed_ips             = ["0.0.0.0/0"] # Change to your public IP for better security\n')
+                f.write(
+                    'allowed_ips             = ["0.0.0.0/0"] '
+                    "# Change to your public IP for better security\n"
+                )
                 f.write('redshift_admin_username = "awsuser"\n')
                 f.write('redshift_admin_password = "SecurePassword123!"\n')
             print("Successfully created terraform.tfvars file.")

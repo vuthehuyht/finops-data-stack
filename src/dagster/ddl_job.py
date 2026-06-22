@@ -40,12 +40,8 @@ def _create_ddl_op(
             "execute_ddl_master_global_op": {
                 "config": {"query_template_file_paths": []}
             },
-            "execute_ddl_batch_asia_op": {
-                "config": {"query_template_file_paths": []}
-            },
-            "execute_ddl_master_asia_op": {
-                "config": {"query_template_file_paths": []}
-            },
+            "execute_ddl_batch_asia_op": {"config": {"query_template_file_paths": []}},
+            "execute_ddl_master_asia_op": {"config": {"query_template_file_paths": []}},
         },
     ),
 )

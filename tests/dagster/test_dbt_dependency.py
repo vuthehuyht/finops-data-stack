@@ -64,7 +64,7 @@ def test_get_downstream() -> None:
 def test_is_raw_asset() -> None:
     """Test is_raw_asset function."""
     raw_asset = dagster.AssetKey(["RAW", "DATA"])
-    non_raw_asset = dagster.AssetKey(["DWH", "DATA"])
+    non_raw_asset = dagster.AssetKey(["STAGING", "DATA"])
 
     assert is_raw_asset(raw_asset) is True
     assert is_raw_asset(non_raw_asset) is False

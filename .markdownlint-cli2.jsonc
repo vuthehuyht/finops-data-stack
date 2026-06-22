@@ -1,0 +1,17 @@
+{
+  "config": {
+    "no-hard-tabs": {
+      "code_blocks": false
+    },
+    "line-length": false,
+    "no-inline-html": false
+  },
+  "globs": [
+    "**/*.md"
+  ],
+  "ignores": [
+    "**/.venv/**",
+    "**/dbt_packages/**",
+    ".github/pull_request_template.md"
+  ]
+}

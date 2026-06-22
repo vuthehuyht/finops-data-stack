@@ -5,9 +5,6 @@ import traceback
 from collections.abc import Sequence
 from typing import Any
 
-from dagster_slack import make_slack_on_run_failure_sensor
-from slack_sdk.web.client import WebClient
-
 from dagster import (
     DagsterEvent,
     HookContext,
@@ -19,6 +16,9 @@ from dagster._core.definitions.events import HookExecutionResult
 from dagster._core.definitions.unresolved_asset_job_definition import (
     UnresolvedAssetJobDefinition,
 )
+from dagster_slack import make_slack_on_run_failure_sensor
+from slack_sdk.web.client import WebClient
+
 from src.pipeline.dagster.k8s import kubernetes_cluster_name, on_k8s
 from src.pipeline.dagster.metrics import op_metrics_hook_impl
 

@@ -8,7 +8,7 @@ from dagster import AssetKey, AssetSpec, multi_asset
 
 from src.dagster.transform_job import (
     _MART_JOB_DEFINITION_FILE,
-    _SILVER_JOB_DEFINITION_FILE,
+    _STAGING_JOB_DEFINITION_FILE,
     read_mart_job_parameter,
     read_transform_job_parameter,
 )
@@ -17,7 +17,7 @@ from src.dagster.transform_job import (
 @pytest.fixture(autouse=True)
 def mock_dbt_assets_and_dependencies():
     # Load parameters to simulate dbt objects
-    silver_params = list(read_transform_job_parameter(_SILVER_JOB_DEFINITION_FILE))
+    silver_params = list(read_transform_job_parameter(_STAGING_JOB_DEFINITION_FILE))
     mart_params = list(read_mart_job_parameter(_MART_JOB_DEFINITION_FILE))
 
     # 1. Mock dependencies for define_silver_jobs and define_mart_jobs
@@ -113,7 +113,7 @@ def test_workspace_has_17_silver_assets() -> None:
         reload(src.dagster.workspace)
         defs = src.dagster.workspace.defs
         silver_keys = [
-            k for k in defs.assets_defs_by_key.keys() if k.path[0] == "SILVER"
+            k for k in defs.assets_defs_by_key.keys() if k.path[0] == "STAGING"
         ]
         assert len(silver_keys) == 17
 

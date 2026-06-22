@@ -30,29 +30,26 @@ def _render_query(query_template: str, parameters: dict[str, str]) -> str:
     )
 
 
-def _make_concatenated_ddl_query_string(
+def _render_ddl_queries(
     input_file_paths: list[str], parameters: dict[str, str]
-) -> str:
-    """Render DDL queries in the input files and concatenate them.
+) -> list[tuple[str, str]]:
+    """Render DDL templates and return (file_path, sql) pairs.
 
     Args:
         input_file_paths: List of absolute or relative paths to template files.
         parameters: Dictionary containing template parameter overrides.
 
     Returns:
-        A single string containing all rendered SQL statements separated by semicolons.
+        List of (file_path, rendered_sql) tuples, one per input file.
     """
-    sql_queries: list[str] = []
+    result: list[tuple[str, str]] = []
     for file_path in input_file_paths:
         logger.info("Processing template file: %s", file_path)
         with open(file_path, encoding="utf-8") as f_in:
             rendered_query = _render_query(f_in.read(), parameters)
-            # Remove trailing semicolons to prevent syntax errors during concatenation
-            cleaned_query = rendered_query.rstrip().rstrip(";")
-            if cleaned_query:
-                sql_queries.append(cleaned_query)
-
-    return "\n;\n".join(sql_queries)
+            if rendered_query.strip():
+                result.append((file_path, rendered_query))
+    return result
 
 
 def confirm_execution(message: str) -> bool:
@@ -73,17 +70,15 @@ def confirm_execution(message: str) -> bool:
 
 
 def execute_ddl_queries(
-    queries: str,
+    file_queries: list[tuple[str, str]],
     skip_confirmation: bool,
-    total_files: int,
     parameters: dict[str, str],
 ) -> None:
-    """Execute concatenated DDL query string on Redshift database.
+    """Execute rendered DDL queries file-by-file on Redshift database.
 
     Args:
-        queries: Concatenated query string to run.
+        file_queries: List of (file_path, rendered_sql) tuples to execute in order.
         skip_confirmation: Flag to bypass user interactive confirmation.
-        total_files: Count of files processed for logging context.
         parameters: Template parameter dictionary for logging metadata.
 
     Raises:
@@ -91,7 +86,7 @@ def execute_ddl_queries(
     """
     if not skip_confirmation:
         warning_msg = (
-            f"Are you certain you want to execute the {total_files} queries "
+            f"Are you certain you want to execute {len(file_queries)} files "
             f"with these parameters: {parameters}?"
         )
         if not confirm_execution(warning_msg):
@@ -99,18 +94,19 @@ def execute_ddl_queries(
             sys.exit(1)
 
     logger.info("Connecting to Redshift database...")
-    # Using psycopg2 connection context manager
     with get_redshift_connection() as conn:
         conn.autocommit = False
         with conn.cursor() as cursor:
             try:
-                logger.info("Running DDL statements block...")
-                # psycopg2 supports executing multiple semicolon-separated statements
-                cursor.execute(queries)
+                for file_path, sql in file_queries:
+                    logger.info("Executing: %s", file_path)
+                    cursor.execute(sql)
                 conn.commit()
                 logger.info("All DDL statements executed and committed successfully.")
             except Exception as e:
-                logger.error("Error executing DDL. Rolling back transaction.")
+                logger.error(
+                    "Error executing DDL from %s. Rolling back transaction.", file_path
+                )
                 conn.rollback()
                 raise e
 
@@ -175,19 +171,18 @@ def main() -> None:
     )
 
     parsed_parameters = json.loads(args.template_parameters)
-    concatenated_queries = _make_concatenated_ddl_query_string(
+    file_queries = _render_ddl_queries(
         args.input_ddl_query_template_file_paths, parsed_parameters
     )
 
     if args.output_ddl_query_file_path:
         logger.info("Writing compiled DDLs to: %s", args.output_ddl_query_file_path)
         with open(args.output_ddl_query_file_path, "w", encoding="utf-8") as f_out:
-            f_out.write(concatenated_queries)
+            f_out.write("\n;\n".join(sql for _, sql in file_queries))
 
     execute_ddl_queries(
-        queries=concatenated_queries,
+        file_queries=file_queries,
         skip_confirmation=args.skip_confirmation,
-        total_files=len(args.input_ddl_query_template_file_paths),
         parameters=parsed_parameters,
     )
 

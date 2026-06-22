@@ -1,8 +1,8 @@
 """Unit tests for InsiderTransactionsPipeline."""
 
-import pytest
-import pandas as pd
 from unittest.mock import MagicMock
+
+import pandas as pd
 
 from src.ingest.pipeline.insider_transactions import InsiderTransactionsPipeline
 
@@ -38,21 +38,25 @@ def test_insider_transactions_pipeline_fetch_vnstock_success(mocker) -> None:
     pipeline = InsiderTransactionsPipeline(batch_date="2026-06-18", symbols=["HPG"])
 
     # Mock vnstock Reference company insider_trading
-    mock_df = pd.DataFrame([{
-        "ticker": "HPG",
-        "date": "2026-06-18",
-        "deal_method": "MATCHING",
-        "deal_action": "BUY",
-        "deal_quantity": 50000,
-        "deal_price": 28500.0,
-        "deal_ratio": 0.002
-    }])
+    mock_df = pd.DataFrame(
+        [
+            {
+                "ticker": "HPG",
+                "date": "2026-06-18",
+                "deal_method": "MATCHING",
+                "deal_action": "BUY",
+                "deal_quantity": 50000,
+                "deal_price": 28500.0,
+                "deal_ratio": 0.002,
+            }
+        ]
+    )
     mock_company = MagicMock()
     mock_company.insider_trading.return_value = mock_df
-    
+
     mock_ref = MagicMock()
     mock_ref.company.return_value = mock_company
-    
+
     mocker.patch("vnstock.Reference", return_value=mock_ref)
 
     df = pipeline.fetch()
@@ -115,10 +119,10 @@ def test_insider_transactions_pipeline_mock_fallback(mocker) -> None:
     # Fail vnstock & CafeF
     mocker.patch("vnstock.Reference", side_effect=Exception("API Error"))
     mocker.patch("requests.get", side_effect=Exception("CafeF Down"))
-    
+
     # Mock random to trigger transaction generation (force random.random() < 0.10)
     mocker.patch("random.random", return_value=0.05)
-    
+
     # Mock quote history
     mock_df_hist = pd.DataFrame([{"close": 29000.0}])
     mock_quote_instance = MagicMock()
