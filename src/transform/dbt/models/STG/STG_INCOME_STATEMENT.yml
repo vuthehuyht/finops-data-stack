@@ -3,10 +3,11 @@
     description: Cleaned/Staging model for raw_income_statement
     data_tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - TICKER
-            - PERIOD
-            - YEAR
+          arguments:
+            combination_of_columns:
+              - TICKER
+              - PERIOD
+              - YEAR
     config:
       meta:
         dagster:

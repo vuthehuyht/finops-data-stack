@@ -3,9 +3,10 @@
     description: Cleaned/Staging model for raw_exchange_rates
     data_tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - PAIR
-            - DATE
+          arguments:
+            combination_of_columns:
+              - PAIR
+              - DATE
     config:
       meta:
         dagster:

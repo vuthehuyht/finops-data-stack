@@ -3,9 +3,10 @@
     description: Cleaned/Staging model for raw_index_price_eod
     data_tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - INDEX_NAME
-            - TRADING_DATE
+          arguments:
+            combination_of_columns:
+              - INDEX_NAME
+              - TRADING_DATE
     config:
       meta:
         dagster:

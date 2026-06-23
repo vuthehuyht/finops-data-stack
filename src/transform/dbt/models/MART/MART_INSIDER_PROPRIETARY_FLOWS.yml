@@ -5,9 +5,10 @@ models:
       flows aggregated at Ticker + Date granularity.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - TICKER
-            - TRADING_DATE
+          arguments:
+            combination_of_columns:
+              - TICKER
+              - TRADING_DATE
     config:
       meta:
         dagster:

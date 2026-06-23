@@ -7,9 +7,10 @@ models:
       them in the Silver layer. Granularity: Ticker + Date.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - TICKER
-            - DATE
+          arguments:
+            combination_of_columns:
+              - TICKER
+              - DATE
     config:
       meta:
         dagster:

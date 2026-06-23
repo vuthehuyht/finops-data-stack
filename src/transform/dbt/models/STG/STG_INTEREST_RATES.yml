@@ -3,9 +3,10 @@
     description: Cleaned/Staging model for raw_interest_rates
     data_tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - RATE_TYPE
-            - DATE
+          arguments:
+            combination_of_columns:
+              - RATE_TYPE
+              - DATE
     config:
       meta:
         dagster:

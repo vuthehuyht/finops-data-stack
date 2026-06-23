@@ -3,9 +3,10 @@
     description: Cleaned/Staging model for raw_stock_price_eod
     data_tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - TICKER
-            - TRADING_DATE
+          arguments:
+            combination_of_columns:
+              - TICKER
+              - TRADING_DATE
     config:
       meta:
         dagster:
