@@ -102,6 +102,20 @@ jobs:
           filter_mode: diff_context
           fail_level: any
 
+      # SQL linting using SQLFluff
+      - name: SQLFluff Lint with Reviewdog (All SQL)
+        env:
+          REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        working-directory: src/transform/dbt
+        run: |
+          uv run sqlfluff lint --format=sarif models/ | \
+            reviewdog \
+              -f=sarif \
+              -reporter=github-pr-review \
+              -filter-mode=diff_context \
+              -name='sqlfluff' \
+              -fail-on-error
+
       # Ruff Format Suggester
       - name: Run Ruff Format check
         run: uv run ruff format --check src/ tests/
