@@ -152,3 +152,18 @@ def test_default_ticker_symbols_contains_vn30() -> None:
         isinstance(s, str) and s != "" and s == s.upper()
         for s in DEFAULT_TICKER_SYMBOLS
     )
+
+
+def test_base_pipeline_custom_logger_is_used() -> None:
+    """Verify that a custom logger passed to __init__ is stored and used."""
+    import logging
+
+    custom_logger = logging.getLogger("test_custom_logger")
+    pipeline = DummyIngestPipeline(batch_date="2026-06-18", logger=custom_logger)
+    assert pipeline.logger is custom_logger
+
+
+def test_base_pipeline_default_logger_uses_class_name() -> None:
+    """Verify no-logger fallback sets the logger name to the pipeline class name."""
+    pipeline = DummyIngestPipeline(batch_date="2026-06-18")
+    assert pipeline.logger.name == "DummyIngestPipeline"
