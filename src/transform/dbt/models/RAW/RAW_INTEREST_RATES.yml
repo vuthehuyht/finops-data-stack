@@ -6,11 +6,12 @@ sources:
     tables:
       - name: RAW_INTEREST_RATES
         description: Raw data source for RAW_INTEREST_RATES
-        meta:
-          dagster:
-            asset_key:
-              - RAW
-              - RAW_INTEREST_RATES
+        config:
+          meta:
+            dagster:
+              asset_key:
+                - RAW
+                - RAW_INTEREST_RATES
         columns:
           - name: RATE_TYPE
             data_type: VARCHAR(256)

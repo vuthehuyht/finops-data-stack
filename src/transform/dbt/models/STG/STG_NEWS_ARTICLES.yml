@@ -1,11 +1,12 @@
 ﻿models:
   - name: STG_NEWS_ARTICLES
     description: Cleaned/Staging model for raw_news_articles
-    meta:
-      dagster:
-        asset_key:
-          - STAGING
-          - STG_NEWS_ARTICLES
+    config:
+      meta:
+        dagster:
+          asset_key:
+            - STAGING
+            - STG_NEWS_ARTICLES
     columns:
       - name: ARTICLE_ID
         data_type: VARCHAR(256)

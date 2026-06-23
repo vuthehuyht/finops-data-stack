@@ -1,11 +1,12 @@
 ﻿models:
   - name: STG_COMPANY_PROFILE
     description: Cleaned/Staging model for raw_company_profile
-    meta:
-      dagster:
-        asset_key:
-          - STAGING
-          - STG_COMPANY_PROFILE
+    config:
+      meta:
+        dagster:
+          asset_key:
+            - STAGING
+            - STG_COMPANY_PROFILE
     columns:
       - name: TICKER
         data_type: VARCHAR(256)

@@ -6,11 +6,12 @@ sources:
     tables:
       - name: RAW_PROPRIETARY_TRADING
         description: Raw data source for RAW_PROPRIETARY_TRADING
-        meta:
-          dagster:
-            asset_key:
-              - RAW
-              - RAW_PROPRIETARY_TRADING
+        config:
+          meta:
+            dagster:
+              asset_key:
+                - RAW
+                - RAW_PROPRIETARY_TRADING
         columns:
           - name: TICKER
             data_type: VARCHAR(256)

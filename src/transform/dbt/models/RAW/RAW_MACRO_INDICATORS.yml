@@ -6,11 +6,12 @@ sources:
     tables:
       - name: RAW_MACRO_INDICATORS
         description: Raw data source for RAW_MACRO_INDICATORS
-        meta:
-          dagster:
-            asset_key:
-              - RAW
-              - RAW_MACRO_INDICATORS
+        config:
+          meta:
+            dagster:
+              asset_key:
+                - RAW
+                - RAW_MACRO_INDICATORS
         columns:
           - name: INDICATOR_NAME
             data_type: VARCHAR(256)

@@ -6,11 +6,12 @@ sources:
     tables:
       - name: RAW_FINANCIAL_RATIOS
         description: Raw data source for RAW_FINANCIAL_RATIOS
-        meta:
-          dagster:
-            asset_key:
-              - RAW
-              - RAW_FINANCIAL_RATIOS
+        config:
+          meta:
+            dagster:
+              asset_key:
+                - RAW
+                - RAW_FINANCIAL_RATIOS
         columns:
           - name: TICKER
             data_type: VARCHAR(256)

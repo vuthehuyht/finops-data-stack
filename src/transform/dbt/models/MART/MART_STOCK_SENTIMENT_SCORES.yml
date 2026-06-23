@@ -7,14 +7,16 @@ models:
       them in the Silver layer. Granularity: Ticker + Date.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - TICKER
-            - DATE
-    meta:
-      dagster:
-        asset_key:
-          - MART
-          - MART_STOCK_SENTIMENT_SCORES
+          arguments:
+            combination_of_columns:
+              - TICKER
+              - DATE
+    config:
+      meta:
+        dagster:
+          asset_key:
+            - MART
+            - MART_STOCK_SENTIMENT_SCORES
     columns:
       - name: TICKER
         data_type: VARCHAR(256)

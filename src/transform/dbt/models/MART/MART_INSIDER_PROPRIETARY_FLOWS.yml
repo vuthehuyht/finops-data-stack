@@ -5,14 +5,16 @@ models:
       flows aggregated at Ticker + Date granularity.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - TICKER
-            - TRADING_DATE
-    meta:
-      dagster:
-        asset_key:
-          - MART
-          - MART_INSIDER_PROPRIETARY_FLOWS
+          arguments:
+            combination_of_columns:
+              - TICKER
+              - TRADING_DATE
+    config:
+      meta:
+        dagster:
+          asset_key:
+            - MART
+            - MART_INSIDER_PROPRIETARY_FLOWS
     columns:
       - name: TICKER
         data_type: VARCHAR(256)

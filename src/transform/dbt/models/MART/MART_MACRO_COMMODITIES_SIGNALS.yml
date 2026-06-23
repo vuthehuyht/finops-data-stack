@@ -6,11 +6,12 @@ models:
       (Brent, WTI, Gold, Steel, Gasoline Singapore, Baltic index), and derived
       features (real interest rate, crack spread, price momentum).
       Granularity: Date.
-    meta:
-      dagster:
-        asset_key:
-          - MART
-          - MART_MACRO_COMMODITIES_SIGNALS
+    config:
+      meta:
+        dagster:
+          asset_key:
+            - MART
+            - MART_MACRO_COMMODITIES_SIGNALS
     columns:
       - name: DATE
         data_type: DATE

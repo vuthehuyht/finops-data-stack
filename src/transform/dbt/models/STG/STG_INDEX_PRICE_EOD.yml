@@ -3,14 +3,16 @@
     description: Cleaned/Staging model for raw_index_price_eod
     data_tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - INDEX_NAME
-            - TRADING_DATE
-    meta:
-      dagster:
-        asset_key:
-          - STAGING
-          - STG_INDEX_PRICE_EOD
+          arguments:
+            combination_of_columns:
+              - INDEX_NAME
+              - TRADING_DATE
+    config:
+      meta:
+        dagster:
+          asset_key:
+            - STAGING
+            - STG_INDEX_PRICE_EOD
     columns:
       - name: INDEX_NAME
         data_type: VARCHAR(256)

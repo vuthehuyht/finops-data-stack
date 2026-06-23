@@ -3,15 +3,17 @@
     description: Cleaned/Staging model for raw_income_statement
     data_tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - TICKER
-            - PERIOD
-            - YEAR
-    meta:
-      dagster:
-        asset_key:
-          - STAGING
-          - STG_INCOME_STATEMENT
+          arguments:
+            combination_of_columns:
+              - TICKER
+              - PERIOD
+              - YEAR
+    config:
+      meta:
+        dagster:
+          asset_key:
+            - STAGING
+            - STG_INCOME_STATEMENT
     columns:
       - name: TICKER
         data_type: VARCHAR(256)

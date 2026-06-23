@@ -6,11 +6,12 @@ sources:
     tables:
       - name: RAW_COMMODITIES_PRICE
         description: Raw data source for RAW_COMMODITIES_PRICE
-        meta:
-          dagster:
-            asset_key:
-              - RAW
-              - RAW_COMMODITIES_PRICE
+        config:
+          meta:
+            dagster:
+              asset_key:
+                - RAW
+                - RAW_COMMODITIES_PRICE
         columns:
           - name: COMMODITY_NAME
             data_type: VARCHAR(256)

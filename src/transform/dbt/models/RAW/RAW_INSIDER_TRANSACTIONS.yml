@@ -6,11 +6,12 @@ sources:
     tables:
       - name: RAW_INSIDER_TRANSACTIONS
         description: Raw data source for RAW_INSIDER_TRANSACTIONS
-        meta:
-          dagster:
-            asset_key:
-              - RAW
-              - RAW_INSIDER_TRANSACTIONS
+        config:
+          meta:
+            dagster:
+              asset_key:
+                - RAW
+                - RAW_INSIDER_TRANSACTIONS
         columns:
           - name: TRANSACTION_ID
             data_type: VARCHAR(256)

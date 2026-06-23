@@ -3,14 +3,16 @@
     description: Cleaned/Staging model for raw_exchange_rates
     data_tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - PAIR
-            - DATE
-    meta:
-      dagster:
-        asset_key:
-          - STAGING
-          - STG_EXCHANGE_RATES
+          arguments:
+            combination_of_columns:
+              - PAIR
+              - DATE
+    config:
+      meta:
+        dagster:
+          asset_key:
+            - STAGING
+            - STG_EXCHANGE_RATES
     columns:
       - name: PAIR
         data_type: VARCHAR(256)

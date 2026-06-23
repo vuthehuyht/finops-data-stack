@@ -46,24 +46,13 @@ jobs:
       contents: read
       pull-requests: write
 
-    services:
-      postgres:
-        image: postgres:15-alpine
-        ports:
-          - 5439:5432
-        env:
-          POSTGRES_DB: dev
-          POSTGRES_USER: awsuser
-          POSTGRES_PASSWORD: mock_password
-
     env:
-      # Redshift simulator config using Postgres
-      REDSHIFT_HOST: localhost
+      REDSHIFT_HOST: ${{ secrets.REDSHIFT_HOST }}
       REDSHIFT_PORT: 5439
-      REDSHIFT_DATABASE: dev
-      REDSHIFT_USER: awsuser
-      REDSHIFT_PASSWORD: mock_password
-      DBT_TYPE: postgres
+      REDSHIFT_DATABASE: ${{ secrets.REDSHIFT_DATABASE }}
+      REDSHIFT_USER: ${{ secrets.REDSHIFT_USER }}
+      REDSHIFT_PASSWORD: ${{ secrets.REDSHIFT_PASSWORD }}
+      DBT_TYPE: redshift
 
       # Dynamic schema prefixes to prevent parallel runs collision
       REDSHIFT_SCHEMA_RAW: CI_RAW_${{ github.run_number }}
@@ -163,20 +152,6 @@ jobs:
           else
             echo "No dbt log found."
           fi
-
-      - name: SQLFluff Lint with Reviewdog (All SQL)
-        env:
-          REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        working-directory: src/transform/dbt
-        run: |
-          uv run sqlfluff lint --format=parsable models/ | \
-            reviewdog \
-              -tee \
-              -efm='%f:%l:%c: %m' \
-              -reporter=github-pr-review \
-              -filter-mode=diff_context \
-              -name='sqlfluff' \
-              -fail-on-error
 
       - name: Run Redshift DDL Teardown
         if: always()

@@ -6,11 +6,12 @@ sources:
     tables:
       - name: RAW_INDEX_PRICE_EOD
         description: Raw data source for RAW_INDEX_PRICE_EOD
-        meta:
-          dagster:
-            asset_key:
-              - RAW
-              - RAW_INDEX_PRICE_EOD
+        config:
+          meta:
+            dagster:
+              asset_key:
+                - RAW
+                - RAW_INDEX_PRICE_EOD
         columns:
           - name: INDEX_NAME
             data_type: VARCHAR(256)

@@ -3,14 +3,16 @@
     description: Cleaned/Staging model for raw_proprietary_trading
     data_tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - TICKER
-            - TRADING_DATE
-    meta:
-      dagster:
-        asset_key:
-          - STAGING
-          - STG_PROPRIETARY_TRADING
+          arguments:
+            combination_of_columns:
+              - TICKER
+              - TRADING_DATE
+    config:
+      meta:
+        dagster:
+          asset_key:
+            - STAGING
+            - STG_PROPRIETARY_TRADING
     columns:
       - name: TICKER
         data_type: VARCHAR(256)
