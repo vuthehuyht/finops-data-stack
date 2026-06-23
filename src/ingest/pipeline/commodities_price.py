@@ -47,24 +47,32 @@ class CommoditiesPricePipeline(BaseIngestPipeline):
         start_str = start_dt.strftime("%Y-%m-%d")
         end_str = end_dt.strftime("%Y-%m-%d")
 
-        self.logger.info(
-            "Fetching prices for %d commodities for batch_date %s",
-            len(DEFAULT_COMMODITIES_MAPPING),
-            self.batch_date,
-        )
-
         for name, ticker in DEFAULT_COMMODITIES_MAPPING.items():
             try:
                 df = client.get_ticker_history(ticker, start_str, end_str)
                 if not df.empty:
                     df = df.reset_index()
+                    # yfinance >= 1.x renames the date index; detect it defensively
+                    date_col = next(
+                        (
+                            c
+                            for c in df.columns
+                            if str(c).lower() in ("date", "datetime")
+                        ),
+                        None,
+                    )
+                    if date_col is None:
+                        self.logger.error(
+                            "Cannot find date column in %s. Available: %s",
+                            ticker,
+                            list(df.columns),
+                        )
+                        continue
 
-                    # Standardize Date column values and Close price
-                    df["date"] = pd.to_datetime(df["Date"]).dt.strftime("%Y-%m-%d")
+                    df["date"] = pd.to_datetime(df[date_col]).dt.strftime("%Y-%m-%d")
                     df["commodity_name"] = name
                     df["price"] = df["Close"].astype(str)
 
-                    # Keep only required columns
                     df = df[["commodity_name", "date", "price"]]
                     all_dfs.append(df)
                 else:
@@ -86,4 +94,11 @@ class CommoditiesPricePipeline(BaseIngestPipeline):
         if not all_dfs:
             return pd.DataFrame()
 
-        return pd.concat(all_dfs, ignore_index=True)
+        result = pd.concat(all_dfs, ignore_index=True)
+        self.logger.info(
+            "Fetched %d rows across %d commodities for batch_date %s",
+            len(result),
+            len(all_dfs),
+            self.batch_date,
+        )
+        return result

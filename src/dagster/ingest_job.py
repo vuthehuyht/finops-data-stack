@@ -1,9 +1,14 @@
 """Dagster assets and jobs for Ingestion Layer (Crawl/API -> S3)."""
 
-from collections.abc import Sequence
+import datetime
+import functools
+from dataclasses import dataclass, field
 
 import dagster
 import pydantic
+from dagster._core.definitions.unresolved_asset_job_definition import (
+    UnresolvedAssetJobDefinition,
+)
 from dagster_aws.s3 import S3Resource
 
 import src.pipeline.dagster as dagster_lib
@@ -26,11 +31,29 @@ from src.ingest.pipeline.news_articles import NewsArticlesPipeline
 from src.ingest.pipeline.proprietary_trading import ProprietaryTradingPipeline
 from src.ingest.pipeline.stock_price_eod import StockPriceEodPipeline
 
+_TIMEZONE = "Asia/Ho_Chi_Minh"
+# 15:30 ICT on weekdays — after VN market closes at 15:00
+_INGEST_CRON = "30 15 * * 1-5"
+
+
+@dataclass
+class IngestJobBundle:
+    """Return value of define_ingest_jobs() — consumed by workspace.py."""
+
+    assets: list[dagster.AssetsDefinition] = field(default_factory=list)
+    jobs: list[dagster.JobDefinition | UnresolvedAssetJobDefinition] = field(
+        default_factory=list
+    )
+    schedules: list[dagster.ScheduleDefinition] = field(default_factory=list)
+
 
 class IngestAssetConfig(dagster.Config):
     """Runtime config injected per asset run."""
 
-    batch_date: str = pydantic.Field(description="Partition date in YYYY-MM-DD format.")
+    batch_date: str = pydantic.Field(
+        default_factory=lambda: datetime.date.today().isoformat(),
+        description="Partition date in YYYY-MM-DD format.",
+    )
     symbols: list[str] = pydantic.Field(
         default_factory=list, description="Target stock symbols."
     )
@@ -47,6 +70,38 @@ def _build_output(
             "symbols_count": len(symbols),
         },
     )
+
+
+def _make_ingest_schedule(
+    job: dagster.JobDefinition | UnresolvedAssetJobDefinition,
+    job_name: str,
+    asset_py_id: str,
+) -> dagster.ScheduleDefinition:
+    """Create a daily schedule that runs an ingest job after VN market close."""
+
+    @dagster.schedule(
+        job=job,
+        cron_schedule=_INGEST_CRON,
+        execution_timezone=_TIMEZONE,
+        name=f"{job_name}_schedule",
+        description=f"Daily VN market ingest schedule for {job_name}.",
+    )
+    def _schedule(
+        context: dagster.ScheduleEvaluationContext,
+    ) -> dagster.RunRequest:
+        batch_date = context.scheduled_execution_time.date().isoformat()
+        return dagster.RunRequest(
+            run_config=dagster.RunConfig(
+                ops={
+                    asset_py_id: IngestAssetConfig(
+                        batch_date=batch_date,
+                        symbols=[],  # falls back to DEFAULT_TICKER_SYMBOLS in pipeline
+                    )
+                }
+            )
+        )
+
+    return _schedule
 
 
 @dagster_lib.asset(
@@ -72,6 +127,7 @@ def raw_stock_price_eod(
         symbols=config.symbols,
         s3_client=s3.get_client(),
         bucket_name=s3bucket.raw_bucket,
+        logger=context.log,
     )
     s3_url = pipeline.run()
     return _build_output(s3_url, config.batch_date, config.symbols)
@@ -95,6 +151,7 @@ def raw_index_price_eod(
         symbols=config.symbols,
         s3_client=s3.get_client(),
         bucket_name=s3bucket.raw_bucket,
+        logger=context.log,
     )
     s3_url = pipeline.run()
     return _build_output(s3_url, config.batch_date, config.symbols)
@@ -122,6 +179,7 @@ def raw_foreign_trading(
         symbols=config.symbols,
         s3_client=s3.get_client(),
         bucket_name=s3bucket.raw_bucket,
+        logger=context.log,
     )
     s3_url = pipeline.run()
     return _build_output(s3_url, config.batch_date, config.symbols)
@@ -149,6 +207,7 @@ def raw_proprietary_trading(
         symbols=config.symbols,
         s3_client=s3.get_client(),
         bucket_name=s3bucket.raw_bucket,
+        logger=context.log,
     )
     s3_url = pipeline.run()
     return _build_output(s3_url, config.batch_date, config.symbols)
@@ -176,6 +235,7 @@ def raw_balance_sheet(
         symbols=config.symbols,
         s3_client=s3.get_client(),
         bucket_name=s3bucket.raw_bucket,
+        logger=context.log,
     )
     s3_url = pipeline.run()
     return _build_output(s3_url, config.batch_date, config.symbols)
@@ -203,6 +263,7 @@ def raw_income_statement(
         symbols=config.symbols,
         s3_client=s3.get_client(),
         bucket_name=s3bucket.raw_bucket,
+        logger=context.log,
     )
     s3_url = pipeline.run()
     return _build_output(s3_url, config.batch_date, config.symbols)
@@ -230,6 +291,7 @@ def raw_cashflow_statement(
         symbols=config.symbols,
         s3_client=s3.get_client(),
         bucket_name=s3bucket.raw_bucket,
+        logger=context.log,
     )
     s3_url = pipeline.run()
     return _build_output(s3_url, config.batch_date, config.symbols)
@@ -257,6 +319,7 @@ def raw_financial_ratios(
         symbols=config.symbols,
         s3_client=s3.get_client(),
         bucket_name=s3bucket.raw_bucket,
+        logger=context.log,
     )
     s3_url = pipeline.run()
     return _build_output(s3_url, config.batch_date, config.symbols)
@@ -284,6 +347,7 @@ def raw_company_profile(
         symbols=config.symbols,
         s3_client=s3.get_client(),
         bucket_name=s3bucket.raw_bucket,
+        logger=context.log,
     )
     s3_url = pipeline.run()
     return _build_output(s3_url, config.batch_date, config.symbols)
@@ -309,6 +373,7 @@ def raw_macro_indicators(
         symbols=config.symbols,
         s3_client=s3.get_client(),
         bucket_name=s3bucket.raw_bucket,
+        logger=context.log,
     )
     s3_url = pipeline.run()
     return _build_output(s3_url, config.batch_date, config.symbols)
@@ -332,6 +397,7 @@ def raw_interest_rates(
         symbols=config.symbols,
         s3_client=s3.get_client(),
         bucket_name=s3bucket.raw_bucket,
+        logger=context.log,
     )
     s3_url = pipeline.run()
     return _build_output(s3_url, config.batch_date, config.symbols)
@@ -355,6 +421,7 @@ def raw_exchange_rates(
         symbols=config.symbols,
         s3_client=s3.get_client(),
         bucket_name=s3bucket.raw_bucket,
+        logger=context.log,
     )
     s3_url = pipeline.run()
     return _build_output(s3_url, config.batch_date, config.symbols)
@@ -380,6 +447,7 @@ def raw_commodities_price(
         symbols=config.symbols,
         s3_client=s3.get_client(),
         bucket_name=s3bucket.raw_bucket,
+        logger=context.log,
     )
     s3_url = pipeline.run()
     return _build_output(s3_url, config.batch_date, config.symbols)
@@ -407,6 +475,7 @@ def raw_news_articles(
         symbols=config.symbols,
         s3_client=s3.get_client(),
         bucket_name=s3bucket.raw_bucket,
+        logger=context.log,
     )
     s3_url = pipeline.run()
     return _build_output(s3_url, config.batch_date, config.symbols)
@@ -434,6 +503,7 @@ def raw_corporate_events(
         symbols=config.symbols,
         s3_client=s3.get_client(),
         bucket_name=s3bucket.raw_bucket,
+        logger=context.log,
     )
     s3_url = pipeline.run()
     return _build_output(s3_url, config.batch_date, config.symbols)
@@ -461,6 +531,7 @@ def raw_insider_transactions(
         symbols=config.symbols,
         s3_client=s3.get_client(),
         bucket_name=s3bucket.raw_bucket,
+        logger=context.log,
     )
     s3_url = pipeline.run()
     return _build_output(s3_url, config.batch_date, config.symbols)
@@ -488,29 +559,53 @@ def raw_analyst_reports(
         symbols=config.symbols,
         s3_client=s3.get_client(),
         bucket_name=s3bucket.raw_bucket,
+        logger=context.log,
     )
     s3_url = pipeline.run()
     return _build_output(s3_url, config.batch_date, config.symbols)
 
 
-def define_ingest_assets() -> Sequence[dagster.AssetsDefinition]:
-    """Return all defined ingestion assets for the workspace."""
-    return [
-        raw_stock_price_eod,
-        raw_index_price_eod,
-        raw_foreign_trading,
-        raw_proprietary_trading,
-        raw_balance_sheet,
-        raw_income_statement,
-        raw_cashflow_statement,
-        raw_financial_ratios,
-        raw_company_profile,
-        raw_macro_indicators,
-        raw_interest_rates,
-        raw_exchange_rates,
-        raw_commodities_price,
-        raw_news_articles,
-        raw_corporate_events,
-        raw_insider_transactions,
-        raw_analyst_reports,
-    ]
+_ALL_INGEST_ASSETS: list[dagster.AssetsDefinition] = [
+    raw_stock_price_eod,
+    raw_index_price_eod,
+    raw_foreign_trading,
+    raw_proprietary_trading,
+    raw_balance_sheet,
+    raw_income_statement,
+    raw_cashflow_statement,
+    raw_financial_ratios,
+    raw_company_profile,
+    raw_macro_indicators,
+    raw_interest_rates,
+    raw_exchange_rates,
+    raw_commodities_price,
+    raw_news_articles,
+    raw_corporate_events,
+    raw_insider_transactions,
+    raw_analyst_reports,
+]
+
+
+@functools.cache
+def define_ingest_jobs() -> IngestJobBundle:
+    """Build Dagster assets, jobs, and schedules for all INPUT ingestion assets."""
+    bundle = IngestJobBundle()
+
+    for asset in _ALL_INGEST_ASSETS:
+        bundle.assets.append(asset)
+
+        job_name = f"ingest_{asset.key.to_python_identifier()}_job"
+        job = dagster_lib.define_asset_job(
+            job_name,
+            selection=[asset],
+            tags={
+                "limit_concurrent_job_runs_to_1": job_name,
+                "type": "ingest",
+            },
+        )
+        bundle.jobs.append(job)
+        bundle.schedules.append(
+            _make_ingest_schedule(job, job_name, asset.key.to_python_identifier())
+        )
+
+    return bundle

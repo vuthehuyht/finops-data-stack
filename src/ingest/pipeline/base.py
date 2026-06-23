@@ -63,6 +63,7 @@ class BaseIngestPipeline(abc.ABC):
         symbols: list[str] | None = None,
         s3_client: "S3Client | None" = None,
         bucket_name: str = "finops-raw-dev",
+        logger: logging.Logger | None = None,
     ) -> None:
         """Initialize pipeline parameters.
 
@@ -71,12 +72,14 @@ class BaseIngestPipeline(abc.ABC):
             symbols: List of target stock symbols (if applicable).
             s3_client: Boto3 S3 Client instance.
             bucket_name: S3 bucket target name.
+            logger: Optional logger; pass context.log from Dagster asset to
+                route logs into the Dagster event stream.
         """
         self.batch_date = batch_date
         self.symbols = symbols or []
         self.s3_client = s3_client
         self.bucket_name = bucket_name
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger = logger or logging.getLogger(self.__class__.__name__)
 
     @property
     @abc.abstractmethod

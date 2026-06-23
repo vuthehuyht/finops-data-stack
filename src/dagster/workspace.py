@@ -29,7 +29,7 @@ def _get_resources() -> dict[str, Any]:
 
 def _create_definitions() -> dagster.Definitions:
     """Create the Dagster definitions for the workspace."""
-    ingest = ingest_job.define_ingest_assets()
+    ingest = ingest_job.define_ingest_jobs()
     load = load_job.define_load_jobs()
     silver = transform_job.define_silver_jobs()
     mart = transform_job.define_mart_jobs()
@@ -37,15 +37,21 @@ def _create_definitions() -> dagster.Definitions:
 
     return dagster_lib.definitions(
         code_location_name="finops",
-        assets=[*ingest, *load.assets, dbt],
+        assets=[*ingest.assets, *load.assets, dbt],
         jobs=[
+            *ingest.jobs,
             *load.jobs,
             *silver.jobs,
             *mart.jobs,
             dbt_assets.dbt_build_job,
             ddl_job.execute_ddl_job,
         ],
-        schedules=[*load.schedules, *silver.schedules, *mart.schedules],
+        schedules=[
+            *ingest.schedules,
+            *load.schedules,
+            *silver.schedules,
+            *mart.schedules,
+        ],
         sensors=[*load.sensors, *silver.sensors, *mart.sensors],
         resources=_get_resources(),
     )
