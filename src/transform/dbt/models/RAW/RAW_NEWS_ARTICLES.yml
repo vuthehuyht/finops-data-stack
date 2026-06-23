@@ -6,11 +6,12 @@ sources:
     tables:
       - name: RAW_NEWS_ARTICLES
         description: Raw data source for RAW_NEWS_ARTICLES
-        meta:
-          dagster:
-            asset_key:
-              - RAW
-              - RAW_NEWS_ARTICLES
+        config:
+          meta:
+            dagster:
+              asset_key:
+                - RAW
+                - RAW_NEWS_ARTICLES
         columns:
           - name: ARTICLE_ID
             data_type: VARCHAR(256)

@@ -6,11 +6,12 @@ sources:
     tables:
       - name: RAW_FOREIGN_TRADING
         description: Raw data source for RAW_FOREIGN_TRADING
-        meta:
-          dagster:
-            asset_key:
-              - RAW
-              - RAW_FOREIGN_TRADING
+        config:
+          meta:
+            dagster:
+              asset_key:
+                - RAW
+                - RAW_FOREIGN_TRADING
         columns:
           - name: TICKER
             data_type: VARCHAR(256)

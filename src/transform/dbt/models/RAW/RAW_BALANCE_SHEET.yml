@@ -6,11 +6,12 @@ sources:
     tables:
       - name: RAW_BALANCE_SHEET
         description: Raw data source for RAW_BALANCE_SHEET
-        meta:
-          dagster:
-            asset_key:
-              - RAW
-              - RAW_BALANCE_SHEET
+        config:
+          meta:
+            dagster:
+              asset_key:
+                - RAW
+                - RAW_BALANCE_SHEET
         columns:
           - name: TICKER
             data_type: VARCHAR(256)

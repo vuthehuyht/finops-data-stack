@@ -6,11 +6,12 @@ sources:
     tables:
       - name: RAW_CORPORATE_EVENTS
         description: Raw data source for RAW_CORPORATE_EVENTS
-        meta:
-          dagster:
-            asset_key:
-              - RAW
-              - RAW_CORPORATE_EVENTS
+        config:
+          meta:
+            dagster:
+              asset_key:
+                - RAW
+                - RAW_CORPORATE_EVENTS
         columns:
           - name: EVENT_ID
             data_type: VARCHAR(256)

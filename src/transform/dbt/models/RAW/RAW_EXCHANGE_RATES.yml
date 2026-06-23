@@ -6,11 +6,12 @@ sources:
     tables:
       - name: RAW_EXCHANGE_RATES
         description: Raw data source for RAW_EXCHANGE_RATES
-        meta:
-          dagster:
-            asset_key:
-              - RAW
-              - RAW_EXCHANGE_RATES
+        config:
+          meta:
+            dagster:
+              asset_key:
+                - RAW
+                - RAW_EXCHANGE_RATES
         columns:
           - name: PAIR
             data_type: VARCHAR(256)

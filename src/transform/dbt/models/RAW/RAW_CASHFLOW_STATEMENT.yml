@@ -6,11 +6,12 @@ sources:
     tables:
       - name: RAW_CASHFLOW_STATEMENT
         description: Raw data source for RAW_CASHFLOW_STATEMENT
-        meta:
-          dagster:
-            asset_key:
-              - RAW
-              - RAW_CASHFLOW_STATEMENT
+        config:
+          meta:
+            dagster:
+              asset_key:
+                - RAW
+                - RAW_CASHFLOW_STATEMENT
         columns:
           - name: TICKER
             data_type: VARCHAR(256)
