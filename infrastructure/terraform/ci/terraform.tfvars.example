@@ -1,0 +1,5 @@
+aws_region              = "ap-southeast-1"
+project_name            = "project_name"
+environment             = "environment"
+redshift_admin_username = "redshift_admin_password"
+redshift_admin_password = "redshift_admin_password"

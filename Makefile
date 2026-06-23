@@ -1,6 +1,6 @@
 # Makefile to setup and run dev_local environment for FinOps Data Stack
 
-.PHONY: help setup dev lint format test clean dev_local dev_local_up dev_local_down up down lint-sql format-sql
+.PHONY: help setup dev lint format test clean dev_local dev_local_up dev_local_down up down lint-sql format-sql ci ci_up ci_down
 
 # Default target when running `make`
 help:
@@ -9,6 +9,8 @@ help:
 	@echo "  make dev            - Start Dagster development server local"
 	@echo "  make dev_local up   - Spin up dev local resources using Terraform"
 	@echo "  make dev_local down - Destroy dev local resources using Terraform"
+	@echo "  make ci up          - Spin up CI resources (Redshift in Default VPC) using Terraform"
+	@echo "  make ci down        - Destroy CI resources using Terraform"
 	@echo "  make lint           - Check code style and formatting issues with ruff"
 	@echo "  make format         - Automatically format and fix lint issues with ruff"
 	@echo "  make test           - Run all unit tests with pytest"
@@ -71,6 +73,21 @@ dev_local_down:
 # Allow command syntax: make dev_local up or make dev_local down
 dev_local:
 	@$(MAKE) dev_local_$(filter-out $@,$(MAKECMDGOALS))
+
+# Spin up CI resources (Terraform)
+ci_up:
+	@echo "Initializing CI resources in Default VPC..."
+	terraform -chdir=infrastructure/terraform/ci init
+	terraform -chdir=infrastructure/terraform/ci apply -auto-approve
+
+# Destroy CI resources (Terraform)
+ci_down:
+	@echo "Destroying CI resources..."
+	terraform -chdir=infrastructure/terraform/ci destroy -auto-approve
+
+# Allow command syntax: make ci up or make ci down
+ci:
+	@$(MAKE) ci_$(filter-out $@,$(MAKECMDGOALS))
 
 # Dummy target to prevent make from complaining about 'up' or 'down' arguments
 up down:
