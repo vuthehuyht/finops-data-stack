@@ -6,11 +6,12 @@
           combination_of_columns:
             - RATE_TYPE
             - DATE
-    meta:
-      dagster:
-        asset_key:
-          - STAGING
-          - STG_INTEREST_RATES
+    config:
+      meta:
+        dagster:
+          asset_key:
+            - STAGING
+            - STG_INTEREST_RATES
     columns:
       - name: RATE_TYPE
         data_type: VARCHAR(256)

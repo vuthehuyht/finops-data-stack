@@ -6,11 +6,12 @@
           combination_of_columns:
             - INDICATOR_NAME
             - REPORT_DATE
-    meta:
-      dagster:
-        asset_key:
-          - STAGING
-          - STG_MACRO_INDICATORS
+    config:
+      meta:
+        dagster:
+          asset_key:
+            - STAGING
+            - STG_MACRO_INDICATORS
     columns:
       - name: INDICATOR_NAME
         data_type: VARCHAR(256)

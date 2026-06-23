@@ -13,11 +13,12 @@ models:
           combination_of_columns:
             - TICKER
             - TRADING_DATE
-    meta:
-      dagster:
-        asset_key:
-          - MART
-          - FACT_ML_FEATURE_SET
+    config:
+      meta:
+        dagster:
+          asset_key:
+            - MART
+            - FACT_ML_FEATURE_SET
     columns:
       - name: TICKER
         data_type: VARCHAR(256)

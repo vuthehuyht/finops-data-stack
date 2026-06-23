@@ -6,11 +6,12 @@
           combination_of_columns:
             - COMMODITY_NAME
             - DATE
-    meta:
-      dagster:
-        asset_key:
-          - STAGING
-          - STG_COMMODITIES_PRICE
+    config:
+      meta:
+        dagster:
+          asset_key:
+            - STAGING
+            - STG_COMMODITIES_PRICE
     columns:
       - name: COMMODITY_NAME
         data_type: VARCHAR(256)

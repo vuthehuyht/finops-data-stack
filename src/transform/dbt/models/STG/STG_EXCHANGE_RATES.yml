@@ -6,11 +6,12 @@
           combination_of_columns:
             - PAIR
             - DATE
-    meta:
-      dagster:
-        asset_key:
-          - STAGING
-          - STG_EXCHANGE_RATES
+    config:
+      meta:
+        dagster:
+          asset_key:
+            - STAGING
+            - STG_EXCHANGE_RATES
     columns:
       - name: PAIR
         data_type: VARCHAR(256)

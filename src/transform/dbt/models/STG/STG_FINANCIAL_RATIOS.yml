@@ -6,11 +6,12 @@
           combination_of_columns:
             - TICKER
             - DATE
-    meta:
-      dagster:
-        asset_key:
-          - STAGING
-          - STG_FINANCIAL_RATIOS
+    config:
+      meta:
+        dagster:
+          asset_key:
+            - STAGING
+            - STG_FINANCIAL_RATIOS
     columns:
       - name: TICKER
         data_type: VARCHAR(256)

@@ -10,11 +10,12 @@ models:
           combination_of_columns:
             - TICKER
             - DATE
-    meta:
-      dagster:
-        asset_key:
-          - MART
-          - MART_STOCK_FUNDAMENTAL_METRICS
+    config:
+      meta:
+        dagster:
+          asset_key:
+            - MART
+            - MART_STOCK_FUNDAMENTAL_METRICS
     columns:
       - name: TICKER
         data_type: VARCHAR(256)

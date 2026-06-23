@@ -1,11 +1,12 @@
 ﻿models:
   - name: STG_INSIDER_TRANSACTIONS
     description: Cleaned/Staging model for raw_insider_transactions
-    meta:
-      dagster:
-        asset_key:
-          - STAGING
-          - STG_INSIDER_TRANSACTIONS
+    config:
+      meta:
+        dagster:
+          asset_key:
+            - STAGING
+            - STG_INSIDER_TRANSACTIONS
     columns:
       - name: TRANSACTION_ID
         data_type: VARCHAR(256)

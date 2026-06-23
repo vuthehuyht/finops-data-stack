@@ -7,11 +7,12 @@
             - TICKER
             - PERIOD
             - YEAR
-    meta:
-      dagster:
-        asset_key:
-          - STAGING
-          - STG_BALANCE_SHEET
+    config:
+      meta:
+        dagster:
+          asset_key:
+            - STAGING
+            - STG_BALANCE_SHEET
     columns:
       - name: TICKER
         data_type: VARCHAR(256)
