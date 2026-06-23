@@ -133,13 +133,13 @@ def test_workspace_has_sensor_for_load_jobs() -> None:
 
         reload(src.dagster.workspace)
         defs = src.dagster.workspace.defs
-        assert len(defs.schedule_defs) == 0
+        assert len(defs.schedule_defs) == 17  # 1 schedule per ingest asset
         sensor_names = {s.name for s in defs.sensor_defs}
         assert "load_job_sensor" in sensor_names
 
 
 def test_workspace_has_transform_sensors() -> None:
-    """Silver, Mart, and Load tables are SENSOR-type — must have exactly three sensors."""
+    """Silver, Mart, and Load tables are SENSOR-type — must have exactly 3 sensors."""
     with unittest.mock.patch.dict(
         os.environ,
         {
