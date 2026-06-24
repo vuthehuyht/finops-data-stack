@@ -9,7 +9,7 @@ transform:
       password: "{{ env_var('REDSHIFT_PASSWORD', '') }}"
       dbname: "{{ env_var('REDSHIFT_DATABASE', '') }}"
       schema: "{{ env_var('REDSHIFT_SCHEMA_RAW', 'raw') }}"
-      threads: 16
+      threads: 4
       connect_retries: 3
       reuse_connections: true
       client_session_keep_alive: true

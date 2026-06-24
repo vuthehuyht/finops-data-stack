@@ -165,7 +165,7 @@ jobs:
               -reporter=github-pr-review \
               -filter-mode=diff_context \
               -name='sqlfluff' \
-              -fail-level=any
+              -fail-on-error
 
       - name: Run Redshift DDL Teardown
         if: always()
