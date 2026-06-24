@@ -159,13 +159,14 @@ jobs:
           REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         working-directory: src/transform/dbt
         run: |
-          uv run sqlfluff lint --format=sarif models/ | \
-            reviewdog \
-              -f=sarif \
-              -reporter=github-pr-review \
-              -filter-mode=diff_context \
-              -name='sqlfluff' \
-              -fail-on-error
+          uv run sqlfluff lint --format=sarif models/ > /tmp/sqlfluff.sarif || true
+          reviewdog \
+            -f=sarif \
+            -reporter=github-pr-review \
+            -filter-mode=diff_context \
+            -name='sqlfluff' \
+            -fail-on-error \
+            < /tmp/sqlfluff.sarif
 
       - name: Run Redshift DDL Teardown
         if: always()
