@@ -1,10 +1,17 @@
-# Random password cho admin user của Redshift
+# Random username và password for Redshift admin user
+resource "random_string" "redshift_username" {
+  length  = 8
+  special = false
+  numeric = false
+  upper   = false
+}
+
 resource "random_password" "redshift_admin" {
   length  = 16
   special = false
 }
 
-# 1. IAM Role cho Redshift Serverless truy cập S3 (Spectrum)
+# 1. IAM Role for Redshift Serverless to access S3 (Spectrum)
 resource "aws_iam_role" "redshift_s3" {
   name = "${var.project_name}-redshift-s3-role"
 
@@ -33,14 +40,14 @@ resource "aws_iam_role_policy_attachment" "redshift_s3_readonly" {
 
 resource "aws_iam_role_policy_attachment" "redshift_glue_access" {
   role       = aws_iam_role.redshift_s3.name
-  policy_arn = "arn:aws:iam::aws:policy/AWSGlueConsoleFullAccess" # Dành cho Glue Data Catalog / External Tables
+  policy_arn = "arn:aws:iam::aws:policy/AWSGlueConsoleFullAccess" # For Glue Data Catalog / External Tables
 }
 
 # 2. Redshift Serverless Namespace
 resource "aws_redshiftserverless_namespace" "main" {
   namespace_name      = "${var.project_name}-redshift-namespace"
   db_name             = "${var.project_name}_db"
-  admin_username      = "awsadmin"
+  admin_username      = "rsadmin_${random_string.redshift_username.result}"
   admin_user_password = random_password.redshift_admin.result
   iam_roles           = [aws_iam_role.redshift_s3.arn]
 
@@ -57,13 +64,24 @@ resource "aws_redshiftserverless_workgroup" "main" {
   subnet_ids         = var.private_db_subnet_ids
   security_group_ids = [var.redshift_sg_id]
 
-  # Cấu hình RPU tối thiểu để tiết kiệm chi phí
-  base_capacity = 8
+  # Minimum RPU to reduce cost
+  base_capacity = 4
+  max_capacity  = 4
 
-  # Chỉ cho phép kết nối nội bộ VPC để đảm bảo an toàn
+  # Internal VPC access only
   publicly_accessible = false
 
   tags = {
     Environment = var.environment
   }
 }
+
+# 4. Usage limit - hard cap on monthly compute cost
+resource "aws_redshiftserverless_usage_limit" "monthly_cost_cap" {
+  resource_arn  = aws_redshiftserverless_workgroup.main.arn
+  usage_type    = "serverless-compute"
+  amount        = var.monthly_cost_cap_usd
+  period        = "monthly"
+  breach_action = "deactivate"
+}
+

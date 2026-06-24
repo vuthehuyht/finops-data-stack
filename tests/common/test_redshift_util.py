@@ -19,6 +19,12 @@ def clean_env() -> Any:
         "REDSHIFT_USER",
         "REDSHIFT_HOST",
         "REDSHIFT_DATABASE",
+        "REDSHIFT_PORT",
+        "RDS_PASSWORD",
+        "RDS_USER",
+        "RDS_HOST",
+        "RDS_PORT",
+        "RDS_DATABASE",
     ]
     old_values = {k: os.environ.get(k) for k in keys}
 
@@ -74,6 +80,30 @@ def test_inject_secrets_from_aws_success(clean_env: Any) -> None:
         assert os.environ.get("REDSHIFT_USER") == "secret_user"
         assert os.environ.get("REDSHIFT_HOST") == "secret_host"
         assert os.environ.get("REDSHIFT_DATABASE") == "secret_db"
+
+
+def test_inject_secrets_from_aws_success_consolidated(clean_env: Any) -> None:
+    """Test successful retrieval of consolidated database credentials."""
+    os.environ["FINOPS_ENVIRONMENT"] = "prod"
+
+    mock_client = unittest.mock.Mock()
+    mock_client.get_secret_value.return_value = {
+        "SecretString": (
+            '{"redshift_password": "secret_pwd", "redshift_username": "secret_user", '
+            '"redshift_host": "secret_host", "redshift_dbname": "secret_db", '
+            '"redshift_port": "5439", "rds_password": "rds_pwd"}'
+        )
+    }
+
+    with unittest.mock.patch("boto3.client", return_value=mock_client):
+        redshift_util.inject_secrets_from_aws()
+
+        assert os.environ.get("REDSHIFT_PASSWORD") == "secret_pwd"
+        assert os.environ.get("REDSHIFT_USER") == "secret_user"
+        assert os.environ.get("REDSHIFT_HOST") == "secret_host"
+        assert os.environ.get("REDSHIFT_DATABASE") == "secret_db"
+        assert os.environ.get("REDSHIFT_PORT") == "5439"
+        assert os.environ.get("RDS_PASSWORD") == "rds_pwd"
 
 
 def test_inject_secrets_from_aws_error(clean_env: Any) -> None:

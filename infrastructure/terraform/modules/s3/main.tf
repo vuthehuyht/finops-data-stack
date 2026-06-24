@@ -34,11 +34,11 @@ resource "aws_s3_bucket_lifecycle_configuration" "raw_lifecycle" {
     id     = "archive-old-data"
     status = "Enabled"
 
-    filter {} # Áp dụng cho toàn bộ các object trong bucket
+    filter {} # Apply to all objects in the bucket
 
     transition {
       days          = 90
-      storage_class = "GLACIER_IR" # Glacier Instant Retrieval để truy vấn nhanh khi cần
+      storage_class = "GLACIER_IR" # Glacier Instant Retrieval for fast query when needed
     }
   }
 }

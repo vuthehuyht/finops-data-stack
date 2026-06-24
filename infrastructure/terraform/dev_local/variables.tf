@@ -43,3 +43,9 @@ variable "redshift_admin_password" {
   sensitive   = true
   description = "Admin password for Redshift Serverless (can be set via TF_VAR_redshift_admin_password env)"
 }
+
+variable "monthly_cost_cap_usd" {
+  type        = number
+  description = "Monthly compute cost cap in USD for Redshift Serverless"
+  default     = 10
+}

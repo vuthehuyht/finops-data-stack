@@ -117,7 +117,7 @@ resource "aws_eks_node_group" "core_system" {
   }
 }
 
-# 4.2. Worker Workload Node Group (Spot - Tiết kiệm chi phí, tự động co giãn)
+# 4.2. Worker Workload Node Group (Spot - Cost savings, auto-scaling)
 resource "aws_eks_node_group" "worker_workload" {
   cluster_name    = aws_eks_cluster.main.name
   node_group_name = "${var.project_name}-worker-workload-ng"
@@ -129,11 +129,11 @@ resource "aws_eks_node_group" "worker_workload" {
 
   scaling_config {
     desired_size = 1
-    min_size     = 0 # Co giãn về 0 khi nhàn rỗi để tiết kiệm chi phí
+    min_size     = 0 # Scale to 0 when idle to save cost
     max_size     = 5
   }
 
-  # Cấu hình taints để ngăn các pod hệ thống chạy trên Spot Node
+  # Configure taints to prevent system pods from running on Spot Nodes
   taint {
     key    = "spotWorker"
     value  = "true"
@@ -167,7 +167,7 @@ resource "aws_iam_openid_connect_provider" "eks" {
   url             = aws_eks_cluster.main.identity[0].oidc[0].issuer
 }
 
-# 6. IRSA: IAM Role cho Dagster Service Account chạy trên EKS
+# 6. IRSA: IAM Role for Dagster Service Account running on EKS
 resource "aws_iam_role" "dagster_service_account" {
   name = "${var.project_name}-dagster-sa-role"
 
@@ -182,7 +182,7 @@ resource "aws_iam_role" "dagster_service_account" {
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
           StringEquals = {
-            # Giới hạn chỉ áp dụng cho Service Account tên "dagster-sa" trong namespace "default" hoặc "dagster"
+            # Restrict to Service Account named "dagster-sa" in "default" or "dagster" namespace
             "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = [
               "system:serviceaccount:default:dagster-sa",
               "system:serviceaccount:dagster:dagster-sa"
@@ -198,7 +198,7 @@ resource "aws_iam_role" "dagster_service_account" {
   }
 }
 
-# 6.1. IAM Policy gán cho Dagster Service Account (S3, SSM, SageMaker)
+# 6.1. IAM Policy assigned to Dagster Service Account (S3, SSM, SageMaker)
 resource "aws_iam_policy" "dagster_sa_permissions" {
   name        = "${var.project_name}-dagster-sa-policy"
   description = "Permissions for Dagster SA to access S3 Data Lake, SSM Parameters and SageMaker ML jobs"
@@ -206,7 +206,7 @@ resource "aws_iam_policy" "dagster_sa_permissions" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-      # Quyền đọc ghi S3 Data Lake & Model Artifacts
+      # Read/write permissions for S3 Data Lake & Model Artifacts
       {
         Effect = "Allow"
         Action = [
@@ -224,7 +224,7 @@ resource "aws_iam_policy" "dagster_sa_permissions" {
           "${var.model_artifacts_bucket_arn}/*"
         ]
       },
-      # Quyền đọc ghi SSM Parameter Store liên quan tới Model
+      # Read/write permissions for SSM Parameter Store related to Model
       {
         Effect = "Allow"
         Action = [
@@ -236,7 +236,7 @@ resource "aws_iam_policy" "dagster_sa_permissions" {
           "arn:aws:ssm:*:*:parameter/${var.project_name}/model/*"
         ]
       },
-      # Quyền điều phối SageMaker (Training, Serverless Endpoint, Invoke)
+      # SageMaker orchestration permissions (Training, Serverless Endpoint, Invoke)
       {
         Effect = "Allow"
         Action = [
@@ -254,7 +254,7 @@ resource "aws_iam_policy" "dagster_sa_permissions" {
           "sagemaker:DescribeEndpoint",
           "sagemaker:UpdateEndpoint",
           "sagemaker:InvokeEndpoint",
-          "iam:PassRole" # Cần PassRole cho sagemaker execution role
+          "iam:PassRole" # Required PassRole for SageMaker execution role
         ]
         Resource = "*"
       }

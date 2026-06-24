@@ -11,7 +11,7 @@ terraform {
     }
   }
 
-  # Điền tên bucket cụ thể nhận được từ output của bootstrap trước khi init
+  # Fill in the specific bucket name received from the bootstrap output before init
   backend "s3" {
     bucket         = "PLACEHOLDER_BUCKET_NAME"
     key            = "state/terraform.tfstate"

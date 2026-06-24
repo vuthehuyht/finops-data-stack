@@ -8,7 +8,7 @@ terraform {
     }
   }
 
-  # Sử dụng local backend để CI runner tự quản lý state trong session chạy
+  # Use local backend so the CI runner manages state locally within its execution session
   backend "local" {
     path = "terraform.tfstate"
   }

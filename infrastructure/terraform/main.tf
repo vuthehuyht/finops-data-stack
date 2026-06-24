@@ -1,4 +1,4 @@
-# Call Module VPC (Mạng, Subnets, Route Tables, NAT, Security Groups, S3 Endpoint)
+# Call VPC Module (Network, Subnets, Route Tables, NAT, Security Groups, S3 Endpoint)
 module "vpc" {
   source = "./modules/vpc"
 
@@ -28,6 +28,17 @@ module "secrets" {
 
   project_name = var.project_name
   environment  = var.environment
+
+  rds_host          = module.rds.rds_instance_address
+  rds_port          = 5432
+  rds_username      = module.rds.rds_username
+  rds_password      = module.rds.rds_password
+  rds_dbname        = module.rds.rds_dbname
+  redshift_host     = module.redshift.endpoint
+  redshift_port     = module.redshift.port
+  redshift_username = module.redshift.admin_username
+  redshift_password = module.redshift.admin_password
+  redshift_dbname   = module.redshift.database_name
 }
 
 # Call Module SSM Parameter Store (Model metadata, endpoint name, thresholds)
@@ -70,3 +81,15 @@ module "eks" {
   processed_bucket_arn       = "arn:aws:s3:::${module.s3.processed_bucket_id}"
   model_artifacts_bucket_arn = "arn:aws:s3:::${module.s3.model_artifacts_bucket_id}"
 }
+
+# Call Module RDS PostgreSQL for Dagster Metadata
+module "rds" {
+  source = "./modules/rds"
+
+  project_name          = var.project_name
+  environment           = var.environment
+  vpc_id                = module.vpc.vpc_id
+  private_db_subnet_ids = module.vpc.private_db_subnet_ids
+  eks_node_sg_id        = module.vpc.eks_node_sg_id
+}
+

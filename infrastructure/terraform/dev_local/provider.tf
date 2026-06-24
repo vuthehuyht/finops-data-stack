@@ -11,7 +11,7 @@ terraform {
     }
   }
 
-  # Sử dụng Local Backend để lưu trữ state cục bộ tại máy dev
+  # Use local backend to store state locally on the dev machine
   backend "local" {
     path = "terraform.tfstate"
   }

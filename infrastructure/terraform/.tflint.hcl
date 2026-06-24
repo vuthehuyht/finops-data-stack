@@ -2,7 +2,7 @@ config {
   format = "compact"
 }
 
-# Kích hoạt plugin kiểm tra các quy tắc thiết kế hạ tầng trên AWS
+# Enable AWS ruleset plugin to check infrastructure design rules on AWS
 plugin "aws" {
   enabled = true
   version = "0.47.0"

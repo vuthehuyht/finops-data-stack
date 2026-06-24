@@ -1,5 +1,5 @@
 # ==============================================================================
-# 1. TRUY VẤN DEFAULT NETWORK DATA SOURCES
+# 1. DEFAULT NETWORK DATA SOURCES
 # ==============================================================================
 
 data "aws_vpc" "default" {
@@ -16,7 +16,7 @@ data "aws_subnets" "default" {
 data "aws_region" "current" {}
 
 # ==============================================================================
-# 2. SECURITY GROUP (Public Ingress cho CI Runner)
+# 2. SECURITY GROUP (Public Ingress for CI Runner)
 # ==============================================================================
 
 resource "aws_security_group" "redshift_ci" {
@@ -24,7 +24,6 @@ resource "aws_security_group" "redshift_ci" {
   description = "Security group for Redshift Serverless CI inside Default VPC"
   vpc_id      = data.aws_vpc.default.id
 
-  # Cho phép kết nối trực tiếp đến Redshift từ toàn bộ internet
   ingress {
     description = "Allow Redshift port 5439 from anywhere for CI integration"
     from_port   = 5439
@@ -48,7 +47,7 @@ resource "aws_security_group" "redshift_ci" {
 }
 
 # ==============================================================================
-# 3. IAM ROLE CHO REDSHIFT ACCESS S3 & GLUE
+# 3. IAM ROLE FOR REDSHIFT ACCESS TO S3 & GLUE
 # ==============================================================================
 
 resource "aws_iam_role" "redshift_s3" {
@@ -102,16 +101,24 @@ resource "aws_redshiftserverless_workgroup" "main" {
   workgroup_name = "${var.project_name}-workgroup"
   namespace_name = aws_redshiftserverless_namespace.main.namespace_name
 
-  # Đặt trong các default subnets thu thập từ Data Source
   subnet_ids         = data.aws_subnets.default.ids
   security_group_ids = [aws_security_group.redshift_ci.id]
 
-  base_capacity = 8 # RPU tối thiểu để tiết kiệm chi phí trong môi trường CI
+  base_capacity = 4 # Minimum RPU to reduce cost in CI
+  max_capacity  = 4
 
-  # Bật Publicly Accessible để AWS cấp DNS Public và IP Public truy cập qua Internet
   publicly_accessible = true
 
   tags = {
     Environment = var.environment
   }
+}
+
+# Usage limit - hard cap on monthly compute cost
+resource "aws_redshiftserverless_usage_limit" "monthly_cost_cap" {
+  resource_arn  = aws_redshiftserverless_workgroup.main.arn
+  usage_type    = "serverless-compute"
+  amount        = var.monthly_cost_cap_usd
+  period        = "monthly"
+  breach_action = "deactivate"
 }

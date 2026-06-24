@@ -12,7 +12,7 @@ resource "aws_ecr_repository" "dagster_app" {
   }
 }
 
-# Hướng dẫn chính sách vòng đời (lifecycle policy) tự động xóa ảnh cũ/rác
+# Lifecycle policy to automatically clean up old/unused images
 resource "aws_ecr_lifecycle_policy" "cleanup_policy" {
   repository = aws_ecr_repository.dagster_app.name
 

@@ -47,3 +47,25 @@ output "sagemaker_execution_role_arn" {
   value       = module.sagemaker.execution_role_arn
   description = "The ARN of the SageMaker execution IAM role"
 }
+
+# RDS PostgreSQL for Dagster Metadata Outputs
+output "rds_endpoint" {
+  value       = module.rds.rds_instance_endpoint
+  description = "The connection endpoint for the RDS instance (Dagster metadata)"
+}
+
+output "rds_address" {
+  value       = module.rds.rds_instance_address
+  description = "The address of the RDS instance (Dagster metadata)"
+}
+
+output "db_credentials_secret_arn" {
+  value       = module.secrets.db_credentials_secret_arn
+  description = "The ARN of the AWS Secrets Manager secret containing consolidated database credentials"
+}
+
+output "rds_secret_arn" {
+  value       = module.secrets.db_credentials_secret_arn
+  description = "The ARN of the AWS Secrets Manager secret containing RDS credentials (deprecated, use db_credentials_secret_arn)"
+}
+
