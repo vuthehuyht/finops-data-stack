@@ -14,12 +14,12 @@ variable "project_name" {
   description = "Project name prefix for resources"
 }
 
-# Tạo một chuỗi ngẫu nhiên để tránh trùng tên S3 bucket toàn cầu
+# Create a random suffix to ensure a globally unique S3 bucket name
 resource "random_id" "bucket_suffix" {
   byte_length = 4
 }
 
-# S3 Bucket lưu trữ Terraform State
+# S3 Bucket to store Terraform State
 resource "aws_s3_bucket" "tf_state" {
   bucket        = "${var.project_name}-tfstate-${lower(random_id.bucket_suffix.hex)}"
   force_destroy = true
@@ -31,7 +31,7 @@ resource "aws_s3_bucket" "tf_state" {
   }
 }
 
-# Kích hoạt Versioning cho S3 Bucket để theo dõi lịch sử và khôi phục state khi cần
+# Enable Versioning for the S3 Bucket to track history and recover state if needed
 resource "aws_s3_bucket_versioning" "tf_state_versioning" {
   bucket = aws_s3_bucket.tf_state.id
   versioning_configuration {
@@ -39,7 +39,7 @@ resource "aws_s3_bucket_versioning" "tf_state_versioning" {
   }
 }
 
-# Mã hóa tĩnh S3 bucket bằng SSE-S3 (Amazon S3 managed keys) - Miễn phí
+# Server-side encryption for the S3 bucket using SSE-S3 (Amazon S3 managed keys) - Free tier
 resource "aws_s3_bucket_server_side_encryption_configuration" "tf_state_crypto" {
   bucket = aws_s3_bucket.tf_state.id
 
@@ -50,7 +50,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "tf_state_crypto" 
   }
 }
 
-# Chặn hoàn toàn truy cập public vào S3 bucket
+# Block all public access to the S3 bucket
 resource "aws_s3_bucket_public_access_block" "tf_state_public_block" {
   bucket = aws_s3_bucket.tf_state.id
 
@@ -60,10 +60,10 @@ resource "aws_s3_bucket_public_access_block" "tf_state_public_block" {
   restrict_public_buckets = true
 }
 
-# DynamoDB Table phục vụ cho việc khóa State (State Locking)
+# DynamoDB Table for Terraform State Locking
 resource "aws_dynamodb_table" "tf_locks" {
   name         = "${var.project_name}-tfstate-locks"
-  billing_mode = "PAY_PER_REQUEST" # On-Demand billing để tối ưu chi phí
+  billing_mode = "PAY_PER_REQUEST" # On-Demand billing to optimize cost
   hash_key     = "LockID"
 
   attribute {
@@ -78,7 +78,7 @@ resource "aws_dynamodb_table" "tf_locks" {
   }
 }
 
-# Output các thông tin cần thiết để điền vào cấu hình backend của module chính
+# Outputs required to configure backend settings in the main module
 output "state_bucket_name" {
   value       = aws_s3_bucket.tf_state.bucket
   description = "Use this value for 'bucket' in your backend configuration"

@@ -45,15 +45,26 @@ def inject_secrets_from_aws() -> None:
             "host": "REDSHIFT_HOST",
             "database": "REDSHIFT_DATABASE",
             "dbname": "REDSHIFT_DATABASE",
+            # Consolidated keys
+            "redshift_password": "REDSHIFT_PASSWORD",
+            "redshift_username": "REDSHIFT_USER",
+            "redshift_host": "REDSHIFT_HOST",
+            "redshift_port": "REDSHIFT_PORT",
+            "redshift_dbname": "REDSHIFT_DATABASE",
+            "rds_password": "RDS_PASSWORD",
+            "rds_username": "RDS_USER",
+            "rds_host": "RDS_HOST",
+            "rds_port": "RDS_PORT",
+            "rds_dbname": "RDS_DATABASE",
         }
 
         for key, val in secret_dict.items():
-            env_key = f"REDSHIFT_{key.upper()}"
-            os.environ[env_key] = str(val)
-
             mapped_key = key_mapping.get(key.lower())
             if mapped_key:
                 os.environ[mapped_key] = str(val)
+            else:
+                env_key = f"REDSHIFT_{key.upper()}"
+                os.environ[env_key] = str(val)
 
         logger.info("Loaded Redshift configs from Secrets Manager.")
 

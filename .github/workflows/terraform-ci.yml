@@ -70,6 +70,8 @@ jobs:
       - name: Initialize TFLint
         run: tflint --init
         working-directory: ./infrastructure/terraform
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Run TFLint
         run: tflint -f compact

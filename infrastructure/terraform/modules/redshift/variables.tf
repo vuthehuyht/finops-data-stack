@@ -17,3 +17,9 @@ variable "redshift_sg_id" {
   type        = string
   description = "Security group ID for Redshift Serverless"
 }
+
+variable "monthly_cost_cap_usd" {
+  type        = number
+  description = "Monthly compute cost cap in USD for Redshift Serverless"
+  default     = 10
+}

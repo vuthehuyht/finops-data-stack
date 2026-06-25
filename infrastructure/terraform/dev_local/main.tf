@@ -1,5 +1,5 @@
 # ==============================================================================
-# 1. NETWORK & SECURITY (VPC Dev Tối Giản Không NAT)
+# 1. NETWORK & SECURITY (Minimal VPC without NAT)
 # ==============================================================================
 
 # VPC
@@ -70,13 +70,12 @@ resource "aws_vpc_endpoint" "s3" {
 
 data "aws_region" "current" {}
 
-# Security Group cho Redshift (Chỉ cho phép IP được cấu hình whitelist)
+# Security Group for Redshift (whitelisted IPs only)
 resource "aws_security_group" "redshift_dev" {
   name        = "${var.project_name}-redshift-sg"
   description = "Security group for Redshift Serverless Dev Local"
   vpc_id      = aws_vpc.dev.id
 
-  # Inbound port 5439 từ dải allowed_ips (IP của nhà phát triển)
   ingress {
     description = "Allow Redshift port 5439 from Dev IP"
     from_port   = 5439
@@ -99,13 +98,13 @@ resource "aws_security_group" "redshift_dev" {
 }
 
 # ==============================================================================
-# 2. AMAZON S3 DEV BUCKETS (Bật force_destroy phục vụ testing)
+# 2. AMAZON S3 DEV BUCKETS (force_destroy enabled for testing)
 # ==============================================================================
 
-# Bucket Raw (Bronze Dev)
+# Raw Bucket (Bronze Dev)
 resource "aws_s3_bucket" "raw" {
   bucket        = "${var.project_name}-data-lake-raw"
-  force_destroy = true # Cho phép xóa nhanh dữ liệu khi destroy
+  force_destroy = true
 
   tags = {
     Name        = "${var.project_name} Raw Data Lake Bucket"
@@ -131,7 +130,7 @@ resource "aws_s3_bucket_public_access_block" "raw_public_block" {
   restrict_public_buckets = true
 }
 
-# Bucket Processed (Log Dev)
+# Processed Bucket (Log Dev)
 resource "aws_s3_bucket" "processed" {
   bucket        = "${var.project_name}-data-lake-processed"
   force_destroy = true
@@ -160,7 +159,7 @@ resource "aws_s3_bucket_public_access_block" "processed_public_block" {
   restrict_public_buckets = true
 }
 
-# Bucket Model Artifacts (ML Models Dev)
+# Model Artifacts Bucket (ML Models Dev)
 resource "aws_s3_bucket" "model_artifacts" {
   bucket        = "${var.project_name}-model-artifacts"
   force_destroy = true
@@ -193,7 +192,7 @@ resource "aws_s3_bucket_public_access_block" "model_artifacts_public_block" {
 # 3. REDSHIFT SERVERLESS (Publicly Accessible)
 # ==============================================================================
 
-# IAM Role cho Spectrum
+# IAM Role for Spectrum
 resource "aws_iam_role" "redshift_s3" {
   name = "${var.project_name}-redshift-s3-role"
 
@@ -243,15 +242,25 @@ resource "aws_redshiftserverless_workgroup" "main" {
   workgroup_name = "${var.project_name}-redshift-workgroup"
   namespace_name = aws_redshiftserverless_namespace.main.namespace_name
 
-  subnet_ids         = aws_subnet.public[*].id # Đặt trong Public Subnets
+  subnet_ids         = aws_subnet.public[*].id
   security_group_ids = [aws_security_group.redshift_dev.id]
 
-  base_capacity = 8 # RPU tối thiểu để tiết kiệm chi phí
+  base_capacity = 4 # Minimum RPU to reduce cost
+  max_capacity  = 4
 
-  # BẬT Publicly Accessible để AWS cấp DNS Public và IP Public truy cập qua Internet
   publicly_accessible = true
 
   tags = {
     Environment = var.environment
   }
 }
+
+# Usage limit - hard cap on monthly compute cost
+resource "aws_redshiftserverless_usage_limit" "monthly_cost_cap" {
+  resource_arn  = aws_redshiftserverless_workgroup.main.arn
+  usage_type    = "serverless-compute"
+  amount        = var.monthly_cost_cap_usd
+  period        = "monthly"
+  breach_action = "deactivate"
+}
+

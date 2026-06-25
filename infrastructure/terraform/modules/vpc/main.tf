@@ -29,7 +29,7 @@ resource "aws_subnet" "public" {
 
   tags = {
     Name                     = "${var.project_name}-public-subnet-${count.index + 1}"
-    "kubernetes.io/role/elb" = "1" # Dành cho AWS Load Balancer Controller
+    "kubernetes.io/role/elb" = "1" # For AWS Load Balancer Controller
   }
 }
 
@@ -42,7 +42,7 @@ resource "aws_subnet" "private_app" {
 
   tags = {
     Name                              = "${var.project_name}-private-app-${count.index + 1}"
-    "kubernetes.io/role/internal-elb" = "1" # Dành cho internal load balancer
+    "kubernetes.io/role/internal-elb" = "1" # For internal load balancer
   }
 }
 
@@ -58,7 +58,7 @@ resource "aws_subnet" "private_db" {
   }
 }
 
-# 4. NAT Gateway (Dùng chung 1 NAT duy nhất để tiết kiệm chi phí, đặt tại Public Subnet đầu tiên)
+# 4. NAT Gateway (Use a single NAT Gateway to save cost, located in the first Public Subnet)
 resource "aws_eip" "nat" {
   domain = "vpc"
 
@@ -69,7 +69,7 @@ resource "aws_eip" "nat" {
 
 resource "aws_nat_gateway" "nat" {
   allocation_id = aws_eip.nat.id
-  subnet_id     = aws_subnet.public[0].id # Đặt ở Public Subnet AZ 1a
+  subnet_id     = aws_subnet.public[0].id # Placed in Public Subnet AZ 1a
 
   tags = {
     Name = "${var.project_name}-nat-gw"
@@ -99,7 +99,7 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
-# Private App Route Table (Định tuyến đi Internet qua NAT Gateway duy nhất)
+# Private App Route Table (Routes Internet-bound traffic through the single NAT Gateway)
 resource "aws_route_table" "private_app" {
   vpc_id = aws_vpc.main.id
 
@@ -119,7 +119,7 @@ resource "aws_route_table_association" "private_app" {
   route_table_id = aws_route_table.private_app.id
 }
 
-# Private DB Route Table (Không có route đi internet - Cô lập hoàn toàn)
+# Private DB Route Table (No internet route - Completely isolated)
 resource "aws_route_table" "private_db" {
   vpc_id = aws_vpc.main.id
 
@@ -134,13 +134,13 @@ resource "aws_route_table_association" "private_db" {
   route_table_id = aws_route_table.private_db.id
 }
 
-# 6. VPC Gateway Endpoint cho S3 (Tiết kiệm chi phí NAT & tăng tốc truyền tải)
+# 6. VPC Gateway Endpoint for S3 (Saves NAT cost & accelerates transfers)
 resource "aws_vpc_endpoint" "s3" {
   vpc_id            = aws_vpc.main.id
   service_name      = "com.amazonaws.${data.aws_region.current.name}.s3"
   vpc_endpoint_type = "Gateway"
 
-  # Liên kết S3 Endpoint tới Public và Private App Route Tables
+  # Associate S3 Endpoint with Public and Private App Route Tables
   route_table_ids = [
     aws_route_table.public.id,
     aws_route_table.private_app.id
@@ -151,7 +151,7 @@ resource "aws_vpc_endpoint" "s3" {
   }
 }
 
-# Data source để lấy region hiện tại
+# Data source to fetch current region
 data "aws_region" "current" {}
 
 # 7. Security Groups
@@ -180,7 +180,7 @@ resource "aws_security_group" "redshift" {
   description = "Security group for Redshift Serverless DWH"
   vpc_id      = aws_vpc.main.id
 
-  # Chỉ chấp nhận inbound port 5439 từ EKS nodes
+  # Only accept inbound port 5439 from EKS nodes
   ingress {
     description     = "Allow Redshift port 5439 from EKS nodes"
     from_port       = 5439

@@ -20,7 +20,7 @@ resource "aws_iam_role" "sagemaker_execution" {
   }
 }
 
-# 2. IAM Policy cho SageMaker truy cập S3 bucket model-artifacts
+# 2. IAM Policy for SageMaker to access model-artifacts S3 bucket
 resource "aws_iam_policy" "sagemaker_s3" {
   name        = "${var.project_name}-sagemaker-s3-policy"
   description = "Allow SageMaker to access model artifacts S3 bucket"
@@ -50,14 +50,14 @@ resource "aws_iam_role_policy_attachment" "sagemaker_s3_attach" {
   policy_arn = aws_iam_policy.sagemaker_s3.arn
 }
 
-# 3. Đính kèm các AWS Managed Policies cần thiết cho SageMaker
-# Cho phép ghi log vào CloudWatch
+# 3. Attach required AWS Managed Policies for SageMaker
+# Allow logging to CloudWatch
 resource "aws_iam_role_policy_attachment" "sagemaker_logs" {
   role       = aws_iam_role.sagemaker_execution.name
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess"
 }
 
-# Cho phép truy cập ECR để lấy container training/inference images
+# Allow accessing ECR to pull training/inference container images
 resource "aws_iam_role_policy_attachment" "sagemaker_ecr" {
   role       = aws_iam_role.sagemaker_execution.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"

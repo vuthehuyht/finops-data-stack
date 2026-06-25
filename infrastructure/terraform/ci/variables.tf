@@ -27,3 +27,9 @@ variable "redshift_admin_password" {
   sensitive   = true
   description = "Admin password for Redshift Serverless CI. Must be 8-64 characters, containing at least 1 uppercase, 1 lowercase, and 1 number. Do NOT use '/', '@', '\"', ' ', '\\', or single quote."
 }
+
+variable "monthly_cost_cap_usd" {
+  type        = number
+  description = "Monthly compute cost cap in USD for Redshift Serverless"
+  default     = 10
+}
