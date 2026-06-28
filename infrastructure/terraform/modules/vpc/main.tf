@@ -58,7 +58,7 @@ resource "aws_subnet" "private_db" {
   }
 }
 
-# 4. NAT Instance (Single On-Demand t4g.nano, located in the first Public Subnet)
+# 4. NAT Gateway (Managed, highly available, no iptables/OS maintenance)
 resource "aws_eip" "nat" {
   domain = "vpc"
 
@@ -67,94 +67,15 @@ resource "aws_eip" "nat" {
   }
 }
 
-data "aws_ami" "amazon_linux_2023" {
-  most_recent = true
-  owners      = ["amazon"]
+resource "aws_nat_gateway" "main" {
+  allocation_id = aws_eip.nat.id
+  subnet_id     = aws_subnet.public[0].id
 
-  filter {
-    name   = "name"
-    values = ["al2023-ami-*-arm64"]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-}
-
-# IAM Role and Profile for NAT Instance (Enables SSH-less debugging via AWS Systems Manager)
-resource "aws_iam_role" "nat" {
-  name = "${var.project_name}-nat-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "ec2.amazonaws.com"
-        }
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "nat_ssm" {
-  role       = aws_iam_role.nat.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-}
-
-resource "aws_iam_instance_profile" "nat" {
-  name = "${var.project_name}-nat-instance-profile"
-  role = aws_iam_role.nat.name
-}
-
-resource "aws_instance" "nat" {
-  ami                  = data.aws_ami.amazon_linux_2023.id
-  instance_type        = "t4g.nano" # Cheap ARM64 On-Demand (~$3.35/month)
-  subnet_id            = aws_subnet.public[0].id
-  vpc_security_group_ids = [aws_security_group.nat.id]
-  iam_instance_profile = aws_iam_instance_profile.nat.name
-  
-  associate_public_ip_address = true
-  source_dest_check           = false # Required for NAT router
-
-  root_block_device {
-    volume_size           = 8
-    volume_type           = "gp3"
-    encrypted             = true
-    delete_on_termination = true
-  }
-
-  # Script configuration with persistent state across reboots
-  user_data = <<-EOF
-              #!/bin/bash
-              # 1. Enable IP forwarding permanently
-              echo "net.ipv4.ip_forward = 1" | sudo tee -a /etc/sysctl.d/custom-ip-forward.conf
-              sudo sysctl -p /etc/sysctl.d/custom-ip-forward.conf
-
-              # 2. Install iptables-services to save configurations permanently
-              sudo dnf install iptables-services -y
-              sudo systemctl enable iptables
-              sudo systemctl start iptables
-
-              # 3. Setup NAT Masquerade on the default network interface
-              DEFAULT_IFACE=$(ip -o -4 route show to default | awk '{print $5}')
-              sudo iptables -t nat -A POSTROUTING -o $DEFAULT_IFACE -j MASQUERADE
-              
-              # 4. Save iptables rule so it reloads on boot
-              sudo service iptables save
-              EOF
+  depends_on = [aws_internet_gateway.igw]
 
   tags = {
-    Name = "${var.project_name}-nat-instance"
+    Name = "${var.project_name}-nat-gateway"
   }
-}
-
-resource "aws_eip_association" "nat" {
-  instance_id   = aws_instance.nat.id
-  allocation_id = aws_eip.nat.id
 }
 
 # 5. Route Tables & Associations
@@ -178,13 +99,13 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
-# Private App Route Table (Routes Internet-bound traffic through the single NAT Instance)
+# Private App Route Table (Routes Internet-bound traffic through NAT Gateway)
 resource "aws_route_table" "private_app" {
   vpc_id = aws_vpc.main.id
 
   route {
-    cidr_block           = "0.0.0.0/0"
-    network_interface_id = aws_instance.nat.primary_network_interface_id
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.main.id
   }
 
   tags = {
@@ -281,29 +202,3 @@ resource "aws_security_group" "redshift" {
   }
 }
 
-# SG cho NAT Instance
-resource "aws_security_group" "nat" {
-  name        = "${var.project_name}-nat-sg"
-  description = "Security group for NAT Instance router"
-  vpc_id      = aws_vpc.main.id
-
-  ingress {
-    description = "Allow inbound traffic from VPC"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = [aws_vpc.main.cidr_block]
-  }
-
-  egress {
-    from_port        = 0
-    to_port          = 0
-    protocol         = "-1"
-    cidr_blocks      = ["0.0.0.0/0"]
-    ipv6_cidr_blocks = ["::/0"]
-  }
-
-  tags = {
-    Name = "${var.project_name}-nat-sg"
-  }
-}
