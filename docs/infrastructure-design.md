@@ -11,7 +11,7 @@ Sử dụng mô hình VPC tiêu chuẩn để cô lập tài nguyên trên 2 Ava
     *   2 Public Subnets (cho NAT Gateway, Load Balancer).
     *   2 Private App Subnets (cho EKS Core & Worker Nodes).
     *   2 Private DB Subnets (cho Redshift Serverless Workgroup).
-*   **NAT Gateway**: 1 cái dùng chung cho cả 2 AZ để tiết kiệm chi phí, đặt tại Public Subnet của AZ đầu tiên.
+*   **NAT Gateway**: 1 cái dùng chung cho cả 2 AZ để tiết kiệm chi phí, đặt tại Public Subnet của AZ đầu tiên. *(Lưu ý: Đối với môi trường Lab/Test ngắn ngày, NAT Gateway được thay thế bằng một NAT Instance chạy trên EC2 Spot `t4g.nano` có cấu hình reboot-persistence và hỗ trợ SSM Session Manager để giảm chi phí mạng từ ~$32/tháng xuống còn ~$1.20/tháng).*
 *   **S3 Gateway Endpoint**: Cấu hình VPC Endpoint cho S3. Toàn bộ traffic truyền tải dữ liệu data lake lớn giữa EKS/Redshift và S3 sẽ đi nội bộ bên trong AWS, tránh đi qua NAT Gateway để loại bỏ phí truyền dữ liệu và tăng tốc độ.
 *   **Security Groups**: Thiết lập các quy tắc nghiêm ngặt, chỉ cho phép traffic từ EKS Security Group kết nối tới Redshift qua port `5439`.
 
@@ -19,10 +19,10 @@ Sử dụng mô hình VPC tiêu chuẩn để cô lập tài nguyên trên 2 Ava
 *   **Amazon EKS (Elastic Kubernetes Service)**:
     *   **Control Plane**: Managed bởi AWS (v1.30).
     *   **Hybrid Node Groups**: Đặt trong Private App Subnets để đảm bảo cân bằng giữa độ ổn định và chi phí:
-        *   **Core Node Group (On-Demand)**: Sử dụng `t3.medium` (hoặc `t3a.medium`), dung lượng mong muốn là 1 node để chạy các pod Core ổn định 24/7 (Dagster Webserver, Dagster Daemon, CoreDNS).
-        *   **Worker Node Group (Spot)**: Sử dụng Spot instances nhỏ như `t3.medium`, `t3a.medium` (co giãn từ 0 đến 5 nodes) để chạy các job xử lý dữ liệu nặng, crawler, dbt transform. Cấu hình taints để tránh các pod Core bị đẩy lên Spot nodes.
+        *   **Core Node Group (On-Demand)**: Sử dụng `t3.medium` (hoặc `t3a.medium`), dung lượng mong muốn là 1 node để chạy các pod Core ổn định 24/7 (Dagster Webserver, Dagster Daemon, CoreDNS). *(Lưu ý: Trong môi trường Lab, ưu tiên dùng `t3a.medium` để tiết kiệm 10% chi phí).*
+        *   **Worker Node Group (Spot)**: Sử dụng Spot instances nhỏ như `t3.medium`, `t3a.medium` (hoặc `t3a.small` cho Lab để tiết kiệm chi phí). Cấu hình co giãn từ 0 đến 3/5 nodes để chạy các job xử lý dữ liệu nặng. *(Lưu ý: Trong môi trường Lab, cấu hình desired_size = 0 để thực hiện scale-to-zero khi nhàn rỗi).*
     *   **Autoscaling**: Cấu hình Cluster Autoscaler để tự động tăng/giảm số lượng Spot node theo workload thực tế của Dagster.
-*   **Amazon ECR (Elastic Container Registry)**: Lưu trữ các private container images của Dagster, dbt và crawlers. Tích hợp Lifecycle Policy tự động dọn dẹp các images không tag và chỉ lưu giữ tối đa 10 images gần nhất để tiết kiệm chi phí lưu trữ.
+*   **Amazon ECR (Elastic Container Registry)**: Lưu trữ các private container images của Dagster, dbt và crawlers. Tích hợp Lifecycle Policy tự động dọn dẹp các images không tag và chỉ lưu giữ tối đa 10 images gần nhất để tiết kiệm chi phí lưu trữ *(hoặc chỉ 5 images gần nhất trong môi trường Lab)*.
 
 ## 3. Lưu trữ & Warehouse (Storage & DWH)
 *   **Amazon S3 (Data Lake)**:
