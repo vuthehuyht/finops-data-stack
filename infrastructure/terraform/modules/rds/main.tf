@@ -56,10 +56,10 @@ resource "aws_db_subnet_group" "rds" {
 resource "aws_db_instance" "dagster_meta" {
   identifier            = "${var.project_name}-dagster-metadata"
   engine                = "postgres"
-  engine_version        = "16.3"
+  engine_version        = "16"
   instance_class        = var.instance_class
   allocated_storage     = var.allocated_storage
-  max_allocated_storage = 10
+  max_allocated_storage = 100
   storage_type          = "gp3"
   storage_encrypted     = true
 

@@ -63,3 +63,15 @@ variable "redshift_dbname" {
   type        = string
   description = "Redshift Serverless database name"
 }
+
+variable "ssi_token" {
+  type        = string
+  sensitive   = true
+  description = "SSI API token for data crawling"
+}
+
+variable "investing_token" {
+  type        = string
+  sensitive   = true
+  description = "Investing.com API token for data crawling"
+}

@@ -38,7 +38,7 @@ resource "aws_ecr_lifecycle_policy" "cleanup_policy" {
             "description": "Keep only last 5 tagged images",
             "selection": {
                 "tagStatus": "any",
-                "countType": "imageCountType",
+                "countType": "imageCountMoreThan",
                 "countNumber": 5
             },
             "action": {
