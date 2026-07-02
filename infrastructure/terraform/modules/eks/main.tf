@@ -95,6 +95,12 @@ resource "aws_eks_node_group" "core_system" {
   capacity_type  = "ON_DEMAND"
   instance_types = ["t3a.medium"] # Optimization: use cheaper AMD instance type
 
+  # Used by K8s nodeSelector (infrastructure/helm/values.yaml) to pin the
+  # always-on webserver/daemon/user-code pods to this node group.
+  labels = {
+    "node-group" = "core"
+  }
+
   scaling_config {
     desired_size = 1
     min_size     = 1
@@ -126,6 +132,12 @@ resource "aws_eks_node_group" "worker_workload" {
 
   capacity_type  = "SPOT"
   instance_types = ["t3a.medium", "t3a.small"] # Cheap AMD instances
+
+  # Used by K8s nodeSelector (infrastructure/helm/values.yaml) to pin run
+  # pods to this node group; paired with the spotWorker taint below.
+  labels = {
+    "node-group" = "worker"
+  }
 
   scaling_config {
     desired_size = 0 # Start at 0 to save idle costs

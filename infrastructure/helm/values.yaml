@@ -297,7 +297,8 @@ dagsterDaemon:
     - name: AWS_REGION
       value: "ap-southeast-1"
 
-  # Always-on — runs on Core, same as webserver (see nodeSelector note there).
+  # Always-on — runs on the Core node group, same as webserver. `node-group: core`
+  # label does not exist in Terraform yet — see "Out of scope" note near the bottom.
   nodeSelector:
     node-group: core
   resources:
@@ -363,10 +364,11 @@ additionalInstanceConfig: {}
 #    single key "postgresql-password", synced from the AWS Secrets Manager "credentials" secret
 #    (infrastructure/terraform/modules/secrets). Required key name verified against the chart's
 #    own templates/secret-postgres.yaml.
-# 2. Add the "node-group: core" label to aws_eks_node_group.core_system and "node-group: worker"
-#    to aws_eks_node_group.worker_workload in infrastructure/terraform/modules/eks/main.tf, so the
-#    nodeSelector fields above actually match. The worker group's taint (spotWorker=true:NoSchedule)
-#    already exists and is matched by the toleration under runLauncher above.
+# 2. [DONE] "node-group: core"/"node-group: worker" labels added to
+#    aws_eks_node_group.core_system/worker_workload in
+#    infrastructure/terraform/modules/eks/main.tf — nodeSelector fields above
+#    now match real infra. The worker group's taint (spotWorker=true:NoSchedule)
+#    already existed and is matched by the toleration under runLauncher above.
 # 3. CI/CD wiring to fill every PLACEHOLDER_* value above via `helm --set` from Terraform outputs
 #    at deploy time (ecr_repository_url, rds_instance_address/rds_username/rds_dbname).
 # 4. `helm repo add dagster https://dagster-io.github.io/helm` + chart version pin — this project
