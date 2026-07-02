@@ -38,6 +38,15 @@ resource "aws_eks_cluster" "main" {
     endpoint_public_access  = true
   }
 
+  # Required for aws_eks_access_entry / aws_eks_access_policy_association
+  # (added below) to have any effect -- without this block, Terraform/AWS
+  # default new clusters to authentication_mode = CONFIG_MAP, which ignores
+  # access entries entirely.
+  access_config {
+    authentication_mode                         = "API_AND_CONFIG_MAP"
+    bootstrap_cluster_creator_admin_permissions = true
+  }
+
   depends_on = [
     aws_iam_role_policy_attachment.eks_cluster_policy
   ]
@@ -331,4 +340,102 @@ resource "aws_iam_policy" "external_secrets_read_credentials" {
 resource "aws_iam_role_policy_attachment" "external_secrets_read_credentials_attach" {
   role       = aws_iam_role.external_secrets_sa.name
   policy_arn = aws_iam_policy.external_secrets_read_credentials.arn
+}
+
+# 8. GitHub OIDC provider, for GitHub Actions to assume an AWS role without
+# long-lived credentials (used by the CI/CD deploy pipeline).
+resource "aws_iam_openid_connect_provider" "github_actions" {
+  url            = "https://token.actions.githubusercontent.com"
+  client_id_list = ["sts.amazonaws.com"]
+  # AWS no longer validates this value for GitHub's OIDC provider (validates via
+  # CA chain instead, per GitHub's own docs) -- Terraform's resource still
+  # requires a non-empty value structurally, so this is GitHub's well-known
+  # intermediate CA thumbprint, kept for compatibility, not functionally checked.
+  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
+}
+
+# 8.1. IAM Role assumed by the GitHub Actions CI/CD deploy workflow. Trust
+# policy restricts to this exact repo AND only the main branch -- feature
+# branches cannot assume this role.
+resource "aws_iam_role" "github_actions_deploy" {
+  name = "${var.project_name}-github-actions-deploy-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Federated = aws_iam_openid_connect_provider.github_actions.arn
+        }
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Condition = {
+          StringEquals = {
+            "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+            "token.actions.githubusercontent.com:sub" = "repo:vuthehuyht/finops-data-stack:ref:refs/heads/main"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Environment = var.environment
+  }
+}
+
+# 8.2. Policy covering every AWS resource type Terraform manages in this
+# project (EC2/VPC, EKS, RDS, Redshift Serverless, IAM, S3, ECR, Secrets
+# Manager, SSM) plus ECR push and EKS describe. This is intentionally broad
+# -- the role runs `terraform apply` against everything Terraform manages --
+# not an oversight.
+resource "aws_iam_policy" "github_actions_deploy_permissions" {
+  name        = "${var.project_name}-github-actions-deploy-policy"
+  description = "Permissions for the GitHub Actions CI/CD deploy pipeline (terraform apply + ECR push + EKS access)"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:*",
+          "eks:*",
+          "rds:*",
+          "redshift-serverless:*",
+          "iam:*",
+          "s3:*",
+          "ecr:*",
+          "secretsmanager:*",
+          "ssm:*",
+          "sagemaker:*",
+          "logs:*"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "github_actions_deploy_permissions_attach" {
+  role       = aws_iam_role.github_actions_deploy.name
+  policy_arn = aws_iam_policy.github_actions_deploy_permissions.arn
+}
+
+# 8.3. Grant the GitHub Actions role admin access to the EKS cluster's
+# Kubernetes API (via EKS Access Entries, not the legacy aws-auth ConfigMap),
+# so `kubectl`/`helm` in the deploy workflow can operate on the cluster.
+resource "aws_eks_access_entry" "github_actions_deploy" {
+  cluster_name  = aws_eks_cluster.main.name
+  principal_arn = aws_iam_role.github_actions_deploy.arn
+}
+
+resource "aws_eks_access_policy_association" "github_actions_deploy_admin" {
+  cluster_name  = aws_eks_cluster.main.name
+  principal_arn = aws_iam_role.github_actions_deploy.arn
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+
+  access_scope {
+    type = "cluster"
+  }
 }

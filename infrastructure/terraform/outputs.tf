@@ -74,3 +74,19 @@ output "rds_secret_arn" {
   description = "The ARN of the AWS Secrets Manager secret containing RDS credentials (deprecated, use db_credentials_secret_arn)"
 }
 
+output "rds_username" {
+  value       = module.rds.rds_username
+  description = "The username of the RDS instance (Dagster metadata)"
+  sensitive   = true
+}
+
+output "rds_dbname" {
+  value       = module.rds.rds_dbname
+  description = "The database name of the RDS instance (Dagster metadata)"
+}
+
+output "github_actions_deploy_role_arn" {
+  value       = module.eks.github_actions_deploy_role_arn
+  description = "The ARN of the IAM role assumed by the GitHub Actions CI/CD deploy pipeline"
+}
+
