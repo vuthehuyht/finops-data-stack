@@ -45,9 +45,9 @@ run_launcher:
     node_selector:
       node-group: worker
     tolerations:
-      - key: "workload"
+      - key: "spotWorker"
         operator: "Equal"
-        value: "spot"
+        value: "true"
         effect: "NoSchedule"
     resources:
       requests:

@@ -49,9 +49,9 @@ def test_dagster_yaml_run_launcher_targets_worker_spot_nodes():
     assert launcher_config["node_selector"] == {"node-group": "worker"}
     assert launcher_config["tolerations"] == [
         {
-            "key": "workload",
+            "key": "spotWorker",
             "operator": "Equal",
-            "value": "spot",
+            "value": "true",
             "effect": "NoSchedule",
         }
     ]
