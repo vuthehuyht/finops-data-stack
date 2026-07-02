@@ -13,6 +13,7 @@ Analyze the current git changes (staged, unstaged, or relative to the base branc
 - The PR description must strictly follow the format defined in `.github/pull_request_template.md`.
 - Code comments and explanations in the code remain in Vietnamese (per project rules), but the PR description itself is targeted for GitHub reviewers (English).
 - Automatically exclude large non-code files (like lockfiles: `uv.lock`, data files, compiled assets) when reviewing the diff to save token window.
+- **Keep it short.** Group changes by module/concern instead of listing every file. `WHAT`: max 5 bullets, one line each. `WHY`: 1-2 sentences total, not one reason per bullet. `QA`: max 3 checklist items — only the ones a reviewer actually needs to verify, skip routine checks (`terraform validate`, `pytest passes`) unless something in the diff makes them non-obvious. Do not restate details already obvious from the diff/filenames.
 
 ## Steps
 
