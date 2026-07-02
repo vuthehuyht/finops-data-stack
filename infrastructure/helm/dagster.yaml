@@ -42,13 +42,11 @@ run_launcher:
       env: DAGSTER_CURRENT_IMAGE
     env_vars:
       - AWS_REGION=ap-southeast-1
-    node_selector:
-      node-group: worker
-    tolerations:
-      - key: "spotWorker"
-        operator: "Equal"
-        value: "true"
-        effect: "NoSchedule"
+    # Name of the k8s ConfigMap holding this same dagster.yaml, mounted
+    # into every run pod so it shares the daemon's instance config.
+    # Required by K8sRunLauncher; the ConfigMap itself is created by the
+    # deploy pipeline, out of scope for this file.
+    instance_config_map: dagster-instance-config-map
     resources:
       requests:
         cpu: "250m"
@@ -56,6 +54,17 @@ run_launcher:
       limits:
         cpu: "1"
         memory: "1Gi"
+    # node_selector/tolerations are not top-level K8sRunLauncher fields —
+    # raw pod spec overrides go through run_k8s_config.pod_spec_config.
+    run_k8s_config:
+      pod_spec_config:
+        node_selector:
+          node-group: worker
+        tolerations:
+          - key: "spotWorker"
+            operator: "Equal"
+            value: "true"
+            effect: "NoSchedule"
 
 run_coordinator:
   module: dagster.core.run_coordinator

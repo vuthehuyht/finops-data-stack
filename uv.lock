@@ -1095,6 +1095,19 @@ wheels = [
 ]
 
 [[package]]
+name = "dagster-postgres"
+version = "0.29.10"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "dagster" },
+    { name = "psycopg2-binary" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/20/68/255c48396691e09bf15ae228d4410042aa0cdf4a29a3f1b0832da4446957/dagster_postgres-0.29.10.tar.gz", hash = "sha256:f6344376a195645f4917691a43e69ed6f4e3885d4caa8ea14c442de101a73cdb", size = 406286, upload-time = "2026-06-18T18:47:03.731Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7b/1a/578d4b3e066ea5aeb7d821090748ac82c18df3f8a3caf44c0a098e096243/dagster_postgres-0.29.10-py3-none-any.whl", hash = "sha256:d35d5bc3a68698a3ef596c04974f73f219d0112647985572d8538e49b56813e1", size = 25504, upload-time = "2026-06-18T18:47:02.561Z" },
+]
+
+[[package]]
 name = "dagster-shared"
 version = "1.13.10"
 source = { registry = "https://pypi.org/simple" }
@@ -1473,6 +1486,7 @@ dependencies = [
     { name = "dagster-dbt" },
     { name = "dagster-k8s" },
     { name = "dagster-pandas" },
+    { name = "dagster-postgres" },
     { name = "dagster-slack" },
     { name = "dbt-redshift" },
     { name = "httpx" },
@@ -1517,6 +1531,7 @@ requires-dist = [
     { name = "dagster-dbt", specifier = "==0.29.10" },
     { name = "dagster-k8s", specifier = "==0.29.10" },
     { name = "dagster-pandas", specifier = "==0.29.10" },
+    { name = "dagster-postgres", specifier = "==0.29.10" },
     { name = "dagster-slack", specifier = "==0.29.10" },
     { name = "dbt-redshift", specifier = ">=1.11.0rc4" },
     { name = "httpx", specifier = ">=0.27.0" },
