@@ -15,3 +15,15 @@ variable "environment" {
   default     = "production"
   description = "Deployment environment (e.g. dev, prod, staging)"
 }
+
+variable "ssi_token" {
+  type        = string
+  sensitive   = true
+  description = "SSI API token for data crawling"
+}
+
+variable "investing_token" {
+  type        = string
+  sensitive   = true
+  description = "Investing.com API token for data crawling"
+}

@@ -39,6 +39,9 @@ module "secrets" {
   redshift_username = module.redshift.admin_username
   redshift_password = module.redshift.admin_password
   redshift_dbname   = module.redshift.database_name
+
+  ssi_token       = var.ssi_token
+  investing_token = var.investing_token
 }
 
 # Call Module SSM Parameter Store (Model metadata, endpoint name, thresholds)
