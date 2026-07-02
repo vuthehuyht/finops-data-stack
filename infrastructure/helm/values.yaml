@@ -61,8 +61,8 @@ dagsterWebserver:
       value: "ap-southeast-1"
 
   # Always-on — runs on the Core node group (On-Demand, t3a.medium), not the
-  # Spot Worker group. `node-group: core` label does not exist in Terraform
-  # yet — see "Out of scope" note near the bottom.
+  # Spot Worker group. `node-group: core` matches the node-group label added
+  # to aws_eks_node_group in Terraform — see "Out of scope" note near the bottom.
   nodeSelector:
     node-group: core
   resources:
@@ -195,7 +195,8 @@ runLauncher:
       # group (infrastructure/terraform/modules/eks/main.tf,
       # aws_eks_node_group.worker_workload). The taint spotWorker=true:NoSchedule
       # already exists there and is matched below; the node-group: worker
-      # label does not exist yet — see "Out of scope" note near the bottom.
+      # label matches the node-group label added to aws_eks_node_group in
+      # Terraform — see "Out of scope" note near the bottom.
       runK8sConfig:
         podSpecConfig:
           nodeSelector:
@@ -278,7 +279,10 @@ dagsterDaemon:
     enabled: true
     startTimeoutSeconds: 300
     pollIntervalSeconds: 120
-    maxResumeRunAttempts: 0
+    # Retry once with a new run worker if the Spot Worker node hosting a run
+    # is reclaimed mid-run, instead of failing the run outright (Worker node
+    # group is capacity_type = SPOT, see infrastructure/terraform/modules/eks).
+    maxResumeRunAttempts: 1
     freeSlotsAfterRunEndSeconds: 0
 
   runRetries:
@@ -298,7 +302,8 @@ dagsterDaemon:
       value: "ap-southeast-1"
 
   # Always-on — runs on the Core node group, same as webserver. `node-group: core`
-  # label does not exist in Terraform yet — see "Out of scope" note near the bottom.
+  # matches the node-group label added to aws_eks_node_group in Terraform —
+  # see "Out of scope" note near the bottom.
   nodeSelector:
     node-group: core
   resources:
@@ -373,4 +378,8 @@ additionalInstanceConfig: {}
 #    at deploy time (ecr_repository_url, rds_instance_address/rds_username/rds_dbname).
 # 4. `helm repo add dagster https://dagster-io.github.io/helm` + chart version pin — this project
 #    does not vendor the chart, it is installed from the upstream Dagster Helm repo.
+# 5. Create the k8s ServiceAccount "dagster-sa" (global.serviceAccountName above), annotated with
+#    eks.amazonaws.com/role-arn = module.eks.dagster_sa_role_arn (the IRSA role Terraform creates).
+#    Not created by Terraform (which only creates the IAM role, not the k8s object) or by the Helm
+#    chart (serviceAccount.create is false above) — must be created by the deploy pipeline.
 ####################################################################################################

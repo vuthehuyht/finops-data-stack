@@ -45,10 +45,10 @@ def _load(filename: str) -> dict:
 def test_secret_store_targets_aws_secrets_manager_via_irsa_service_account():
     manifest = _load("secret-store.yaml")
 
-    assert manifest["apiVersion"] == "external-secrets.io/v1beta1"
-    assert manifest["kind"] == "SecretStore"
+    assert manifest["apiVersion"] == "external-secrets.io/v1"
+    assert manifest["kind"] == "ClusterSecretStore"
     assert manifest["metadata"]["name"] == "aws-secrets-manager"
-    assert manifest["metadata"]["namespace"] == "dagster"
+    assert "namespace" not in manifest["metadata"]
 
     aws_provider = manifest["spec"]["provider"]["aws"]
     assert aws_provider["service"] == "SecretsManager"
@@ -62,7 +62,7 @@ def test_secret_store_targets_aws_secrets_manager_via_irsa_service_account():
 def test_external_secret_refreshes_hourly_and_targets_dagster_pg_credentials():
     manifest = _load("external-secret-dagster-pg.yaml")
 
-    assert manifest["apiVersion"] == "external-secrets.io/v1beta1"
+    assert manifest["apiVersion"] == "external-secrets.io/v1"
     assert manifest["kind"] == "ExternalSecret"
     assert manifest["metadata"]["name"] == "dagster-pg-credentials"
     assert manifest["metadata"]["namespace"] == "dagster"
@@ -71,7 +71,7 @@ def test_external_secret_refreshes_hourly_and_targets_dagster_pg_credentials():
     assert spec["refreshInterval"] == "1h"
     assert spec["secretStoreRef"] == {
         "name": "aws-secrets-manager",
-        "kind": "SecretStore",
+        "kind": "ClusterSecretStore",
     }
     assert spec["target"]["name"] == "dagster-pg-credentials"
     assert spec["target"]["creationPolicy"] == "Owner"
