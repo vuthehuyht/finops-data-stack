@@ -127,9 +127,35 @@ dagster-user-deployments:
       includeConfigInLaunchedRuns:
         enabled: true
 
+      # Redshift creds injected directly from the "dagster-pg-credentials" k8s
+      # Secret (kept in sync from AWS Secrets Manager by External Secrets
+      # Operator, see src/k8s/manifest/external-secrets/) — src/common/
+      # redshift_util.py reads these env vars directly, no boto3 call at
+      # runtime. Renamed via valueFrom.secretKeyRef because the Secret's own
+      # keys are lowercase (redshift_host, ...) and the app expects uppercase.
       env:
         - name: AWS_REGION
           value: "ap-southeast-1"
+        - name: REDSHIFT_HOST
+          valueFrom:
+            secretKeyRef:
+              name: dagster-pg-credentials
+              key: redshift_host
+        - name: REDSHIFT_USER
+          valueFrom:
+            secretKeyRef:
+              name: dagster-pg-credentials
+              key: redshift_username
+        - name: REDSHIFT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: dagster-pg-credentials
+              key: redshift_password
+        - name: REDSHIFT_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: dagster-pg-credentials
+              key: redshift_dbname
 
       # Always-on gRPC server serving definitions — runs on Core, same as
       # webserver/daemon (see nodeSelector note there).
@@ -206,6 +232,31 @@ runLauncher:
               operator: "Equal"
               value: "true"
               effect: "NoSchedule"
+        # Redshift creds for the run's main container — same rationale as
+        # dagster-user-deployments.deployments[0].env above (renamed from the
+        # k8s Secret's lowercase keys to the uppercase names the app reads).
+        containerConfig:
+          env:
+            - name: REDSHIFT_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: dagster-pg-credentials
+                  key: redshift_host
+            - name: REDSHIFT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: dagster-pg-credentials
+                  key: redshift_username
+            - name: REDSHIFT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: dagster-pg-credentials
+                  key: redshift_password
+            - name: REDSHIFT_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: dagster-pg-credentials
+                  key: redshift_dbname
 
 ####################################################################################################
 # PostgreSQL — external RDS instance (aws_db_instance.dagster_meta), not chart-managed.
