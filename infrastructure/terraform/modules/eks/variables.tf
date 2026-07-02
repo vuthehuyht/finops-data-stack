@@ -37,3 +37,8 @@ variable "processed_bucket_arn" {
   type        = string
   description = "ARN of processed data lake S3 bucket for IRSA permissions"
 }
+
+variable "db_credentials_secret_arn" {
+  type        = string
+  description = "ARN of the consolidated AWS Secrets Manager secret (finops-db-credentials) for External Secrets Operator IRSA permissions"
+}

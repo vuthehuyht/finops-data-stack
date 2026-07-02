@@ -278,3 +278,57 @@ resource "aws_iam_role_policy_attachment" "dagster_sa_permissions_attach" {
   role       = aws_iam_role.dagster_service_account.name
   policy_arn = aws_iam_policy.dagster_sa_permissions.arn
 }
+
+# 7. IRSA: IAM Role for External Secrets Operator, to sync AWS Secrets Manager
+# secrets into k8s Secrets (e.g. dagster-pg-credentials for the Dagster Helm chart).
+resource "aws_iam_role" "external_secrets_sa" {
+  name = "${var.project_name}-external-secrets-sa-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Federated = aws_iam_openid_connect_provider.eks.arn
+        }
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Condition = {
+          StringEquals = {
+            # Restrict to Service Account named "external-secrets-sa" in the "external-secrets" namespace
+            "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = "system:serviceaccount:external-secrets:external-secrets-sa"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Environment = var.environment
+  }
+}
+
+# 7.1. Least-privilege policy: read-only access to exactly the consolidated credentials secret
+resource "aws_iam_policy" "external_secrets_read_credentials" {
+  name        = "${var.project_name}-external-secrets-read-policy"
+  description = "Read-only access to the consolidated AWS Secrets Manager secret, for External Secrets Operator"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ]
+        Resource = var.db_credentials_secret_arn
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "external_secrets_read_credentials_attach" {
+  role       = aws_iam_role.external_secrets_sa.name
+  policy_arn = aws_iam_policy.external_secrets_read_credentials.arn
+}

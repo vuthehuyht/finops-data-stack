@@ -83,6 +83,7 @@ module "eks" {
   raw_bucket_arn             = "arn:aws:s3:::${module.s3.raw_bucket_id}"
   processed_bucket_arn       = "arn:aws:s3:::${module.s3.processed_bucket_id}"
   model_artifacts_bucket_arn = "arn:aws:s3:::${module.s3.model_artifacts_bucket_id}"
+  db_credentials_secret_arn  = module.secrets.db_credentials_secret_arn
 }
 
 # Call Module RDS PostgreSQL for Dagster Metadata

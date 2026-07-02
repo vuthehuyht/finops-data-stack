@@ -17,3 +17,8 @@ output "dagster_sa_role_arn" {
   value       = aws_iam_role.dagster_service_account.arn
   description = "The ARN of the IAM role for the Dagster Service Account (IRSA)"
 }
+
+output "external_secrets_sa_role_arn" {
+  value       = aws_iam_role.external_secrets_sa.arn
+  description = "The ARN of the IAM role for the External Secrets Operator ServiceAccount (IRSA)"
+}

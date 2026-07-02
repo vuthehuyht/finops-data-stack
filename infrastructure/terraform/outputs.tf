@@ -43,6 +43,11 @@ output "dagster_sa_role_arn" {
   description = "The ARN of the IAM role for the Dagster Service Account (IRSA)"
 }
 
+output "external_secrets_sa_role_arn" {
+  value       = module.eks.external_secrets_sa_role_arn
+  description = "The ARN of the IAM role for the External Secrets Operator ServiceAccount (IRSA)"
+}
+
 output "sagemaker_execution_role_arn" {
   value       = module.sagemaker.execution_role_arn
   description = "The ARN of the SageMaker execution IAM role"
