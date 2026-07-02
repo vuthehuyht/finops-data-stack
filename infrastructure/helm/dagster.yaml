@@ -1,0 +1,75 @@
+# Dagster instance config for production on EKS.
+# Postgres connection and the run-pod image are env-indirected — no
+# secret value or image tag is hardcoded here. The referenced env vars
+# (DAGSTER_PG_HOST/USERNAME/PASSWORD/DB, DAGSTER_CURRENT_IMAGE) must be
+# injected into the webserver/daemon/run pods by the deploy pipeline
+# (out of scope for this file — see docs/superpowers/specs/2026-07-02-dagster-instance-config-design.md §3).
+
+run_storage:
+  module: dagster_postgres.run_storage
+  class: PostgresRunStorage
+  config: &pg_conn
+    postgres_db:
+      hostname:
+        env: DAGSTER_PG_HOST
+      username:
+        env: DAGSTER_PG_USERNAME
+      password:
+        env: DAGSTER_PG_PASSWORD
+      db_name:
+        env: DAGSTER_PG_DB
+      port: 5432
+
+event_log_storage:
+  module: dagster_postgres.event_log
+  class: PostgresEventLogStorage
+  config: *pg_conn
+
+schedule_storage:
+  module: dagster_postgres.schedule_storage
+  class: PostgresScheduleStorage
+  config: *pg_conn
+
+run_launcher:
+  module: dagster_k8s
+  class: K8sRunLauncher
+  config:
+    service_account_name: dagster-sa
+    job_namespace: dagster
+    load_incluster_config: true
+    image_pull_policy: Always
+    job_image:
+      env: DAGSTER_CURRENT_IMAGE
+    env_vars:
+      - AWS_REGION=ap-southeast-1
+    node_selector:
+      node-group: worker
+    tolerations:
+      - key: "workload"
+        operator: "Equal"
+        value: "spot"
+        effect: "NoSchedule"
+    resources:
+      requests:
+        cpu: "250m"
+        memory: "512Mi"
+      limits:
+        cpu: "1"
+        memory: "1Gi"
+
+run_coordinator:
+  module: dagster.core.run_coordinator
+  class: QueuedRunCoordinator
+  config:
+    max_concurrent_runs: 3
+
+compute_logs:
+  module: dagster_aws.s3.compute_log_manager
+  class: S3ComputeLogManager
+  config:
+    bucket: finops-data-lake-processed
+    prefix: dagster-compute-logs
+    region: ap-southeast-1
+
+telemetry:
+  enabled: false
