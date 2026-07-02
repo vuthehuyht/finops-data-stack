@@ -58,7 +58,7 @@ resource "aws_subnet" "private_db" {
   }
 }
 
-# 4. NAT Gateway (Use a single NAT Gateway to save cost, located in the first Public Subnet)
+# 4. NAT Gateway (Managed, highly available, no iptables/OS maintenance)
 resource "aws_eip" "nat" {
   domain = "vpc"
 
@@ -67,15 +67,15 @@ resource "aws_eip" "nat" {
   }
 }
 
-resource "aws_nat_gateway" "nat" {
+resource "aws_nat_gateway" "main" {
   allocation_id = aws_eip.nat.id
-  subnet_id     = aws_subnet.public[0].id # Placed in Public Subnet AZ 1a
-
-  tags = {
-    Name = "${var.project_name}-nat-gw"
-  }
+  subnet_id     = aws_subnet.public[0].id
 
   depends_on = [aws_internet_gateway.igw]
+
+  tags = {
+    Name = "${var.project_name}-nat-gateway"
+  }
 }
 
 # 5. Route Tables & Associations
@@ -99,13 +99,13 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
-# Private App Route Table (Routes Internet-bound traffic through the single NAT Gateway)
+# Private App Route Table (Routes Internet-bound traffic through NAT Gateway)
 resource "aws_route_table" "private_app" {
   vpc_id = aws_vpc.main.id
 
   route {
     cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.nat.id
+    nat_gateway_id = aws_nat_gateway.main.id
   }
 
   tags = {
@@ -201,3 +201,4 @@ resource "aws_security_group" "redshift" {
     Name = "${var.project_name}-redshift-sg"
   }
 }
+

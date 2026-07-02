@@ -14,14 +14,9 @@ variable "project_name" {
   description = "Project name prefix for resources"
 }
 
-# Create a random suffix to ensure a globally unique S3 bucket name
-resource "random_id" "bucket_suffix" {
-  byte_length = 4
-}
-
 # S3 Bucket to store Terraform State
 resource "aws_s3_bucket" "tf_state" {
-  bucket        = "${var.project_name}-tfstate-${lower(random_id.bucket_suffix.hex)}"
+  bucket        = "${var.project_name}-tfstate-s3"
   force_destroy = true
 
   tags = {

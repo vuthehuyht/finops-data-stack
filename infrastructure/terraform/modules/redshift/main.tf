@@ -64,9 +64,9 @@ resource "aws_redshiftserverless_workgroup" "main" {
   subnet_ids         = var.private_db_subnet_ids
   security_group_ids = [var.redshift_sg_id]
 
-  # Minimum RPU to reduce cost
-  base_capacity = 4
-  max_capacity  = 4
+  # Minimum RPU to reduce cost (8 RPU is the AWS minimum limit)
+  base_capacity = 8
+  max_capacity  = 8
 
   # Internal VPC access only
   publicly_accessible = false
@@ -84,4 +84,3 @@ resource "aws_redshiftserverless_usage_limit" "monthly_cost_cap" {
   period        = "monthly"
   breach_action = "deactivate"
 }
-

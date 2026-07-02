@@ -29,7 +29,7 @@ resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
 resource "aws_eks_cluster" "main" {
   name     = "${var.project_name}-eks-cluster"
   role_arn = aws_iam_role.eks_cluster.arn
-  version  = "1.30"
+  version  = "1.36"
 
   vpc_config {
     subnet_ids              = var.private_app_subnet_ids
@@ -93,12 +93,12 @@ resource "aws_eks_node_group" "core_system" {
   subnet_ids      = var.private_app_subnet_ids
 
   capacity_type  = "ON_DEMAND"
-  instance_types = ["t3.medium"]
+  instance_types = ["t3a.medium"] # Optimization: use cheaper AMD instance type
 
   scaling_config {
     desired_size = 1
     min_size     = 1
-    max_size     = 2
+    max_size     = 1 # Lock to 1 node to prevent accidental scale-up cost
   }
 
   update_config {
@@ -125,12 +125,12 @@ resource "aws_eks_node_group" "worker_workload" {
   subnet_ids      = var.private_app_subnet_ids
 
   capacity_type  = "SPOT"
-  instance_types = ["t3.medium", "t3a.medium"]
+  instance_types = ["t3a.medium", "t3a.small"] # Cheap AMD instances
 
   scaling_config {
-    desired_size = 1
-    min_size     = 0 # Scale to 0 when idle to save cost
-    max_size     = 5
+    desired_size = 0 # Start at 0 to save idle costs
+    min_size     = 0
+    max_size     = 3 # Cap at 3 to prevent runaway scaling costs
   }
 
   # Configure taints to prevent system pods from running on Spot Nodes

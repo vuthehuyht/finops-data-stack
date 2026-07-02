@@ -13,7 +13,7 @@ terraform {
 
   # Fill in the specific bucket name received from the bootstrap output before init
   backend "s3" {
-    bucket         = "PLACEHOLDER_BUCKET_NAME"
+    bucket         = "finops-tfstate-s3"
     key            = "state/terraform.tfstate"
     region         = "ap-southeast-1"
     dynamodb_table = "finops-tfstate-locks"

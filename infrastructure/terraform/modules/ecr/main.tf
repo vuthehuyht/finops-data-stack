@@ -1,6 +1,7 @@
 resource "aws_ecr_repository" "dagster_app" {
   name                 = "${var.project_name}-dagster-app"
   image_tag_mutability = "MUTABLE"
+  force_delete         = true # Enable deleting repository with images when destroying
 
   image_scanning_configuration {
     scan_on_push = true
@@ -34,11 +35,11 @@ resource "aws_ecr_lifecycle_policy" "cleanup_policy" {
         },
         {
             "rulePriority": 2,
-            "description": "Keep only last 10 tagged images",
+            "description": "Keep only last 5 tagged images",
             "selection": {
                 "tagStatus": "any",
-                "countType": "imageCountType",
-                "countNumber": 10
+                "countType": "imageCountMoreThan",
+                "countNumber": 5
             },
             "action": {
                 "type": "expire"
