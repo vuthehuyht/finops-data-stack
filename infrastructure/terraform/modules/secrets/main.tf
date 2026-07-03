@@ -20,7 +20,8 @@ resource "aws_secretsmanager_secret_version" "credentials_val" {
     redshift_username = var.redshift_username
     redshift_password = var.redshift_password
     redshift_dbname   = var.redshift_dbname
-    ssi_token         = var.ssi_token
+    fireant_email     = var.fireant_email
+    fireant_password  = var.fireant_password
     investing_token   = var.investing_token
   })
 }

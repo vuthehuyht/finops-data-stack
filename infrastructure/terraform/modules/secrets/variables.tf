@@ -64,10 +64,16 @@ variable "redshift_dbname" {
   description = "Redshift Serverless database name"
 }
 
-variable "ssi_token" {
+variable "fireant_email" {
   type        = string
   sensitive   = true
-  description = "SSI API token for data crawling"
+  description = "FireAnt account email, for analyst reports ingestion"
+}
+
+variable "fireant_password" {
+  type        = string
+  sensitive   = true
+  description = "FireAnt account password, for analyst reports ingestion"
 }
 
 variable "investing_token" {
