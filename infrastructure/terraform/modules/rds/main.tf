@@ -17,14 +17,15 @@ resource "aws_security_group" "rds" {
   description = "Security group for RDS PostgreSQL (Dagster metadata)"
   vpc_id      = var.vpc_id
 
-  # Only accept connections on port 5432 from EKS nodes
-  ingress {
-    description     = "Allow PostgreSQL from EKS nodes"
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
-    security_groups = [var.eks_node_sg_id]
-  }
+  # Ingress rules are managed entirely as standalone aws_security_group_rule
+  # resources at the root module (infrastructure/terraform/main.tf), not
+  # inline here. Reason: this module cannot take the EKS cluster's
+  # auto-created security group ID as an input without creating a circular
+  # module dependency (rds -> secrets -> eks already exists; eks_cluster_sg_id
+  # would need rds -> eks directly). Mixing inline ingress{} blocks with
+  # separate aws_security_group_rule resources on the same SG also causes
+  # Terraform to fight itself (each apply reverts the other's rule) -- so
+  # ingress must be 100% one approach or the other, never both.
 
   egress {
     from_port        = 0

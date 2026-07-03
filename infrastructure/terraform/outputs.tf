@@ -90,3 +90,8 @@ output "github_actions_deploy_role_arn" {
   description = "The ARN of the IAM role assumed by the GitHub Actions CI/CD deploy pipeline"
 }
 
+output "cluster_autoscaler_role_arn" {
+  value       = module.eks.cluster_autoscaler_role_arn
+  description = "The ARN of the IAM role for the Cluster Autoscaler ServiceAccount (IRSA)"
+}
+

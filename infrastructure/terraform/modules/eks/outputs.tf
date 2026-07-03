@@ -32,3 +32,8 @@ output "cluster_security_group_id" {
   value       = aws_eks_cluster.main.vpc_config[0].cluster_security_group_id
   description = "The ID of the security group EKS auto-creates and attaches to managed node group instances (distinct from var.eks_node_sg_id, which is only used for the cluster's vpc_config.security_group_ids and is NOT what gets attached to node EC2 instances by default -- verified against the running node's actual attached security groups)"
 }
+
+output "cluster_autoscaler_role_arn" {
+  value       = aws_iam_role.cluster_autoscaler.arn
+  description = "The ARN of the IAM role for the Cluster Autoscaler ServiceAccount (IRSA)"
+}

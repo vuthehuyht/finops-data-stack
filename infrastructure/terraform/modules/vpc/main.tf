@@ -180,14 +180,12 @@ resource "aws_security_group" "redshift" {
   description = "Security group for Redshift Serverless DWH"
   vpc_id      = aws_vpc.main.id
 
-  # Only accept inbound port 5439 from EKS nodes
-  ingress {
-    description     = "Allow Redshift port 5439 from EKS nodes"
-    from_port       = 5439
-    to_port         = 5439
-    protocol        = "tcp"
-    security_groups = [aws_security_group.eks_nodes.id]
-  }
+  # Ingress rules are managed entirely as standalone aws_security_group_rule
+  # resources at the root module (infrastructure/terraform/main.tf), not
+  # inline here -- mixing inline ingress{} blocks with separate
+  # aws_security_group_rule resources on the same SG causes Terraform to
+  # fight itself (each apply reverts the other's rule), so ingress must be
+  # 100% one approach or the other, never both.
 
   egress {
     from_port        = 0

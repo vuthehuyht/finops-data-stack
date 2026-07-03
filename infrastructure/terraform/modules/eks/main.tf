@@ -119,7 +119,7 @@ resource "aws_eks_node_group" "core_system" {
   scaling_config {
     desired_size = 1
     min_size     = 1
-    max_size     = 1 # Lock to 1 node to prevent accidental scale-up cost
+    max_size     = 2 # Allow Cluster Autoscaler to scale out once (was locked to 1)
   }
 
   update_config {
@@ -463,4 +463,76 @@ resource "aws_eks_access_policy_association" "cluster_admins" {
   access_scope {
     type = "cluster"
   }
+}
+
+# 9. IRSA: IAM Role for Cluster Autoscaler (ASG auto-discovery -- EKS Managed
+# Node Group ASGs are already auto-tagged by AWS with
+# k8s.io/cluster-autoscaler/enabled and k8s.io/cluster-autoscaler/<cluster-name>,
+# verified via `aws autoscaling describe-auto-scaling-groups`, so no manual
+# ASG tagging is needed here).
+resource "aws_iam_role" "cluster_autoscaler" {
+  name = "${var.project_name}-cluster-autoscaler-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Federated = aws_iam_openid_connect_provider.eks.arn
+        }
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Condition = {
+          StringEquals = {
+            "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = "system:serviceaccount:kube-system:cluster-autoscaler"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Environment = var.environment
+  }
+}
+
+# 9.1. Official Cluster Autoscaler AWS policy (ASG auto-discovery variant),
+# verbatim from kubernetes/autoscaler's cloudprovider/aws/README.md.
+resource "aws_iam_policy" "cluster_autoscaler_permissions" {
+  name        = "${var.project_name}-cluster-autoscaler-policy"
+  description = "Permissions for Cluster Autoscaler to discover and scale EKS Managed Node Group ASGs"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "autoscaling:DescribeAutoScalingGroups",
+          "autoscaling:DescribeAutoScalingInstances",
+          "autoscaling:DescribeLaunchConfigurations",
+          "autoscaling:DescribeScalingActivities",
+          "ec2:DescribeImages",
+          "ec2:DescribeInstanceTypes",
+          "ec2:DescribeLaunchTemplateVersions",
+          "ec2:GetInstanceTypesFromInstanceRequirements",
+          "eks:DescribeNodegroup"
+        ]
+        Resource = ["*"]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "autoscaling:SetDesiredCapacity",
+          "autoscaling:TerminateInstanceInAutoScalingGroup"
+        ]
+        Resource = ["*"]
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "cluster_autoscaler_permissions_attach" {
+  role       = aws_iam_role.cluster_autoscaler.name
+  policy_arn = aws_iam_policy.cluster_autoscaler_permissions.arn
 }
