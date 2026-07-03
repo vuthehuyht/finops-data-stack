@@ -57,9 +57,15 @@ def test_docker_build_step_pushes_only_and_uses_timestamp_tag_on_push_events():
 
     build_step = next(s for s in steps if s.get("name") == "Docker Build")
     assert build_step["with"]["push"] == "${{ github.event_name == 'push' }}"
-    assert "IMAGE_TAG" in build_step["with"]["tags"] or "env.IMAGE_TAG" in str(
-        build_step["with"]["tags"]
-    )
+    tags_expr = build_step["with"]["tags"]
+    assert "env.IMAGE_TAG" in tags_expr
+    # The ECR repository name must be part of the push target, not just the
+    # registry hostname (steps.ecr-login.outputs.registry is registry-only,
+    # e.g. "<account>.dkr.ecr.<region>.amazonaws.com" with no repo path) --
+    # matches aws_ecr_repository.dagster_app's name in
+    # infrastructure/terraform/modules/ecr/main.tf ("${var.project_name}-dagster-app",
+    # project_name default "finops" per infrastructure/terraform/variables.tf).
+    assert "finops-dagster-app" in tags_expr
 
 
 def test_workflow_generates_utc_timestamp_tag_only_on_push():

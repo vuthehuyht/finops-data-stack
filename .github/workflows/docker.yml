@@ -74,7 +74,7 @@ jobs:
           file: src/docker/Dockerfile
           push: ${{ github.event_name == 'push' }}
           load: ${{ github.event_name != 'push' }}
-          tags: ${{ github.event_name == 'push' && format('{0}:{1}', steps.ecr-login.outputs.registry, env.IMAGE_TAG) || 'finops-data-stack:ci' }}
+          tags: ${{ github.event_name == 'push' && format('{0}/finops-dagster-app:{1}', steps.ecr-login.outputs.registry, env.IMAGE_TAG) || 'finops-data-stack:ci' }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 
