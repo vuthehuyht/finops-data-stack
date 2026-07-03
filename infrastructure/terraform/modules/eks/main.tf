@@ -42,9 +42,15 @@ resource "aws_eks_cluster" "main" {
   # (added below) to have any effect -- without this block, Terraform/AWS
   # default new clusters to authentication_mode = CONFIG_MAP, which ignores
   # access entries entirely.
+  # bootstrap_cluster_creator_admin_permissions intentionally omitted: it is
+  # ForceNew (verified in hashicorp/terraform-provider-aws internal/service/eks/cluster.go)
+  # -- setting it explicitly on an existing cluster risks Terraform planning a
+  # destroy+recreate of this cluster if the computed prior state ever
+  # disagrees. It is not needed here anyway: this project grants cluster
+  # access via its own explicit aws_eks_access_entry resources (see below),
+  # not via the bootstrap cluster-creator entry.
   access_config {
-    authentication_mode                         = "API_AND_CONFIG_MAP"
-    bootstrap_cluster_creator_admin_permissions = true
+    authentication_mode = "API_AND_CONFIG_MAP"
   }
 
   depends_on = [

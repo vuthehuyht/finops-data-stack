@@ -13,8 +13,33 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # github.event.head_commit.modified only reflects the single head commit of
+  # the push (misses multi-commit pushes and can be empty on some merge
+  # commits) and contains() on that array only matches whole elements, not
+  # path prefixes -- dorny/paths-filter diffs the actual push range and
+  # supports glob patterns, so it is used here instead for both jobs' gates.
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      helm: ${{ steps.filter.outputs.helm }}
+      terraform: ${{ steps.filter.outputs.terraform }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            helm:
+              - 'infrastructure/helm/values.yaml'
+            terraform:
+              - 'infrastructure/terraform/**'
+
   deploy-app:
-    if: contains(github.event.head_commit.modified, 'infrastructure/helm/values.yaml')
+    needs: detect-changes
+    if: needs.detect-changes.outputs.helm == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -67,7 +92,8 @@ jobs:
           external-secrets-sa-role-arn: ${{ steps.tf-outputs.outputs.external_secrets_sa_role_arn }}
 
   deploy-infra:
-    if: contains(github.event.head_commit.modified, 'infrastructure/terraform/')
+    needs: detect-changes
+    if: needs.detect-changes.outputs.terraform == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:

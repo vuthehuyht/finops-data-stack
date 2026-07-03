@@ -1,7 +1,8 @@
-"""Structural validation for .github/workflows/deploy.yml: the two
-independently-triggered jobs (deploy-app reads Terraform state only;
-deploy-infra runs terraform apply) both end by calling the shared
-deploy-dagster-to-eks composite action.
+"""Structural validation for .github/workflows/deploy.yml: a detect-changes
+job (dorny/paths-filter, diffs the actual push range rather than only the
+head commit) gates two independently-triggered jobs -- deploy-app reads
+Terraform state only; deploy-infra runs terraform apply -- both of which end
+by calling the shared deploy-dagster-to-eks composite action.
 """
 
 from pathlib import Path
@@ -18,7 +19,26 @@ def _load_workflow():
         return yaml.safe_load(f)
 
 
-def test_deploy_app_job_triggers_only_on_helm_values_path_and_never_applies_terraform():
+def test_detect_changes_job_filters_on_the_two_relevant_paths_with_globs():
+    workflow = _load_workflow()
+    job = workflow["jobs"]["detect-changes"]
+
+    assert job["outputs"] == {
+        "helm": "${{ steps.filter.outputs.helm }}",
+        "terraform": "${{ steps.filter.outputs.terraform }}",
+    }
+
+    filter_step = next(
+        s for s in job["steps"] if s.get("uses", "").startswith("dorny/paths-filter")
+    )
+    filters = yaml.safe_load(filter_step["with"]["filters"])
+    assert filters == {
+        "helm": ["infrastructure/helm/values.yaml"],
+        "terraform": ["infrastructure/terraform/**"],
+    }
+
+
+def test_deploy_app_job_needs_detect_changes_and_never_applies_terraform():
     workflow = _load_workflow()
     triggers = workflow[True]["push"]
 
@@ -27,10 +47,8 @@ def test_deploy_app_job_triggers_only_on_helm_values_path_and_never_applies_terr
     assert "infrastructure/terraform/**" in triggers["paths"]
 
     job = workflow["jobs"]["deploy-app"]
-    expected_if = (
-        "contains(github.event.head_commit.modified, 'infrastructure/helm/values.yaml')"
-    )
-    assert job["if"] == expected_if
+    assert job["needs"] == "detect-changes"
+    assert job["if"] == "needs.detect-changes.outputs.helm == 'true'"
 
     steps = job["steps"]
     run_scripts = "\n".join(s.get("run", "") for s in steps)
@@ -39,14 +57,12 @@ def test_deploy_app_job_triggers_only_on_helm_values_path_and_never_applies_terr
     assert "terraform output" in run_scripts
 
 
-def test_deploy_infra_job_triggers_on_terraform_path_and_runs_apply():
+def test_deploy_infra_job_needs_detect_changes_and_runs_apply():
     workflow = _load_workflow()
 
     job = workflow["jobs"]["deploy-infra"]
-    assert (
-        job["if"]
-        == "contains(github.event.head_commit.modified, 'infrastructure/terraform/')"
-    )
+    assert job["needs"] == "detect-changes"
+    assert job["if"] == "needs.detect-changes.outputs.terraform == 'true'"
 
     steps = job["steps"]
     run_scripts = "\n".join(s.get("run", "") for s in steps)
