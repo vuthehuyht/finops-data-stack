@@ -27,3 +27,9 @@ variable "fireant_password" {
   sensitive   = true
   description = "FireAnt account password, for analyst reports ingestion"
 }
+
+variable "cluster_admin_principal_arns" {
+  type        = list(string)
+  default     = []
+  description = "Additional IAM principal ARNs (e.g. human operators running kubectl/helm manually) granted EKS cluster-admin access via Access Entries"
+}

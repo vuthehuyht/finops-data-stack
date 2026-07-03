@@ -75,15 +75,16 @@ module "redshift" {
 module "eks" {
   source = "./modules/eks"
 
-  project_name               = var.project_name
-  environment                = var.environment
-  vpc_id                     = module.vpc.vpc_id
-  private_app_subnet_ids     = module.vpc.private_app_subnet_ids
-  eks_node_sg_id             = module.vpc.eks_node_sg_id
-  raw_bucket_arn             = "arn:aws:s3:::${module.s3.raw_bucket_id}"
-  processed_bucket_arn       = "arn:aws:s3:::${module.s3.processed_bucket_id}"
-  model_artifacts_bucket_arn = "arn:aws:s3:::${module.s3.model_artifacts_bucket_id}"
-  db_credentials_secret_arn  = module.secrets.db_credentials_secret_arn
+  project_name                 = var.project_name
+  environment                  = var.environment
+  vpc_id                       = module.vpc.vpc_id
+  private_app_subnet_ids       = module.vpc.private_app_subnet_ids
+  eks_node_sg_id               = module.vpc.eks_node_sg_id
+  raw_bucket_arn               = "arn:aws:s3:::${module.s3.raw_bucket_id}"
+  processed_bucket_arn         = "arn:aws:s3:::${module.s3.processed_bucket_id}"
+  model_artifacts_bucket_arn   = "arn:aws:s3:::${module.s3.model_artifacts_bucket_id}"
+  db_credentials_secret_arn    = module.secrets.db_credentials_secret_arn
+  cluster_admin_principal_arns = var.cluster_admin_principal_arns
 }
 
 # Call Module RDS PostgreSQL for Dagster Metadata
@@ -95,5 +96,33 @@ module "rds" {
   vpc_id                = module.vpc.vpc_id
   private_db_subnet_ids = module.vpc.private_db_subnet_ids
   eks_node_sg_id        = module.vpc.eks_node_sg_id
+}
+
+# EKS managed node groups (without a custom launch template) attach the
+# cluster's auto-created security group to node EC2 instances -- NOT
+# module.vpc.eks_node_sg_id (that ID is only used for the cluster's
+# vpc_config.security_group_ids, which is a different thing). Verified
+# empirically: `aws ec2 describe-instances` on a running node showed only
+# "eks-cluster-sg-<cluster-name>-<suffix>", not finops-eks-nodes-sg. Without
+# these rules, pods on that node cannot reach RDS/Redshift at all (Dagster's
+# check-db-ready init container hangs forever retrying "no response").
+resource "aws_security_group_rule" "rds_allow_eks_cluster_sg" {
+  type                     = "ingress"
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  security_group_id        = module.rds.rds_security_group_id
+  source_security_group_id = module.eks.cluster_security_group_id
+  description              = "Allow PostgreSQL from EKS-managed node group instances (auto-created cluster SG)"
+}
+
+resource "aws_security_group_rule" "redshift_allow_eks_cluster_sg" {
+  type                     = "ingress"
+  from_port                = 5439
+  to_port                  = 5439
+  protocol                 = "tcp"
+  security_group_id        = module.vpc.redshift_sg_id
+  source_security_group_id = module.eks.cluster_security_group_id
+  description              = "Allow Redshift from EKS-managed node group instances (auto-created cluster SG)"
 }
 
