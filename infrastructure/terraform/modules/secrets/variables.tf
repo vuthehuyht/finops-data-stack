@@ -75,9 +75,3 @@ variable "fireant_password" {
   sensitive   = true
   description = "FireAnt account password, for analyst reports ingestion"
 }
-
-variable "investing_token" {
-  type        = string
-  sensitive   = true
-  description = "Investing.com API token for data crawling"
-}

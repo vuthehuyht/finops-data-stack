@@ -42,7 +42,6 @@ module "secrets" {
 
   fireant_email    = var.fireant_email
   fireant_password = var.fireant_password
-  investing_token  = var.investing_token
 }
 
 # Call Module SSM Parameter Store (Model metadata, endpoint name, thresholds)
