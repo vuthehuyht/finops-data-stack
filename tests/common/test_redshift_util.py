@@ -5,7 +5,6 @@ import unittest.mock
 from typing import Any
 
 import pytest
-from botocore.exceptions import ClientError
 
 from src.common import redshift_util
 
@@ -14,17 +13,11 @@ from src.common import redshift_util
 def clean_env() -> Any:
     """Fixture to clean up Redshift environment variables before and after each test."""
     keys = [
-        "FINOPS_ENVIRONMENT",
         "REDSHIFT_PASSWORD",
         "REDSHIFT_USER",
         "REDSHIFT_HOST",
         "REDSHIFT_DATABASE",
         "REDSHIFT_PORT",
-        "RDS_PASSWORD",
-        "RDS_USER",
-        "RDS_HOST",
-        "RDS_PORT",
-        "RDS_DATABASE",
     ]
     old_values = {k: os.environ.get(k) for k in keys}
 
@@ -39,89 +32,6 @@ def clean_env() -> Any:
             os.environ[k] = v
         elif k in os.environ:
             del os.environ[k]
-
-
-def test_inject_secrets_from_aws_not_prod(clean_env: Any) -> None:
-    """Ensure secrets are not injected if FINOPS_ENVIRONMENT is not prod."""
-    os.environ["FINOPS_ENVIRONMENT"] = "dev"
-    with unittest.mock.patch("boto3.client") as mock_boto:
-        redshift_util.inject_secrets_from_aws()
-        mock_boto.assert_not_called()
-
-
-def test_inject_secrets_from_aws_already_has_password(clean_env: Any) -> None:
-    """Ensure secrets are not injected if REDSHIFT_PASSWORD is already set."""
-    os.environ["FINOPS_ENVIRONMENT"] = "prod"
-    os.environ["REDSHIFT_PASSWORD"] = "existing_password"
-    with unittest.mock.patch("boto3.client") as mock_boto:
-        redshift_util.inject_secrets_from_aws()
-        mock_boto.assert_not_called()
-
-
-def test_inject_secrets_from_aws_success(clean_env: Any) -> None:
-    """Test successful retrieval of database credentials from AWS Secrets Manager."""
-    os.environ["FINOPS_ENVIRONMENT"] = "prod"
-
-    mock_client = unittest.mock.Mock()
-    mock_client.get_secret_value.return_value = {
-        "SecretString": (
-            '{"password": "secret_pwd", "username": "secret_user", '
-            '"host": "secret_host", "dbname": "secret_db"}'
-        )
-    }
-
-    with unittest.mock.patch("boto3.client", return_value=mock_client) as mock_boto:
-        redshift_util.inject_secrets_from_aws()
-        mock_boto.assert_called_once_with(
-            "secretsmanager", region_name="ap-southeast-1"
-        )
-
-        assert os.environ.get("REDSHIFT_PASSWORD") == "secret_pwd"
-        assert os.environ.get("REDSHIFT_USER") == "secret_user"
-        assert os.environ.get("REDSHIFT_HOST") == "secret_host"
-        assert os.environ.get("REDSHIFT_DATABASE") == "secret_db"
-
-
-def test_inject_secrets_from_aws_success_consolidated(clean_env: Any) -> None:
-    """Test successful retrieval of consolidated database credentials."""
-    os.environ["FINOPS_ENVIRONMENT"] = "prod"
-
-    mock_client = unittest.mock.Mock()
-    mock_client.get_secret_value.return_value = {
-        "SecretString": (
-            '{"redshift_password": "secret_pwd", "redshift_username": "secret_user", '
-            '"redshift_host": "secret_host", "redshift_dbname": "secret_db", '
-            '"redshift_port": "5439", "rds_password": "rds_pwd"}'
-        )
-    }
-
-    with unittest.mock.patch("boto3.client", return_value=mock_client):
-        redshift_util.inject_secrets_from_aws()
-
-        assert os.environ.get("REDSHIFT_PASSWORD") == "secret_pwd"
-        assert os.environ.get("REDSHIFT_USER") == "secret_user"
-        assert os.environ.get("REDSHIFT_HOST") == "secret_host"
-        assert os.environ.get("REDSHIFT_DATABASE") == "secret_db"
-        assert os.environ.get("REDSHIFT_PORT") == "5439"
-        assert os.environ.get("RDS_PASSWORD") == "rds_pwd"
-
-
-def test_inject_secrets_from_aws_error(clean_env: Any) -> None:
-    """Test error handling when AWS Secrets Manager call fails."""
-    os.environ["FINOPS_ENVIRONMENT"] = "prod"
-
-    mock_client = unittest.mock.Mock()
-    # Mock botocore ClientError
-    error_response = {
-        "Error": {"Code": "DecryptionFailureException", "Message": "Error"}
-    }
-    mock_client.get_secret_value.side_effect = ClientError(
-        error_response, "GetSecretValue"
-    )
-
-    with unittest.mock.patch("boto3.client", return_value=mock_client):
-        with pytest.raises(ClientError):
-            redshift_util.inject_secrets_from_aws()
 
 
 def test_get_redshift_connection(clean_env: Any) -> None:

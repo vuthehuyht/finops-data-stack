@@ -1,86 +1,23 @@
 """Utility module for connection and querying with AWS Redshift Serverless."""
 
-import json
 import logging
 import os
 import time
 from typing import Any
 
-import boto3
 import psycopg2
-from botocore.exceptions import ClientError
 
 logger = logging.getLogger(__name__)
 
 
-def inject_secrets_from_aws() -> None:
-    """Retrieve database credentials from AWS Secrets Manager on production.
-
-    Updates env variables with the retrieved database configurations.
-    """
-    secret_name = os.getenv("FINOPS_REDSHIFT_SECRET_NAME", "prod/finops/redshift")
-    region_name = os.getenv("AWS_DEFAULT_REGION", "ap-southeast-1")
-
-    # Only run in production and when the password has not been loaded yet
-    if os.getenv("FINOPS_ENVIRONMENT", "dev").lower() != "prod":
-        return
-
-    if os.getenv("REDSHIFT_PASSWORD"):
-        return
-
-    logger.info("Retrieving database credentials from AWS Secrets Manager.")
-
-    try:
-        client = boto3.client("secretsmanager", region_name=region_name)
-        response = client.get_secret_value(SecretId=secret_name)
-
-        if "SecretString" not in response:
-            raise ValueError("No SecretString found in AWS Secret response.")
-
-        secret_dict = json.loads(response["SecretString"])
-        key_mapping = {
-            "password": "REDSHIFT_PASSWORD",
-            "username": "REDSHIFT_USER",
-            "user": "REDSHIFT_USER",
-            "host": "REDSHIFT_HOST",
-            "database": "REDSHIFT_DATABASE",
-            "dbname": "REDSHIFT_DATABASE",
-            # Consolidated keys
-            "redshift_password": "REDSHIFT_PASSWORD",
-            "redshift_username": "REDSHIFT_USER",
-            "redshift_host": "REDSHIFT_HOST",
-            "redshift_port": "REDSHIFT_PORT",
-            "redshift_dbname": "REDSHIFT_DATABASE",
-            "rds_password": "RDS_PASSWORD",
-            "rds_username": "RDS_USER",
-            "rds_host": "RDS_HOST",
-            "rds_port": "RDS_PORT",
-            "rds_dbname": "RDS_DATABASE",
-        }
-
-        for key, val in secret_dict.items():
-            mapped_key = key_mapping.get(key.lower())
-            if mapped_key:
-                os.environ[mapped_key] = str(val)
-            else:
-                env_key = f"REDSHIFT_{key.upper()}"
-                os.environ[env_key] = str(val)
-
-        logger.info("Loaded Redshift configs from Secrets Manager.")
-
-    except ClientError as e:
-        logger.error("Error accessing AWS Secrets Manager: %s", e)
-        raise e
-    except Exception as e:
-        logger.error("Unexpected error loading database credentials: %s", e)
-        raise e
-
-
 def get_redshift_connection() -> Any:
-    """Establish and return a connection to Amazon Redshift."""
-    if os.getenv("FINOPS_ENVIRONMENT", "dev").lower() == "prod":
-        inject_secrets_from_aws()
+    """Establish and return a connection to Amazon Redshift.
 
+    Credentials come from REDSHIFT_* env vars. In production these are
+    injected by Kubernetes via secretKeyRef from the "dagster-pg-credentials"
+    Secret (kept in sync from AWS Secrets Manager by External Secrets
+    Operator — see infrastructure/helm/values.yaml), not fetched here.
+    """
     return psycopg2.connect(
         host=os.getenv("REDSHIFT_HOST", "localhost"),
         port=int(os.getenv("REDSHIFT_PORT", "5439")),

@@ -16,14 +16,20 @@ variable "environment" {
   description = "Deployment environment (e.g. dev, prod, staging)"
 }
 
-variable "ssi_token" {
+variable "fireant_email" {
   type        = string
   sensitive   = true
-  description = "SSI API token for data crawling"
+  description = "FireAnt account email, for analyst reports ingestion"
 }
 
-variable "investing_token" {
+variable "fireant_password" {
   type        = string
   sensitive   = true
-  description = "Investing.com API token for data crawling"
+  description = "FireAnt account password, for analyst reports ingestion"
+}
+
+variable "cluster_admin_principal_arns" {
+  type        = list(string)
+  default     = []
+  description = "Additional IAM principal ARNs (e.g. human operators running kubectl/helm manually) granted EKS cluster-admin access via Access Entries"
 }
