@@ -18,11 +18,6 @@ variable "private_db_subnet_ids" {
   description = "List of private database subnet IDs where RDS should be deployed"
 }
 
-variable "eks_node_sg_id" {
-  type        = string
-  description = "The Security Group ID of the EKS nodes to allow connection to RDS"
-}
-
 variable "instance_class" {
   type        = string
   default     = "db.t4g.micro"

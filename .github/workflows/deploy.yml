@@ -20,6 +20,8 @@ jobs:
   # supports glob patterns, so it is used here instead for both jobs' gates.
   detect-changes:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       helm: ${{ steps.filter.outputs.helm }}
       terraform: ${{ steps.filter.outputs.terraform }}
