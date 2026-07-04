@@ -1,6 +1,7 @@
 """Dagster resources for FinOps pipeline."""
 
 import contextlib
+import json
 import os
 import pathlib
 from collections.abc import Iterator
@@ -61,7 +62,7 @@ class LoadJobConfigResource(dagster.ConfigurableResource):
 
 
 class SageMakerResource(dagster.ConfigurableResource):
-    """SageMaker execution role and target bucket for the ML training pipeline."""
+    """SageMaker execution role, target bucket, and endpoint management."""
 
     execution_role_arn: str = Field(
         default_factory=lambda: os.getenv("SAGEMAKER_EXECUTION_ROLE_ARN", ""),
@@ -73,6 +74,53 @@ class SageMakerResource(dagster.ConfigurableResource):
         ),
         description="S3 bucket storing versioned model.tar.gz + metadata.json.",
     )
+    region_name: str = Field(default="ap-southeast-1")
+
+    def deploy_model_version(
+        self,
+        endpoint_name: str,
+        model_name: str,
+        model_data_s3_uri: str,
+        inference_image: str,
+        memory_size_in_mb: int = 4096,
+        max_concurrency: int = 5,
+    ) -> None:
+        """Create a Model + EndpointConfig for a model version and update the endpoint.
+
+        Uses plain boto3 (not the `sagemaker` SDK's ModelBuilder) — the
+        CreateModel/CreateEndpointConfig/UpdateEndpoint APIs are stable
+        across SDK client versions.
+        """
+        client = boto3.client("sagemaker", region_name=self.region_name)
+        client.create_model(
+            ModelName=model_name,
+            PrimaryContainer={
+                "Image": inference_image,
+                "ModelDataUrl": model_data_s3_uri,
+                "Environment": {
+                    "SAGEMAKER_PROGRAM": "serve.py",
+                    "SAGEMAKER_SUBMIT_DIRECTORY": "/opt/ml/model/code",
+                },
+            },
+            ExecutionRoleArn=self.execution_role_arn,
+        )
+        endpoint_config_name = f"{model_name}-config"
+        client.create_endpoint_config(
+            EndpointConfigName=endpoint_config_name,
+            ProductionVariants=[
+                {
+                    "VariantName": "AllTraffic",
+                    "ModelName": model_name,
+                    "ServerlessConfig": {
+                        "MemorySizeInMB": memory_size_in_mb,
+                        "MaxConcurrency": max_concurrency,
+                    },
+                }
+            ],
+        )
+        client.update_endpoint(
+            EndpointName=endpoint_name, EndpointConfigName=endpoint_config_name
+        )
 
 
 class SsmParameterResource(dagster.ConfigurableResource):
@@ -95,6 +143,23 @@ class SsmParameterResource(dagster.ConfigurableResource):
         client.put_parameter(Name=name, Value=value, Type="String", Overwrite=True)
 
 
+class SageMakerRuntimeResource(dagster.ConfigurableResource):
+    """SageMaker Runtime access for invoking inference endpoints."""
+
+    region_name: str = Field(default="ap-southeast-1")
+
+    def invoke_endpoint(self, endpoint_name: str, payload: dict) -> dict:
+        """Invoke a SageMaker endpoint with a JSON payload; parse the JSON response."""
+        client = boto3.client("sagemaker-runtime", region_name=self.region_name)
+        response = client.invoke_endpoint(
+            EndpointName=endpoint_name,
+            ContentType="application/json",
+            Accept="application/json",
+            Body=json.dumps(payload).encode("utf-8"),
+        )
+        return json.loads(response["Body"].read())
+
+
 dbt = DbtCliResource(
     project_dir=os.fspath(_PROJECT_ROOT / "src" / "transform" / "dbt"),
 )
@@ -105,3 +170,4 @@ dbt_config = DbtConfigResource()
 load_config = LoadJobConfigResource()
 sagemaker_config = SageMakerResource()
 ssm = SsmParameterResource()
+sagemaker_runtime = SageMakerRuntimeResource()

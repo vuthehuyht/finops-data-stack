@@ -152,6 +152,81 @@ def test_ssm_parameter_resource_put_parameter() -> None:
     )
 
 
+def test_sagemaker_runtime_resource_invoke_endpoint() -> None:
+    from src.dagster.resources import SageMakerRuntimeResource
+
+    mock_client = unittest.mock.MagicMock()
+    mock_body = unittest.mock.MagicMock()
+    mock_body.read.return_value = b'{"predicted_return": 0.05}'
+    mock_client.invoke_endpoint.return_value = {"Body": mock_body}
+
+    with unittest.mock.patch(
+        "src.dagster.resources.boto3.client", return_value=mock_client
+    ):
+        r = SageMakerRuntimeResource()
+        result = r.invoke_endpoint(
+            "my-endpoint", {"sequence": [[1.0]], "tabular": [2.0]}
+        )
+
+    assert result == {"predicted_return": 0.05}
+    mock_client.invoke_endpoint.assert_called_once_with(
+        EndpointName="my-endpoint",
+        ContentType="application/json",
+        Accept="application/json",
+        Body=b'{"sequence": [[1.0]], "tabular": [2.0]}',
+    )
+
+
+_TEST_INFERENCE_IMAGE = (
+    "763104351884.dkr.ecr.ap-southeast-1.amazonaws.com/pytorch-inference:2.2-cpu-py310"
+)
+_TEST_MODEL_DATA_URI = "s3://bucket/finops-multimodal-regressor-20260703/model.tar.gz"
+
+
+def test_sagemaker_resource_deploy_model_version_calls_expected_boto3_apis() -> None:
+    from src.dagster.resources import SageMakerResource
+
+    mock_client = unittest.mock.MagicMock()
+
+    with unittest.mock.patch(
+        "src.dagster.resources.boto3.client", return_value=mock_client
+    ):
+        r = SageMakerResource(execution_role_arn="arn:aws:iam::123:role/sm")
+        r.deploy_model_version(
+            endpoint_name="finops-endpoint",
+            model_name="finops-multimodal-regressor-20260703",
+            model_data_s3_uri=_TEST_MODEL_DATA_URI,
+            inference_image=_TEST_INFERENCE_IMAGE,
+        )
+
+    mock_client.create_model.assert_called_once_with(
+        ModelName="finops-multimodal-regressor-20260703",
+        PrimaryContainer={
+            "Image": _TEST_INFERENCE_IMAGE,
+            "ModelDataUrl": _TEST_MODEL_DATA_URI,
+            "Environment": {
+                "SAGEMAKER_PROGRAM": "serve.py",
+                "SAGEMAKER_SUBMIT_DIRECTORY": "/opt/ml/model/code",
+            },
+        },
+        ExecutionRoleArn="arn:aws:iam::123:role/sm",
+    )
+    mock_client.create_endpoint_config.assert_called_once_with(
+        EndpointConfigName="finops-multimodal-regressor-20260703-config",
+        ProductionVariants=[
+            {
+                "VariantName": "AllTraffic",
+                "ModelName": "finops-multimodal-regressor-20260703",
+                "ServerlessConfig": {"MemorySizeInMB": 4096, "MaxConcurrency": 5},
+            }
+        ],
+    )
+    mock_client.update_endpoint.assert_called_once_with(
+        EndpointName="finops-endpoint",
+        EndpointConfigName="finops-multimodal-regressor-20260703-config",
+    )
+
+
 def test_module_singletons_importable() -> None:
     from src.dagster import resources
 
@@ -163,3 +238,4 @@ def test_module_singletons_importable() -> None:
     assert resources.load_config is not None
     assert resources.sagemaker_config is not None
     assert resources.ssm is not None
+    assert resources.sagemaker_runtime is not None

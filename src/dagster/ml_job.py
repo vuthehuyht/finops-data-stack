@@ -27,6 +27,10 @@ from src.ml.training_job import launch_training_job
 
 _ACTIVE_VERSION_PARAM = "/finops/model/active_version"
 _EVALUATION_THRESHOLD_PARAM = "/finops/model/evaluation_threshold"
+_ENDPOINT_NAME_PARAM = "/finops/model/endpoint_name"
+_INFERENCE_IMAGE = (
+    "763104351884.dkr.ecr.ap-southeast-1.amazonaws.com/pytorch-inference:2.2-cpu-py310"
+)
 
 _TRAINING_DATASET_ASSET_KEY = dagster_lib.asset_key(["ML", "GOLD_ML_TRAINING_DATASET"])
 _TRAINING_JOB_ASSET_KEY = dagster_lib.asset_key(["ML", "ML_TRAINING_JOB"])
@@ -220,6 +224,23 @@ def ml_model_evaluation(
     promoted = compare_and_promote(challenger_metrics, champion_metrics, threshold)
     if promoted:
         ssm.put_parameter(_ACTIVE_VERSION_PARAM, version)
+        endpoint_name = ssm.get_parameter(_ENDPOINT_NAME_PARAM)
+        if endpoint_name is not None:
+            sagemaker.deploy_model_version(
+                endpoint_name=endpoint_name,
+                model_name=version,
+                model_data_s3_uri=f"s3://{target_bucket}/{version_prefix}model.tar.gz",
+                inference_image=_INFERENCE_IMAGE,
+            )
+            context.log.info(
+                "Updated endpoint %s to version %s.", endpoint_name, version
+            )
+        else:
+            context.log.warning(
+                "SSM %s not set; skipping endpoint update for version %s.",
+                _ENDPOINT_NAME_PARAM,
+                version,
+            )
         context.log.info("Promoted model version %s to active (Champion).", version)
     else:
         context.log.info(

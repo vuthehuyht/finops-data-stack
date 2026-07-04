@@ -9,6 +9,7 @@ import argparse
 import glob
 import json
 import os
+import shutil
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 
@@ -33,6 +34,24 @@ except ImportError:
     from config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS, WINDOW_SIZE
     from dataset import StockSequenceDataset, time_based_split
     from model import FusionModel
+
+
+# Files copied into model_dir/code/ so every trained model.tar.gz is
+# self-contained and directly servable by the SageMaker inference container
+# (SAGEMAKER_PROGRAM=serve.py, SAGEMAKER_SUBMIT_DIRECTORY=/opt/ml/model/code)
+# — no separate code-packaging step needed at promotion time.
+_SERVING_FILES = ("serve.py", "inference.py", "model.py", "config.py")
+
+
+def _bundle_serving_code(model_dir: str) -> None:
+    """Copy the serving entrypoint + its dependencies into `model_dir/code/`."""
+    source_dir = os.path.dirname(os.path.abspath(__file__))
+    code_dir = os.path.join(model_dir, "code")
+    os.makedirs(code_dir, exist_ok=True)
+    for filename in _SERVING_FILES:
+        shutil.copy(
+            os.path.join(source_dir, filename), os.path.join(code_dir, filename)
+        )
 
 
 @dataclass
@@ -161,6 +180,7 @@ def main() -> None:
 
     os.makedirs(args.model_dir, exist_ok=True)
     torch.save(model.state_dict(), os.path.join(args.model_dir, "model.pt"))
+    _bundle_serving_code(args.model_dir)
 
     metadata = {
         "trained_at": datetime.now(UTC).isoformat(),

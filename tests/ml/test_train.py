@@ -51,3 +51,15 @@ def test_load_training_dataframe_raises_when_empty(tmp_path) -> None:
         raise AssertionError("expected FileNotFoundError")
     except FileNotFoundError:
         pass
+
+
+def test_bundle_serving_code_copies_serve_and_dependencies(tmp_path) -> None:
+    from src.ml.train import _bundle_serving_code
+
+    _bundle_serving_code(str(tmp_path))
+
+    code_dir = tmp_path / "code"
+    assert (code_dir / "serve.py").is_file()
+    assert (code_dir / "inference.py").is_file()
+    assert (code_dir / "model.py").is_file()
+    assert (code_dir / "config.py").is_file()
