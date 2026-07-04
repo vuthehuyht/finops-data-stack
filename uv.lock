@@ -1508,11 +1508,6 @@ ml = [
     { name = "sagemaker" },
     { name = "torch" },
 ]
-ml-container = [
-    { name = "sagemaker-inference" },
-    { name = "sagemaker-pytorch-inference" },
-    { name = "sagemaker-training" },
-]
 
 [package.metadata]
 requires-dist = [
@@ -1554,11 +1549,6 @@ dev = [
 ml = [
     { name = "sagemaker", specifier = ">=3.8.0" },
     { name = "torch", specifier = ">=2.2.0" },
-]
-ml-container = [
-    { name = "sagemaker-inference", specifier = ">=1.10.1" },
-    { name = "sagemaker-pytorch-inference", specifier = ">=2.0.25" },
-    { name = "sagemaker-training", specifier = ">=5.1.1" },
 ]
 
 [[package]]
@@ -2205,12 +2195,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/72/34/14ca021ce8e5dfedc
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cb/b1/3846dd7f199d53cb17f49cba7e651e9ce294d8497c8c150530ed11865bb8/iniconfig-2.3.0-py3-none-any.whl", hash = "sha256:f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12", size = 7484, upload-time = "2025-10-18T21:55:41.639Z" },
 ]
-
-[[package]]
-name = "inotify-simple"
-version = "1.2.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/7b/2d/c7450cc2c6ec9be3a6f35d7d22f6866f156a32f4ea97e75b13b27ad300fd/inotify_simple-1.2.1.tar.gz", hash = "sha256:db69f2d75603e0e8f72e734854ac445beb60ed38922bc97b7f7a522795ca4c8c", size = 7896, upload-time = "2019-11-22T17:43:53.719Z" }
 
 [[package]]
 name = "invoke"
@@ -3943,15 +3927,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pip"
-version = "26.1.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/01/91/47e7d486260f618783899587af63ccf7980fb60245c3e63dd4571c6b57ad/pip-26.1.2.tar.gz", hash = "sha256:f49cd134c61cf2fd75e0ce2676db03e4054504a5a4986d00f8299ae632dc4605", size = 1840799, upload-time = "2026-05-31T17:33:58.56Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/5d/95/6b5cb3461ea5673ba0995989746db58eb18b91b54dbf331e72f569540946/pip-26.1.2-py3-none-any.whl", hash = "sha256:382ff9f685ee3bc25864f820aa50505825f10f5458ffff07e30a6d96e5715cab", size = 1813144, upload-time = "2026-05-31T17:33:56.772Z" },
-]
-
-[[package]]
 name = "platformdirs"
 version = "4.10.0"
 source = { registry = "https://pypi.org/simple" }
@@ -4946,15 +4921,6 @@ wheels = [
 ]
 
 [[package]]
-name = "retrying"
-version = "1.3.7"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/db/4b/8e06a67c8256a546107d2287bf0b0053a0f147de9a0763b10f12d7717eca/retrying-1.3.7.tar.gz", hash = "sha256:7aab7324db8ad92029eef1073bf7257315cc7d9f861243a66b916c164a2c3c20", size = 11171, upload-time = "2025-07-05T05:00:21.385Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/05/41/aeac1881a65fc3e6326ca3cbd6e39a37c78ed55f6fb4d26203bddd37802f/retrying-1.3.7-py3-none-any.whl", hash = "sha256:4449b0a9f6754ab381aabc2771a2aa8350cfe194c2238992e1303b662cfa94e2", size = 11965, upload-time = "2025-07-05T05:00:20.078Z" },
-]
-
-[[package]]
 name = "rich"
 version = "14.3.4"
 source = { registry = "https://pypi.org/simple" }
@@ -5178,20 +5144,6 @@ wheels = [
 ]
 
 [[package]]
-name = "sagemaker-inference"
-version = "1.10.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "boto3" },
-    { name = "numpy" },
-    { name = "psutil" },
-    { name = "retrying" },
-    { name = "scipy" },
-    { name = "six" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/da/4e/f10fbc7675501500beb90caa5f0740321dd25593831d50df758320806b5b/sagemaker_inference-1.10.1.tar.gz", hash = "sha256:7aab74809c8eb28c6980eda52cd46e2ca9699a581f291477a0aa3b12ce5e9762", size = 23394, upload-time = "2023-10-25T09:40:28.723Z" }
-
-[[package]]
 name = "sagemaker-mlflow"
 version = "0.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -5223,20 +5175,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/49/33/40aa8ebafc5284773
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b8/4e/9876b256149b074e837164209744a30cbb2451aa52ef78df6eda1f6b748a/sagemaker_mlops-1.13.1-py3-none-any.whl", hash = "sha256:0471807945445da9ec9e55a2b9502fa9024bd18d0833471395ef2e1103a64e3a", size = 220386, upload-time = "2026-06-05T07:18:56.308Z" },
 ]
-
-[[package]]
-name = "sagemaker-pytorch-inference"
-version = "2.0.25"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "boto3" },
-    { name = "numpy" },
-    { name = "psutil" },
-    { name = "retrying" },
-    { name = "scipy" },
-    { name = "six" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/27/1b/8c0367e6d07ca92b20462ffe43cc38914e70719b1e30f605ac6eb560eaed/sagemaker_pytorch_inference-2.0.25.tar.gz", hash = "sha256:71ae0de6168715c1c9f7d9e5e4e1b3482e91ef901cf2048a8d0fbd5d77501ec1", size = 22330, upload-time = "2024-10-07T20:57:53.362Z" }
 
 [[package]]
 name = "sagemaker-schema-inference-artifacts"
@@ -5296,27 +5234,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/eb/9a/4253055e5a12458a7
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b9/52/6ce05ada913a0e3cc6f8b2240593e90ead6f7b3be6ee700d565bcc9a7802/sagemaker_train-1.13.1-py3-none-any.whl", hash = "sha256:00446a823267247597b774646788c718ceaafcc4f2027286da449536dcce6a96", size = 314800, upload-time = "2026-06-05T05:13:12.277Z" },
 ]
-
-[[package]]
-name = "sagemaker-training"
-version = "5.1.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "boto3" },
-    { name = "botocore" },
-    { name = "gevent" },
-    { name = "inotify-simple" },
-    { name = "numpy" },
-    { name = "paramiko" },
-    { name = "pip" },
-    { name = "protobuf" },
-    { name = "psutil" },
-    { name = "retrying" },
-    { name = "scipy" },
-    { name = "six" },
-    { name = "werkzeug" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/be/fa/b92e31cdc7414c8e9e396c77239fb1585c5e9165f65d6b12b4f94f76fe45/sagemaker_training-5.1.1.tar.gz", hash = "sha256:d61e1ef4daa3ac45c9b47dfd1d8201248395bad6f3df6e1503f295f6fb850384", size = 59177, upload-time = "2025-09-22T16:58:52.542Z" }
 
 [[package]]
 name = "schema"
