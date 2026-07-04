@@ -69,6 +69,89 @@ def test_load_job_config_resource_default() -> None:
     assert r.iam_role_arn == ""
 
 
+def test_sagemaker_resource_defaults() -> None:
+    from src.dagster.resources import SageMakerResource
+
+    with unittest.mock.patch.dict(os.environ, {}, clear=False):
+        os.environ.pop("SAGEMAKER_EXECUTION_ROLE_ARN", None)
+        os.environ.pop("FINOPS_MODEL_ARTIFACTS_BUCKET", None)
+        r = SageMakerResource()
+    assert r.execution_role_arn == ""
+    assert r.model_artifacts_bucket == "finops-model-artifacts-dev"
+
+
+def test_sagemaker_resource_from_env() -> None:
+    from src.dagster.resources import SageMakerResource
+
+    with unittest.mock.patch.dict(
+        os.environ,
+        {
+            "SAGEMAKER_EXECUTION_ROLE_ARN": "arn:aws:iam::123:role/sm",
+            "FINOPS_MODEL_ARTIFACTS_BUCKET": "my-artifacts",
+        },
+    ):
+        r = SageMakerResource()
+    assert r.execution_role_arn == "arn:aws:iam::123:role/sm"
+    assert r.model_artifacts_bucket == "my-artifacts"
+
+
+def test_ssm_parameter_resource_get_parameter_returns_value() -> None:
+    from src.dagster.resources import SsmParameterResource
+
+    mock_client = unittest.mock.MagicMock()
+    mock_client.exceptions.ParameterNotFound = Exception
+    mock_client.get_parameter.return_value = {"Parameter": {"Value": "v42"}}
+
+    with unittest.mock.patch(
+        "src.dagster.resources.boto3.client", return_value=mock_client
+    ):
+        r = SsmParameterResource()
+        value = r.get_parameter("/finops/model/active_version")
+
+    assert value == "v42"
+    mock_client.get_parameter.assert_called_once_with(
+        Name="/finops/model/active_version"
+    )
+
+
+def test_ssm_parameter_resource_get_parameter_returns_none_when_missing() -> None:
+    from src.dagster.resources import SsmParameterResource
+
+    class _ParameterNotFound(Exception):
+        pass
+
+    mock_client = unittest.mock.MagicMock()
+    mock_client.exceptions.ParameterNotFound = _ParameterNotFound
+    mock_client.get_parameter.side_effect = _ParameterNotFound()
+
+    with unittest.mock.patch(
+        "src.dagster.resources.boto3.client", return_value=mock_client
+    ):
+        r = SsmParameterResource()
+        value = r.get_parameter("/finops/model/active_version")
+
+    assert value is None
+
+
+def test_ssm_parameter_resource_put_parameter() -> None:
+    from src.dagster.resources import SsmParameterResource
+
+    mock_client = unittest.mock.MagicMock()
+
+    with unittest.mock.patch(
+        "src.dagster.resources.boto3.client", return_value=mock_client
+    ):
+        r = SsmParameterResource()
+        r.put_parameter("/finops/model/active_version", "v43")
+
+    mock_client.put_parameter.assert_called_once_with(
+        Name="/finops/model/active_version",
+        Value="v43",
+        Type="String",
+        Overwrite=True,
+    )
+
+
 def test_module_singletons_importable() -> None:
     from src.dagster import resources
 
@@ -78,3 +161,5 @@ def test_module_singletons_importable() -> None:
     assert resources.dbt is not None
     assert resources.dbt_config is not None
     assert resources.load_config is not None
+    assert resources.sagemaker_config is not None
+    assert resources.ssm is not None

@@ -6,6 +6,7 @@ import pathlib
 from collections.abc import Iterator
 from typing import Any
 
+import boto3
 import dagster
 from dagster_aws.s3 import S3Resource
 from dagster_dbt import DbtCliResource
@@ -59,6 +60,41 @@ class LoadJobConfigResource(dagster.ConfigurableResource):
     )
 
 
+class SageMakerResource(dagster.ConfigurableResource):
+    """SageMaker execution role and target bucket for the ML training pipeline."""
+
+    execution_role_arn: str = Field(
+        default_factory=lambda: os.getenv("SAGEMAKER_EXECUTION_ROLE_ARN", ""),
+        description="IAM Role ARN SageMaker assumes to run training jobs.",
+    )
+    model_artifacts_bucket: str = Field(
+        default_factory=lambda: os.getenv(
+            "FINOPS_MODEL_ARTIFACTS_BUCKET", "finops-model-artifacts-dev"
+        ),
+        description="S3 bucket storing versioned model.tar.gz + metadata.json.",
+    )
+
+
+class SsmParameterResource(dagster.ConfigurableResource):
+    """SSM Parameter Store access for ML model version tracking."""
+
+    region_name: str = Field(default="ap-southeast-1")
+
+    def get_parameter(self, name: str) -> str | None:
+        """Return the parameter value, or None if it does not exist."""
+        client = boto3.client("ssm", region_name=self.region_name)
+        try:
+            response = client.get_parameter(Name=name)
+        except client.exceptions.ParameterNotFound:
+            return None
+        return response["Parameter"]["Value"]
+
+    def put_parameter(self, name: str, value: str) -> None:
+        """Create or overwrite a String SSM parameter."""
+        client = boto3.client("ssm", region_name=self.region_name)
+        client.put_parameter(Name=name, Value=value, Type="String", Overwrite=True)
+
+
 dbt = DbtCliResource(
     project_dir=os.fspath(_PROJECT_ROOT / "src" / "transform" / "dbt"),
 )
@@ -67,3 +103,5 @@ s3bucket = S3BucketResource()
 redshift = RedshiftResource()
 dbt_config = DbtConfigResource()
 load_config = LoadJobConfigResource()
+sagemaker_config = SageMakerResource()
+ssm = SsmParameterResource()
