@@ -5,6 +5,7 @@ import json
 import os
 import tempfile
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 
 import dagster
@@ -13,8 +14,8 @@ import pydantic
 from dagster_aws.s3 import S3Resource
 
 import src.pipeline.dagster as dagster_lib
-from src.common.redshift_util import execute_query
 from src.dagster.resources import (
+    LoadJobConfigResource,
     RedshiftResource,
     S3BucketResource,
     SageMakerResource,
@@ -26,10 +27,14 @@ from src.ml.config import (
     WINDOW_SIZE,
 )
 from src.ml.evaluation import model_version_prefix
-from src.ml.inference import build_latest_window, check_feature_null_rate
+from src.ml.forecast_publish import publish_forecast_results
+from src.ml.inference import (
+    build_latest_window,
+    check_feature_null_rate,
+    next_trading_day,
+)
 
 _FEATURE_TABLE = "MART.FACT_ML_FEATURE_SET"
-_FORECAST_TABLE = "MART.FCT_ML_FORECAST_RESULTS"
 _ACTIVE_VERSION_PARAM = "/finops/model/active_version"
 _INFERENCE_IMAGE = (
     "763104351884.dkr.ecr.ap-southeast-1.amazonaws.com/pytorch-inference:2.2-cpu-py310"
@@ -71,6 +76,7 @@ class MlInferenceGateConfig(dagster.Config):
     key=_DATA_QUALITY_GATE_ASSET_KEY,
     group_name="ML",
     kinds={"python", "redshift"},
+    deps=[_FACT_ML_FEATURE_SET_KEY],
     description=(
         "Gate inference on FACT_ML_FEATURE_SET null rates for the latest trading date."
     ),
@@ -221,38 +227,40 @@ def ml_daily_forecast(  # noqa: C901
         local_output_path = os.path.join(tmpdir, "output.jsonl.out")
         s3_client.download_file(s3bucket.raw_bucket, output_key, local_output_path)
 
-        # 6. Đọc kết quả và khớp với ticker
+        # 6. Đọc kết quả — output.jsonl.out is now self-contained
+        # ({"ticker": ..., "predicted_return": ...} per line), no position
+        # matching against valid_tickers needed.
         with open(local_output_path, encoding="utf-8") as f_out:
-            for ticker, line_out in zip(valid_tickers, f_out, strict=False):
+            for line_out in f_out:
                 if not line_out.strip():
                     continue
                 try:
                     prediction = json.loads(line_out)
                     results.append(
                         {
-                            "ticker": ticker,
+                            "ticker": prediction["ticker"],
                             "predicted_return": prediction["predicted_return"],
                         }
                     )
                 except Exception as exc:
-                    context.log.warning(
-                        "Failed to parse prediction for ticker %s: %s",
-                        ticker,
-                        exc,
-                    )
+                    context.log.warning("Failed to parse a prediction line: %s", exc)
 
     if not results:
         raise ValueError(f"All {len(tickers)} tickers failed inference; aborting.")
 
+    anchor_date = datetime.date.fromisoformat(validated_date)
+    forecast_trading_date = next_trading_day(anchor_date).isoformat()
+
     context.log.info("Forecasted %s/%s tickers.", len(results), len(tickers))
     return dagster.Output(
         value={
-            "trading_date": validated_date,
+            "trading_date": forecast_trading_date,
             "model_version": model_version,
             "results": results,
+            "output_s3_uri": f"{output_s3_uri}input.jsonl.out",
         },
         metadata={
-            "trading_date": validated_date,
+            "trading_date": forecast_trading_date,
             "model_version": model_version,
             "success_count": len(results),
             "ticker_count": len(tickers),
@@ -266,51 +274,34 @@ def ml_daily_forecast(  # noqa: C901
     kinds={"python", "redshift"},
     ins={"forecast_result": dagster.AssetIn(key=_DAILY_FORECAST_ASSET_KEY)},
     description=(
-        "Write daily forecast results to Redshift Gold (FCT_ML_FORECAST_RESULTS)."
+        "COPY Batch Transform forecast output into Redshift Gold "
+        "(FCT_ML_FORECAST_RESULTS)."
     ),
 )
 def ml_publish_forecast_results(
     context: dagster.AssetExecutionContext,
     forecast_result: dict,
     redshift: RedshiftResource,
+    load_config: LoadJobConfigResource,
 ) -> dagster.Output[int]:
-    """Delete any existing rows for the trading date, then insert fresh results."""
+    """COPY the forecast output file into Redshift, replacing rows for the date."""
     trading_date = _validate_iso_date(forecast_result["trading_date"])
     model_version = forecast_result["model_version"]
     results = forecast_result["results"]
+    output_s3_uri = forecast_result["output_s3_uri"]
 
     if not results:
         raise ValueError("No forecast results to publish.")
 
     with redshift.get_connection() as conn:
         with conn.cursor() as cursor:
-            execute_query(
-                cursor,
-                f"DELETE FROM {_FORECAST_TABLE} WHERE TRADING_DATE = %s",
-                (trading_date,),
+            publish_forecast_results(
+                cursor=cursor,
+                s3_url=output_s3_uri,
+                iam_role_arn=load_config.iam_role_arn,
+                trading_date=trading_date,
+                model_version=model_version,
             )
-            for result in results:
-                execute_query(
-                    cursor,
-                    f"""
-                    INSERT INTO {_FORECAST_TABLE}
-                        (TICKER, TRADING_DATE, PREDICTED_RETURN, MODEL_VERSION,
-                         DATACORE_CREATE_DATETIME, DATACORE_CREATE_PROGRAM,
-                         DATACORE_CREATE_BY, DATACORE_UPDATE_DATETIME,
-                         DATACORE_UPDATE_PROGRAM, DATACORE_UPDATE_BY, BATCH_DATE)
-                    VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, %s, CURRENT_USER,
-                            CURRENT_TIMESTAMP, %s, CURRENT_USER, %s)
-                    """,
-                    (
-                        result["ticker"],
-                        trading_date,
-                        result["predicted_return"],
-                        model_version,
-                        "ml_publish_forecast_results",
-                        "ml_publish_forecast_results",
-                        trading_date,
-                    ),
-                )
         conn.commit()
 
     context.log.info("Published %s forecast rows for %s.", len(results), trading_date)
@@ -337,17 +328,25 @@ def define_inference_jobs() -> InferenceJobBundle:
         tags={"type": "ml"},
     )
 
-    @dagster.asset_sensor(
-        asset_key=_FACT_ML_FEATURE_SET_KEY,
+    @dagster.multi_asset_sensor(
+        monitored_assets=[_FACT_ML_FEATURE_SET_KEY],
         job=job,
         name="ml_daily_inference_sensor",
         minimum_interval_seconds=60,
+        description=(
+            "Trigger the ML daily inference job when FACT_ML_FEATURE_SET materializes."
+        ),
     )
     def ml_daily_inference_sensor(
-        context: dagster.SensorEvaluationContext,
-        asset_event: dagster.EventLogEntry,
-    ) -> dagster.RunRequest:
-        return dagster.RunRequest(run_key=context.cursor)
+        context: dagster.MultiAssetSensorEvaluationContext,
+    ) -> Iterator[dagster.RunRequest]:
+        for key, asset_event, _materialization in dagster_lib.fetch_materializations(
+            context, fetch_limit_for_each_asset=1
+        ):
+            context.advance_cursor({key: asset_event})
+            yield dagster.RunRequest(
+                run_key=f"ml_daily_inference_{asset_event.storage_id}"
+            )
 
     return InferenceJobBundle(
         assets=assets, jobs=[job], sensors=[ml_daily_inference_sensor]

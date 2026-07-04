@@ -139,3 +139,30 @@ def test_load_model_from_s3_success() -> None:
         )
         mock_model.load_state_dict.assert_called_once_with(fake_state_dict)
         mock_model.eval.assert_called_once()
+
+
+def test_next_trading_day_skips_to_next_weekday() -> None:
+    import datetime
+
+    from src.ml.inference import next_trading_day
+
+    # Tuesday -> Wednesday
+    assert next_trading_day(datetime.date(2026, 7, 7)) == datetime.date(2026, 7, 8)
+
+
+def test_next_trading_day_skips_weekend_after_friday() -> None:
+    import datetime
+
+    from src.ml.inference import next_trading_day
+
+    # Friday -> Monday (skips Sat/Sun)
+    assert next_trading_day(datetime.date(2026, 7, 3)) == datetime.date(2026, 7, 6)
+
+
+def test_next_trading_day_from_saturday_skips_to_monday() -> None:
+    import datetime
+
+    from src.ml.inference import next_trading_day
+
+    # Saturday input (shouldn't occur given the ingest cron, but must not crash)
+    assert next_trading_day(datetime.date(2026, 7, 4)) == datetime.date(2026, 7, 6)

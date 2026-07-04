@@ -42,25 +42,32 @@ def test_input_fn_raises_on_unsupported_content_type() -> None:
         input_fn(b"<xml/>", "application/xml")
 
 
-def test_predict_fn_delegates_to_predict_from_payload() -> None:
+def test_predict_fn_echoes_ticker_alongside_prediction() -> None:
     from src.ml.model import FusionModel
     from src.ml.serve import predict_fn
 
     model = FusionModel(sequence_input_size=2, tabular_input_size=2)
     model.eval()
-    input_data = {"sequence": [[0.1, 0.2], [0.3, 0.4]], "tabular": [0.5, 0.6]}
+    input_data = {
+        "ticker": "AAA",
+        "sequence": [[0.1, 0.2], [0.3, 0.4]],
+        "tabular": [0.5, 0.6],
+    }
 
     result = predict_fn(input_data, model)
 
+    assert result["ticker"] == "AAA"
     assert isinstance(result["predicted_return"], float)
 
 
-def test_output_fn_serializes_prediction_to_json() -> None:
+def test_output_fn_serializes_ticker_and_prediction_to_json() -> None:
     from src.ml.serve import output_fn
 
-    result = output_fn({"predicted_return": 0.0123}, "application/json")
+    result = output_fn(
+        {"ticker": "AAA", "predicted_return": 0.0123}, "application/json"
+    )
 
-    assert json.loads(result) == {"predicted_return": 0.0123}
+    assert json.loads(result) == {"ticker": "AAA", "predicted_return": 0.0123}
 
 
 def test_output_fn_raises_on_unsupported_accept() -> None:

@@ -60,8 +60,14 @@ def input_fn(request_body: bytes, content_type: str) -> dict:
 
 
 def predict_fn(input_data: dict, model: FusionModel) -> dict:
-    """Run inference using the already-loaded model."""
-    return predict_from_payload(model, input_data)
+    """Run inference using the already-loaded model.
+
+    Echoes `ticker` from the input alongside the prediction so the Batch
+    Transform output file is self-contained (no output-line-to-input-line
+    position matching needed downstream).
+    """
+    prediction = predict_from_payload(model, input_data)
+    return {"ticker": input_data["ticker"], **prediction}
 
 
 def output_fn(prediction: dict, accept: str) -> bytes:

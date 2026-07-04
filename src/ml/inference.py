@@ -5,6 +5,8 @@ No AWS dependency — reused by both the Dagster daily inference pipeline
 (src/ml/serve.py).
 """
 
+import datetime
+
 import numpy as np
 import pandas as pd
 import torch
@@ -23,6 +25,18 @@ except ImportError:
 
 _DATE_COLUMN = "TRADING_DATE"
 _TICKER_COLUMN = "TICKER"
+
+
+def next_trading_day(anchor_date: datetime.date) -> datetime.date:
+    """Return the next Mon-Fri weekday after `anchor_date`.
+
+    No VN public-holiday calendar exists in this codebase (same limitation
+    as the ingest cron `30 15 * * 1-5`) — only Saturday/Sunday are skipped.
+    """
+    candidate = anchor_date + datetime.timedelta(days=1)
+    while candidate.weekday() >= 5:  # 5=Saturday, 6=Sunday
+        candidate += datetime.timedelta(days=1)
+    return candidate
 
 
 def check_feature_null_rate(
