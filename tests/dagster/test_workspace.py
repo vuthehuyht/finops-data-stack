@@ -139,7 +139,10 @@ def test_workspace_has_sensor_for_load_jobs() -> None:
 
 
 def test_workspace_has_transform_sensors() -> None:
-    """Silver, Mart, and Load tables are SENSOR-type — must have exactly 3 sensors."""
+    """Silver, Mart, Load, and ML daily inference are SENSOR-type.
+
+    Must have exactly 4 sensors.
+    """
     with unittest.mock.patch.dict(
         os.environ,
         {
@@ -153,15 +156,16 @@ def test_workspace_has_transform_sensors() -> None:
 
         reload(src.dagster.workspace)
         defs = src.dagster.workspace.defs
-        assert len(defs.sensor_defs) == 3
+        assert len(defs.sensor_defs) == 4
         sensor_names = {s.name for s in defs.sensor_defs}
         assert "load_job_sensor" in sensor_names
         assert "silver_job_sensor" in sensor_names
         assert "mart_job_sensor" in sensor_names
+        assert "ml_daily_inference_sensor" in sensor_names
 
 
-def test_workspace_definitions_include_ml_job() -> None:
-    """workspace.py must register the ML quarterly re-training job."""
+def test_workspace_definitions_include_ml_jobs() -> None:
+    """workspace.py must register ML quarterly re-training and daily inference jobs."""
     with unittest.mock.patch.dict(
         os.environ,
         {
@@ -176,10 +180,11 @@ def test_workspace_definitions_include_ml_job() -> None:
         reload(src.dagster.workspace)
         defs = src.dagster.workspace.defs
         assert "ml_quarterly_retrain_job" in defs.job_names
+        assert "ml_daily_inference_job" in defs.job_names
 
 
 def test_workspace_definitions_include_ml_assets() -> None:
-    """workspace.py must register all three ML assets."""
+    """workspace.py must register all ML assets (training and inference)."""
     with unittest.mock.patch.dict(
         os.environ,
         {
@@ -197,6 +202,9 @@ def test_workspace_definitions_include_ml_assets() -> None:
         assert AssetKey(["ML", "GOLD_ML_TRAINING_DATASET"]) in asset_keys
         assert AssetKey(["ML", "ML_TRAINING_JOB"]) in asset_keys
         assert AssetKey(["ML", "ML_MODEL_EVALUATION"]) in asset_keys
+        assert AssetKey(["ML", "ML_DATA_QUALITY_GATE"]) in asset_keys
+        assert AssetKey(["ML", "ML_DAILY_FORECAST"]) in asset_keys
+        assert AssetKey(["ML", "ML_PUBLISH_FORECAST_RESULTS"]) in asset_keys
 
 
 def test_workspace_resources_include_sagemaker_and_ssm() -> None:

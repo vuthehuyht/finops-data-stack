@@ -93,3 +93,49 @@ def test_predict_from_payload_returns_float_prediction() -> None:
 
     assert isinstance(result, dict)
     assert isinstance(result["predicted_return"], float)
+
+
+def test_load_model_from_s3_success() -> None:
+    import io
+    import tarfile
+    import unittest.mock
+
+    from src.ml.inference import load_model_from_s3
+
+    mock_s3_client = unittest.mock.MagicMock()
+
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
+        content = b"fake state dict"
+        info = tarfile.TarInfo(name="model.pt")
+        info.size = len(content)
+        tar.addfile(info, io.BytesIO(content))
+    tarball_bytes = buffer.getvalue()
+
+    def download_file_side_effect(Bucket, Key, Filename):
+        with open(Filename, "wb") as f:
+            f.write(tarball_bytes)
+
+    mock_s3_client.download_file.side_effect = download_file_side_effect
+
+    fake_state_dict = {}
+    with (
+        unittest.mock.patch(
+            "src.ml.inference.torch.load", return_value=fake_state_dict
+        ) as mock_torch_load,
+        unittest.mock.patch("src.ml.inference.FusionModel") as mock_fusion_model_class,
+    ):
+        mock_model = unittest.mock.MagicMock()
+        mock_fusion_model_class.return_value = mock_model
+
+        model = load_model_from_s3(mock_s3_client, "my-bucket", "my-key")
+
+        assert model == mock_model
+        mock_s3_client.download_file.assert_called_once_with(
+            "my-bucket", "my-key", unittest.mock.ANY
+        )
+        mock_torch_load.assert_called_once_with(
+            unittest.mock.ANY, map_location="cpu", weights_only=True
+        )
+        mock_model.load_state_dict.assert_called_once_with(fake_state_dict)
+        mock_model.eval.assert_called_once()

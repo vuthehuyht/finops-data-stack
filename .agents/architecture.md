@@ -22,7 +22,7 @@ Data Mesh / Lakehouse architecture on AWS, orchestrated by **Dagster** (Software
 2. Sensor & Loading (S3 → Redshift Bronze): trigger `COPY` to load raw tables.
 3. Transformation (dbt Silver & Gold): type casting + `DATACORE_*` metadata, then feature engineering at Gold (Mart) layer.
 4. Data Quality Gate: validate `fact_ml_feature_set` meets standards before continuing.
-5. ML Inference: call SageMaker Serverless Endpoint (scale-to-zero).
+5. ML Inference: run SageMaker Batch Transform Job (Serverless Batch).
 6. Results Publishing: write forecast results to Redshift Gold + dashboard.
 
 ### 2. Quarterly Re-training Pipeline (after new financial statements are published)
@@ -30,7 +30,7 @@ Data Mesh / Lakehouse architecture on AWS, orchestrated by **Dagster** (Software
 2. Training Job (SageMaker GPU) → model artifact pushed to S3.
 3. Model Registration into SageMaker Model Registry with evaluation metrics.
 4. Model Evaluation & Approval: compare Challenger vs Champion.
-5. Serverless Deployment: update endpoint to use the newly approved version.
+5. Model Promotion: update active model version in SSM Parameter Store.
 
 ## `src/` Directory Structure (Flywheel Architecture)
 
@@ -46,7 +46,7 @@ src/
 ├── k8s/         # Kubernetes manifests
 ```
 
-*(Note: `src/docker/` is planned but not yet created. Inference-time SageMaker Serverless Endpoint deployment is a separate, not-yet-implemented sub-project.)*
+*(Note: Inference-time SageMaker Batch Transform job is orchestrated dynamically using SageMakerResource helper methods.)*
 
 ## Metadata Governance (names only, see docs for detail)
 

@@ -43,14 +43,14 @@ Sử dụng mô hình VPC tiêu chuẩn để cô lập tài nguyên trên 2 Ava
 ## 4. Machine Learning (SageMaker)
 
 * **SageMaker Training**: Chạy theo nhu cầu (On-demand) trên các instance có GPU nhỏ nhất (ví dụ: `g4dn.xlarge`) để huấn luyện mô hình.
-* **SageMaker Serverless Inference**: Cấu hình Serverless Endpoint phục vụ suy luận hàng ngày, tự động tắt (scale-to-zero) khi Dagster hoàn thành công việc dự báo.
+* **SageMaker Batch Transform (Serverless Batch)**: Khởi chạy các phiên suy luận hàng ngày theo mô hình batch transform (tự động khởi chạy máy chủ, xử lý dữ liệu và tự giải phóng tài nguyên sau khi hoàn tất), loại bỏ việc duy trì Endpoint cố định để tối ưu chi phí.
 * **Model Versioning**: Quản lý các phiên bản mô hình trực tiếp qua cấu trúc thư mục trên S3 (`finops-model-artifacts/v1/`, `v2/`...).
 
 ## 5. Bảo mật & Quản trị (Security & Governance)
 
 * **IAM Roles for Service Accounts (IRSA)**: Gán IAM role trực tiếp cho Service Account của Pod trong EKS (ví dụ: cho phép Dagster Worker gọi API của SageMaker và SSM Parameter Store).
 * **AWS Secrets Manager**: Lưu trữ DB credentials, API keys bảo mật.
-* **AWS Systems Manager (SSM) Parameter Store**: Sử dụng Standard Parameters (miễn phí) để lưu trữ các thông tin phi nhạy cảm liên quan đến mô hình ML (như phiên bản model active `/finops/model/active_version`, tên endpoint active `/finops/model/endpoint_name`, ngưỡng đánh giá `/finops/model/evaluation_threshold`).
+* **AWS Systems Manager (SSM) Parameter Store**: Sử dụng Standard Parameters (miễn phí) để lưu trữ các thông tin phi nhạy cảm liên quan đến mô hình ML (như phiên bản model active `/finops/model/active_version`, ngưỡng đánh giá `/finops/model/evaluation_threshold`).
 * **CloudWatch Logs**: Giám sát log từ EKS, Redshift, SageMaker.
 
 ## 6. Luồng CI/CD & Quản lý State (Infrastructure as Code)

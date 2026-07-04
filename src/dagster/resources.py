@@ -1,9 +1,9 @@
 """Dagster resources for FinOps pipeline."""
 
 import contextlib
-import json
 import os
 import pathlib
+import time
 from collections.abc import Iterator
 from typing import Any
 
@@ -62,7 +62,7 @@ class LoadJobConfigResource(dagster.ConfigurableResource):
 
 
 class SageMakerResource(dagster.ConfigurableResource):
-    """SageMaker execution role, target bucket, and endpoint management."""
+    """SageMaker execution role, target bucket, and Batch Transform job management."""
 
     execution_role_arn: str = Field(
         default_factory=lambda: os.getenv("SAGEMAKER_EXECUTION_ROLE_ARN", ""),
@@ -76,51 +76,85 @@ class SageMakerResource(dagster.ConfigurableResource):
     )
     region_name: str = Field(default="ap-southeast-1")
 
-    def deploy_model_version(
+    def create_model_if_not_exists(
         self,
-        endpoint_name: str,
         model_name: str,
         model_data_s3_uri: str,
         inference_image: str,
-        memory_size_in_mb: int = 4096,
-        max_concurrency: int = 5,
     ) -> None:
-        """Create a Model + EndpointConfig for a model version and update the endpoint.
-
-        Uses plain boto3 (not the `sagemaker` SDK's ModelBuilder) — the
-        CreateModel/CreateEndpointConfig/UpdateEndpoint APIs are stable
-        across SDK client versions.
-        """
+        """Create a SageMaker Model resource if it does not already exist."""
         client = boto3.client("sagemaker", region_name=self.region_name)
-        client.create_model(
-            ModelName=model_name,
-            PrimaryContainer={
-                "Image": inference_image,
-                "ModelDataUrl": model_data_s3_uri,
-                "Environment": {
-                    "SAGEMAKER_PROGRAM": "serve.py",
-                    "SAGEMAKER_SUBMIT_DIRECTORY": "/opt/ml/model/code",
-                },
-            },
-            ExecutionRoleArn=self.execution_role_arn,
-        )
-        endpoint_config_name = f"{model_name}-config"
-        client.create_endpoint_config(
-            EndpointConfigName=endpoint_config_name,
-            ProductionVariants=[
-                {
-                    "VariantName": "AllTraffic",
-                    "ModelName": model_name,
-                    "ServerlessConfig": {
-                        "MemorySizeInMB": memory_size_in_mb,
-                        "MaxConcurrency": max_concurrency,
+        model_exists = False
+        try:
+            client.describe_model(ModelName=model_name)
+            model_exists = True
+        except client.exceptions.ClientError as exc:
+            is_val = "ValidationException" in str(exc)
+            if "Could not find" not in str(exc) and not is_val:
+                raise exc
+
+        if not model_exists:
+            client.create_model(
+                ModelName=model_name,
+                PrimaryContainer={
+                    "Image": inference_image,
+                    "ModelDataUrl": model_data_s3_uri,
+                    "Environment": {
+                        "SAGEMAKER_PROGRAM": "serve.py",
+                        "SAGEMAKER_SUBMIT_DIRECTORY": "/opt/ml/model/code",
                     },
-                }
-            ],
+                },
+                ExecutionRoleArn=self.execution_role_arn,
+            )
+
+    def run_batch_transform_job(
+        self,
+        job_name: str,
+        model_name: str,
+        input_s3_uri: str,
+        output_s3_uri: str,
+        instance_type: str = "ml.m5.large",
+    ) -> None:
+        """Launch a SageMaker Batch Transform Job and block until it completes."""
+        client = boto3.client("sagemaker", region_name=self.region_name)
+        client.create_transform_job(
+            TransformJobName=job_name,
+            ModelName=model_name,
+            TransformInput={
+                "DataSource": {
+                    "S3DataSource": {
+                        "S3DataType": "S3Prefix",
+                        "S3Uri": input_s3_uri,
+                    }
+                },
+                # SplitType=Line sends each line as a separate request whose body
+                # is one JSON object, not the whole JSON Lines file -- keep this
+                # as application/json, matching src/ml/serve.py::input_fn.
+                "ContentType": "application/json",
+                "SplitType": "Line",
+            },
+            TransformOutput={
+                "S3OutputPath": output_s3_uri,
+                "AssembleWith": "Line",
+            },
+            TransformResources={
+                "InstanceType": instance_type,
+                "InstanceCount": 1,
+            },
         )
-        client.update_endpoint(
-            EndpointName=endpoint_name, EndpointConfigName=endpoint_config_name
-        )
+
+        while True:
+            desc = client.describe_transform_job(TransformJobName=job_name)
+            status = desc["TransformJobStatus"]
+            if status == "Completed":
+                break
+            elif status in ("Failed", "Stopped"):
+                failure_reason = desc.get("FailureReason", "unknown reason")
+                raise RuntimeError(
+                    f"SageMaker Batch Transform Job {job_name} "
+                    f"ended with status {status}: {failure_reason}"
+                )
+            time.sleep(10)
 
 
 class SsmParameterResource(dagster.ConfigurableResource):
@@ -143,23 +177,6 @@ class SsmParameterResource(dagster.ConfigurableResource):
         client.put_parameter(Name=name, Value=value, Type="String", Overwrite=True)
 
 
-class SageMakerRuntimeResource(dagster.ConfigurableResource):
-    """SageMaker Runtime access for invoking inference endpoints."""
-
-    region_name: str = Field(default="ap-southeast-1")
-
-    def invoke_endpoint(self, endpoint_name: str, payload: dict) -> dict:
-        """Invoke a SageMaker endpoint with a JSON payload; parse the JSON response."""
-        client = boto3.client("sagemaker-runtime", region_name=self.region_name)
-        response = client.invoke_endpoint(
-            EndpointName=endpoint_name,
-            ContentType="application/json",
-            Accept="application/json",
-            Body=json.dumps(payload).encode("utf-8"),
-        )
-        return json.loads(response["Body"].read())
-
-
 dbt = DbtCliResource(
     project_dir=os.fspath(_PROJECT_ROOT / "src" / "transform" / "dbt"),
 )
@@ -170,4 +187,3 @@ dbt_config = DbtConfigResource()
 load_config = LoadJobConfigResource()
 sagemaker_config = SageMakerResource()
 ssm = SsmParameterResource()
-sagemaker_runtime = SageMakerRuntimeResource()

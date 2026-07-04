@@ -13,11 +13,13 @@ try:
     # Package-relative import: used when pytest imports this module as
     # `src.ml.inference` from the repo root, where the `src` package resolves.
     from src.ml.config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS
+    from src.ml.model import FusionModel
 except ImportError:
     # Sibling import: SageMaker script mode copies `source_dir`'s contents
     # flat into /opt/ml/input/data/code/, so there is no `src` package there
     # — config.py is a plain sibling of inference.py in that directory.
     from config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS
+    from model import FusionModel
 
 _DATE_COLUMN = "TRADING_DATE"
 _TICKER_COLUMN = "TICKER"
@@ -112,3 +114,35 @@ def predict_from_payload(model: torch.nn.Module, payload: dict) -> dict:
     with torch.no_grad():
         prediction = model(sequence, tabular)
     return {"predicted_return": prediction.item()}
+
+
+def load_model_from_s3(s3_client, bucket: str, key: str) -> torch.nn.Module:
+    """Download model.tar.gz from S3, extract it, and load it.
+
+    Loads the weights into a FusionModel instance.
+    """
+    import os
+    import tarfile
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tarball_path = os.path.join(tmpdir, "model.tar.gz")
+        s3_client.download_file(bucket, key, tarball_path)
+
+        with tarfile.open(tarball_path, "r:gz") as tar:
+            tar.extractall(path=tmpdir)
+
+        model_path = os.path.join(tmpdir, "model.pt")
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(
+                f"model.pt not found in tarball extracted from s3://{bucket}/{key}"
+            )
+
+        model = FusionModel(
+            sequence_input_size=len(SEQUENCE_FEATURE_COLUMNS),
+            tabular_input_size=len(TABULAR_FEATURE_COLUMNS),
+        )
+        state_dict = torch.load(model_path, map_location="cpu", weights_only=True)
+        model.load_state_dict(state_dict)
+        model.eval()
+        return model

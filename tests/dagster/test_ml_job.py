@@ -96,7 +96,7 @@ def test_define_ml_jobs_job_name() -> None:
     assert bundle.jobs[0].name == "ml_quarterly_retrain_job"
 
 
-def test_ml_model_evaluation_updates_endpoint_on_promotion() -> None:
+def test_ml_model_evaluation_promotes_model_on_better_metrics() -> None:
     from src.dagster.ml_job import MlEvaluationConfig, ml_model_evaluation
 
     mock_s3_client = unittest.mock.MagicMock()
@@ -116,7 +116,6 @@ def test_ml_model_evaluation_updates_endpoint_on_promotion() -> None:
     mock_ssm.get_parameter.side_effect = lambda name: {
         "/finops/model/active_version": None,
         "/finops/model/evaluation_threshold": None,
-        "/finops/model/endpoint_name": "finops-endpoint",
     }.get(name)
 
     training_job_result = {
@@ -137,17 +136,12 @@ def test_ml_model_evaluation_updates_endpoint_on_promotion() -> None:
     )
 
     assert result.value is True  # no champion yet -> bootstrap promotion
-    mock_sagemaker.deploy_model_version.assert_called_once()
-    _, kwargs = mock_sagemaker.deploy_model_version.call_args
-    assert kwargs["endpoint_name"] == "finops-endpoint"
-    assert kwargs["model_name"] == "finops-multimodal-regressor-20260703"
-    assert kwargs["model_data_s3_uri"] == (
-        "s3://finops-model-artifacts-dev/"
-        "finops-multimodal-regressor/finops-multimodal-regressor-20260703/model.tar.gz"
+    mock_ssm.put_parameter.assert_called_once_with(
+        "/finops/model/active_version", "finops-multimodal-regressor-20260703"
     )
 
 
-def test_ml_model_evaluation_skips_endpoint_update_when_not_promoted() -> None:
+def test_ml_model_evaluation_skips_promotion_when_not_better() -> None:
     from src.dagster.ml_job import MlEvaluationConfig, ml_model_evaluation
 
     mock_s3_client = unittest.mock.MagicMock()
@@ -174,7 +168,6 @@ def test_ml_model_evaluation_skips_endpoint_update_when_not_promoted() -> None:
     mock_ssm.get_parameter.side_effect = lambda name: {
         "/finops/model/active_version": "finops-multimodal-regressor-20260601",
         "/finops/model/evaluation_threshold": "0.5",
-        "/finops/model/endpoint_name": "finops-endpoint",
     }.get(name)
 
     training_job_result = {
@@ -195,4 +188,4 @@ def test_ml_model_evaluation_skips_endpoint_update_when_not_promoted() -> None:
     )
 
     assert result.value is False
-    mock_sagemaker.deploy_model_version.assert_not_called()
+    mock_ssm.put_parameter.assert_not_called()

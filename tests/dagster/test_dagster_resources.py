@@ -152,55 +152,39 @@ def test_ssm_parameter_resource_put_parameter() -> None:
     )
 
 
-def test_sagemaker_runtime_resource_invoke_endpoint() -> None:
-    from src.dagster.resources import SageMakerRuntimeResource
-
-    mock_client = unittest.mock.MagicMock()
-    mock_body = unittest.mock.MagicMock()
-    mock_body.read.return_value = b'{"predicted_return": 0.05}'
-    mock_client.invoke_endpoint.return_value = {"Body": mock_body}
-
-    with unittest.mock.patch(
-        "src.dagster.resources.boto3.client", return_value=mock_client
-    ):
-        r = SageMakerRuntimeResource()
-        result = r.invoke_endpoint(
-            "my-endpoint", {"sequence": [[1.0]], "tabular": [2.0]}
-        )
-
-    assert result == {"predicted_return": 0.05}
-    mock_client.invoke_endpoint.assert_called_once_with(
-        EndpointName="my-endpoint",
-        ContentType="application/json",
-        Accept="application/json",
-        Body=b'{"sequence": [[1.0]], "tabular": [2.0]}',
-    )
-
-
 _TEST_INFERENCE_IMAGE = (
     "763104351884.dkr.ecr.ap-southeast-1.amazonaws.com/pytorch-inference:2.2-cpu-py310"
 )
 _TEST_MODEL_DATA_URI = "s3://bucket/finops-multimodal-regressor-20260703/model.tar.gz"
 
 
-def test_sagemaker_resource_deploy_model_version_calls_expected_boto3_apis() -> None:
+def test_sagemaker_resource_create_model_if_not_exists() -> None:
+    import botocore.exceptions
+
     from src.dagster.resources import SageMakerResource
 
     mock_client = unittest.mock.MagicMock()
+    mock_client.exceptions.ClientError = botocore.exceptions.ClientError
+    err = botocore.exceptions.ClientError(
+        error_response={
+            "Error": {"Code": "ValidationException", "Message": "Could not find"}
+        },
+        operation_name="DescribeModel",
+    )
+    mock_client.describe_model.side_effect = err
 
     with unittest.mock.patch(
         "src.dagster.resources.boto3.client", return_value=mock_client
     ):
         r = SageMakerResource(execution_role_arn="arn:aws:iam::123:role/sm")
-        r.deploy_model_version(
-            endpoint_name="finops-endpoint",
-            model_name="finops-multimodal-regressor-20260703",
+        r.create_model_if_not_exists(
+            model_name="my-model",
             model_data_s3_uri=_TEST_MODEL_DATA_URI,
             inference_image=_TEST_INFERENCE_IMAGE,
         )
 
     mock_client.create_model.assert_called_once_with(
-        ModelName="finops-multimodal-regressor-20260703",
+        ModelName="my-model",
         PrimaryContainer={
             "Image": _TEST_INFERENCE_IMAGE,
             "ModelDataUrl": _TEST_MODEL_DATA_URI,
@@ -211,20 +195,54 @@ def test_sagemaker_resource_deploy_model_version_calls_expected_boto3_apis() -> 
         },
         ExecutionRoleArn="arn:aws:iam::123:role/sm",
     )
-    mock_client.create_endpoint_config.assert_called_once_with(
-        EndpointConfigName="finops-multimodal-regressor-20260703-config",
-        ProductionVariants=[
-            {
-                "VariantName": "AllTraffic",
-                "ModelName": "finops-multimodal-regressor-20260703",
-                "ServerlessConfig": {"MemorySizeInMB": 4096, "MaxConcurrency": 5},
-            }
-        ],
+
+
+def test_sagemaker_resource_run_batch_transform_job() -> None:
+    from src.dagster.resources import SageMakerResource
+
+    mock_client = unittest.mock.MagicMock()
+    mock_client.describe_transform_job.side_effect = [
+        {"TransformJobStatus": "InProgress"},
+        {"TransformJobStatus": "Completed"},
+    ]
+
+    with (
+        unittest.mock.patch(
+            "src.dagster.resources.boto3.client", return_value=mock_client
+        ),
+        unittest.mock.patch("src.dagster.resources.time.sleep") as mock_sleep,
+    ):
+        r = SageMakerResource()
+        r.run_batch_transform_job(
+            job_name="my-job",
+            model_name="my-model",
+            input_s3_uri="s3://in/in.jsonl",
+            output_s3_uri="s3://out/",
+        )
+
+    mock_client.create_transform_job.assert_called_once_with(
+        TransformJobName="my-job",
+        ModelName="my-model",
+        TransformInput={
+            "DataSource": {
+                "S3DataSource": {
+                    "S3DataType": "S3Prefix",
+                    "S3Uri": "s3://in/in.jsonl",
+                }
+            },
+            "ContentType": "application/json",
+            "SplitType": "Line",
+        },
+        TransformOutput={
+            "S3OutputPath": "s3://out/",
+            "AssembleWith": "Line",
+        },
+        TransformResources={
+            "InstanceType": "ml.m5.large",
+            "InstanceCount": 1,
+        },
     )
-    mock_client.update_endpoint.assert_called_once_with(
-        EndpointName="finops-endpoint",
-        EndpointConfigName="finops-multimodal-regressor-20260703-config",
-    )
+    mock_sleep.assert_called_once_with(10)
 
 
 def test_module_singletons_importable() -> None:
@@ -238,4 +256,3 @@ def test_module_singletons_importable() -> None:
     assert resources.load_config is not None
     assert resources.sagemaker_config is not None
     assert resources.ssm is not None
-    assert resources.sagemaker_runtime is not None

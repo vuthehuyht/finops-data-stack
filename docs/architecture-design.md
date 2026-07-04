@@ -34,8 +34,8 @@ Luồng này chạy tự động sau khi thị trường chứng khoán đóng c
     *   Sensor trigger dbt chạy các model Cleaned (ép kiểu, gán metadata `DATACORE_*`).
     *   Chạy tiếp các dbt model Feature Engineering tại tầng Gold (Mart).
 4.  **Data Quality Gate:** Kiểm tra chất lượng bảng `fact_ml_feature_set`. Nếu đạt chuẩn, luồng sẽ tiếp tục.
-5.  **ML Inference (SageMaker Serverless):** Dagster gọi **SageMaker Serverless Endpoint**. Endpoint này tự động scale-to-zero khi không có yêu cầu, giúp tiết kiệm chi phí tối đa.
-6.  **Results Publishing:** Kết quả dự báo được ghi ngược lại vào bảng Redshift Gold và đẩy lên Dashboard.
+5.  **ML Inference (SageMaker Batch Transform):** Dagster xuất dữ liệu feature cần dự đoán lên S3 dưới dạng JSON Lines, sau đó kích hoạt **SageMaker Batch Transform Job**. Job này tự động khởi chạy instance tính toán, thực hiện suy luận hàng loạt và ghi kết quả ngược lại S3, sau đó tự động tắt instance để tối ưu hóa chi phí.
+6.  **Results Publishing:** Kết quả dự báo được tải từ S3 và ghi ngược lại vào bảng Redshift Gold và đẩy lên Dashboard.
 
 ### 4.2. Luồng tái huấn luyện định kỳ (Quarterly Re-training Pipeline)
 Luồng này chạy định kỳ hàng Quý (sau khi các doanh nghiệp công bố đầy đủ BCTC mới).
@@ -44,7 +44,7 @@ Luồng này chạy định kỳ hàng Quý (sau khi các doanh nghiệp công b
 2.  **Training Job (SageMaker):** Khởi chạy SageMaker Training Job (GPU). Sau khi hoàn tất, model artifact (`model.tar.gz`) được đẩy lên **Amazon S3**.
 3.  **Model Registration:** Đăng ký phiên bản mô hình mới vào **SageMaker Model Registry** kèm theo các metrics đánh giá.
 4.  **Model Evaluation & Approval:** So sánh mô hình mới (Challenger) vs mô hình hiện tại (Champion). Nếu đạt yêu cầu, quản trị viên (hoặc auto-approve script) phê duyệt model trong Registry.
-5.  **Serverless Deployment:** Cập nhật SageMaker Serverless Endpoint để sử dụng version mới nhất vừa được phê duyệt.
+5.  **Model Promotion:** Thăng cấp active version của mô hình mới nhất bằng cách lưu version của nó lên SSM Parameter Store (`/finops/model/active_version`), giúp luồng dự báo hàng ngày tự động nhận diện và sử dụng.
 
 ## 5. Phased Implementation Plan
 

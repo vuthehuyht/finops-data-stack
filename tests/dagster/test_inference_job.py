@@ -1,5 +1,6 @@
 """Tests for inference_job.py."""
 
+import json
 import unittest.mock
 
 import dagster
@@ -111,7 +112,7 @@ def _build_ticker_block(ticker: str, end_date: str) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def test_ml_daily_forecast_skips_ticker_on_endpoint_failure_but_continues() -> None:
+def test_ml_daily_forecast_runs_batch_transform_successfully() -> None:
     from src.dagster.inference_job import ml_daily_forecast
 
     df = pd.concat(
@@ -128,31 +129,61 @@ def test_ml_daily_forecast_skips_ticker_on_endpoint_failure_but_continues() -> N
     )
     mock_ssm = unittest.mock.MagicMock()
     mock_ssm.get_parameter.side_effect = lambda name: {
-        "/finops/model/endpoint_name": "finops-endpoint",
         "/finops/model/active_version": "v1",
     }.get(name)
-    mock_runtime = unittest.mock.MagicMock()
-    mock_runtime.invoke_endpoint.side_effect = [
-        {"predicted_return": 0.05},
-        RuntimeError("boom"),
-    ]
+
+    mock_sagemaker = unittest.mock.MagicMock()
+    mock_sagemaker.model_artifacts_bucket = "finops-model-artifacts-dev"
+
+    mock_s3bucket = unittest.mock.MagicMock()
+    mock_s3bucket.raw_bucket = "finops-raw-bucket-dev"
+
+    mock_s3 = unittest.mock.MagicMock()
+    mock_s3_client = unittest.mock.MagicMock()
+    mock_s3.get_client.return_value = mock_s3_client
+
+    # Mock S3 download_file để viết file out giả lập kết quả dự đoán
+    def mock_download(bucket, key, local_path):
+        with open(local_path, "w", encoding="utf-8") as f:
+            f.write(json.dumps({"predicted_return": 0.05}) + "\n")
+            f.write(json.dumps({"predicted_return": -0.02}) + "\n")
+
+    mock_s3_client.download_file.side_effect = mock_download
+
     context = dagster.build_asset_context()
 
     with unittest.mock.patch("src.dagster.inference_job.pd.read_sql", return_value=df):
         result = ml_daily_forecast(
-            context, "2026-07-03", mock_redshift, mock_ssm, mock_runtime
+            context,
+            "2026-07-03",
+            mock_redshift,
+            mock_ssm,
+            mock_sagemaker,
+            mock_s3bucket,
+            mock_s3,
         )
 
     assert result.value["trading_date"] == "2026-07-03"
     assert result.value["model_version"] == "v1"
-    assert len(result.value["results"]) == 1
+    assert len(result.value["results"]) == 2
     assert result.value["results"][0]["ticker"] == "AAA"
+    assert result.value["results"][0]["predicted_return"] == 0.05
+    assert result.value["results"][1]["ticker"] == "BBB"
+    assert result.value["results"][1]["predicted_return"] == -0.02
+
+    mock_sagemaker.create_model_if_not_exists.assert_called_once_with(
+        model_name="v1",
+        model_data_s3_uri="s3://finops-model-artifacts-dev/finops-multimodal-regressor/v1/model.tar.gz",
+        inference_image=unittest.mock.ANY,
+    )
+    mock_sagemaker.run_batch_transform_job.assert_called_once()
 
 
-def test_ml_daily_forecast_raises_when_all_tickers_fail() -> None:
+def test_ml_daily_forecast_raises_when_no_valid_tickers() -> None:
     from src.dagster.inference_job import ml_daily_forecast
 
-    df = _build_ticker_block("AAA", "2026-07-03")
+    # Ticker rỗng
+    df = pd.DataFrame(columns=["TICKER", "TRADING_DATE"])
 
     mock_redshift = unittest.mock.MagicMock()
     mock_redshift.get_connection.return_value.__enter__.return_value = (
@@ -160,17 +191,26 @@ def test_ml_daily_forecast_raises_when_all_tickers_fail() -> None:
     )
     mock_ssm = unittest.mock.MagicMock()
     mock_ssm.get_parameter.side_effect = lambda name: {
-        "/finops/model/endpoint_name": "finops-endpoint",
         "/finops/model/active_version": "v1",
     }.get(name)
-    mock_runtime = unittest.mock.MagicMock()
-    mock_runtime.invoke_endpoint.side_effect = RuntimeError("boom")
+
+    mock_sagemaker = unittest.mock.MagicMock()
+    mock_sagemaker.model_artifacts_bucket = "finops-model-artifacts-dev"
+    mock_s3bucket = unittest.mock.MagicMock()
+    mock_s3 = unittest.mock.MagicMock()
+
     context = dagster.build_asset_context()
 
     with unittest.mock.patch("src.dagster.inference_job.pd.read_sql", return_value=df):
-        with pytest.raises(ValueError, match="failed inference"):
+        with pytest.raises(ValueError, match="No tickers had valid features"):
             ml_daily_forecast(
-                context, "2026-07-03", mock_redshift, mock_ssm, mock_runtime
+                context,
+                "2026-07-03",
+                mock_redshift,
+                mock_ssm,
+                mock_sagemaker,
+                mock_s3bucket,
+                mock_s3,
             )
 
 

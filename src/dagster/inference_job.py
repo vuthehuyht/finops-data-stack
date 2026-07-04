@@ -1,17 +1,23 @@
 """Dagster assets, job, and sensor for the ML daily inference pipeline."""
 
 import datetime
+import json
+import os
+import tempfile
+import time
 from dataclasses import dataclass, field
 
 import dagster
 import pandas as pd
 import pydantic
+from dagster_aws.s3 import S3Resource
 
 import src.pipeline.dagster as dagster_lib
 from src.common.redshift_util import execute_query
 from src.dagster.resources import (
     RedshiftResource,
-    SageMakerRuntimeResource,
+    S3BucketResource,
+    SageMakerResource,
     SsmParameterResource,
 )
 from src.ml.config import (
@@ -19,12 +25,15 @@ from src.ml.config import (
     TABULAR_FEATURE_COLUMNS,
     WINDOW_SIZE,
 )
+from src.ml.evaluation import model_version_prefix
 from src.ml.inference import build_latest_window, check_feature_null_rate
 
 _FEATURE_TABLE = "MART.FACT_ML_FEATURE_SET"
 _FORECAST_TABLE = "MART.FCT_ML_FORECAST_RESULTS"
-_ENDPOINT_NAME_PARAM = "/finops/model/endpoint_name"
 _ACTIVE_VERSION_PARAM = "/finops/model/active_version"
+_INFERENCE_IMAGE = (
+    "763104351884.dkr.ecr.ap-southeast-1.amazonaws.com/pytorch-inference:2.2-cpu-py310"
+)
 _LOOKBACK_DAYS = 90  # comfortably covers WINDOW_SIZE=30 trading days
 
 _DATA_QUALITY_GATE_ASSET_KEY = dagster_lib.asset_key(["ML", "ML_DATA_QUALITY_GATE"])
@@ -107,24 +116,40 @@ def ml_data_quality_gate(
 @dagster_lib.asset(
     key=_DAILY_FORECAST_ASSET_KEY,
     group_name="ML",
-    kinds={"python", "redshift", "sagemaker"},
+    kinds={"python", "redshift", "sagemaker", "s3"},
     ins={"trading_date": dagster.AssetIn(key=_DATA_QUALITY_GATE_ASSET_KEY)},
     description=(
-        "Call the SageMaker endpoint once per ticker to forecast LABEL_NEXT_5D_RETURN."
+        "Run SageMaker Batch Transform (Serverless Batch) to forecast "
+        "LABEL_NEXT_5D_RETURN for each ticker."
     ),
 )
-def ml_daily_forecast(
+def ml_daily_forecast(  # noqa: C901
     context: dagster.AssetExecutionContext,
     trading_date: str,
     redshift: RedshiftResource,
     ssm: SsmParameterResource,
-    sagemaker_runtime: SageMakerRuntimeResource,
+    sagemaker: SageMakerResource,
+    s3bucket: S3BucketResource,
+    s3: S3Resource,
 ) -> dagster.Output[dict]:
-    """Forecast every ticker on `trading_date`; tolerate per-ticker failures."""
-    endpoint_name = ssm.get_parameter(_ENDPOINT_NAME_PARAM)
-    if endpoint_name is None:
-        raise ValueError(f"SSM parameter {_ENDPOINT_NAME_PARAM} is not set.")
-    model_version = ssm.get_parameter(_ACTIVE_VERSION_PARAM) or "unknown"
+    """Forecast every ticker on `trading_date` using SageMaker Batch Transform."""
+    model_version = ssm.get_parameter(_ACTIVE_VERSION_PARAM)
+    if model_version is None:
+        raise ValueError(f"SSM parameter {_ACTIVE_VERSION_PARAM} is not set.")
+
+    # 1. Đảm bảo model đã được đăng ký trên SageMaker
+    model_data_s3_uri = (
+        f"s3://{sagemaker.model_artifacts_bucket}/"
+        f"{model_version_prefix(model_version)}model.tar.gz"
+    )
+    try:
+        sagemaker.create_model_if_not_exists(
+            model_name=model_version,
+            model_data_s3_uri=model_data_s3_uri,
+            inference_image=_INFERENCE_IMAGE,
+        )
+    except Exception as exc:
+        raise RuntimeError(f"Failed to ensure SageMaker model exists: {exc}") from exc
 
     validated_date = _validate_iso_date(trading_date)
     lower_bound = (
@@ -144,19 +169,77 @@ def ml_daily_forecast(
     tickers = sorted(
         df.loc[df["TRADING_DATE"] == pd.Timestamp(validated_date), "TICKER"].unique()
     )
-    results: list[dict] = []
-    for ticker in tickers:
+
+    results = []
+    with tempfile.TemporaryDirectory() as tmpdir:
+        local_input_path = os.path.join(tmpdir, "input.jsonl")
+
+        valid_tickers = []
+        with open(local_input_path, "w", encoding="utf-8") as f_in:
+            for ticker in tickers:
+                try:
+                    sequence, tabular = build_latest_window(df, ticker, WINDOW_SIZE)
+                    payload = {
+                        "ticker": ticker,
+                        "sequence": sequence.tolist(),
+                        "tabular": tabular.tolist(),
+                    }
+                    f_in.write(json.dumps(payload) + "\n")
+                    valid_tickers.append(ticker)
+                except Exception as exc:
+                    context.log.warning(
+                        "Skip preparing features for ticker %s: %s", ticker, exc
+                    )
+
+        if not valid_tickers:
+            raise ValueError("No tickers had valid features to forecast.")
+
+        # 3. Upload file JSONL lên S3
+        input_key = f"ml-inference-input/{validated_date}/input.jsonl"
+        s3_client = s3.get_client()
+        s3_client.upload_file(local_input_path, s3bucket.raw_bucket, input_key)
+
+        # 4. Chạy Batch Transform Job
+        input_s3_uri = f"s3://{s3bucket.raw_bucket}/{input_key}"
+        output_prefix = f"ml-inference-output/{validated_date}/"
+        output_s3_uri = f"s3://{s3bucket.raw_bucket}/{output_prefix}"
+        job_name = f"finops-forecast-{validated_date}-{int(time.time())}"
+
+        context.log.info("Starting SageMaker Batch Transform Job: %s", job_name)
         try:
-            sequence, tabular = build_latest_window(df, ticker, WINDOW_SIZE)
-            payload = {"sequence": sequence.tolist(), "tabular": tabular.tolist()}
-            response = sagemaker_runtime.invoke_endpoint(endpoint_name, payload)
-            results.append(
-                {"ticker": ticker, "predicted_return": response["predicted_return"]}
+            sagemaker.run_batch_transform_job(
+                job_name=job_name,
+                model_name=model_version,
+                input_s3_uri=input_s3_uri,
+                output_s3_uri=output_s3_uri,
             )
         except Exception as exc:
-            # Per-ticker tolerance is intentional (spec §4.2/§9): one bad
-            # ticker must not abort the whole run. Logged, not swallowed.
-            context.log.warning("Forecast failed for ticker %s: %s", ticker, exc)
+            raise RuntimeError(f"Failed to run Batch Transform Job: {exc}") from exc
+
+        # 5. Tải kết quả đầu ra về local
+        output_key = f"{output_prefix}input.jsonl.out"
+        local_output_path = os.path.join(tmpdir, "output.jsonl.out")
+        s3_client.download_file(s3bucket.raw_bucket, output_key, local_output_path)
+
+        # 6. Đọc kết quả và khớp với ticker
+        with open(local_output_path, encoding="utf-8") as f_out:
+            for ticker, line_out in zip(valid_tickers, f_out, strict=False):
+                if not line_out.strip():
+                    continue
+                try:
+                    prediction = json.loads(line_out)
+                    results.append(
+                        {
+                            "ticker": ticker,
+                            "predicted_return": prediction["predicted_return"],
+                        }
+                    )
+                except Exception as exc:
+                    context.log.warning(
+                        "Failed to parse prediction for ticker %s: %s",
+                        ticker,
+                        exc,
+                    )
 
     if not results:
         raise ValueError(f"All {len(tickers)} tickers failed inference; aborting.")
