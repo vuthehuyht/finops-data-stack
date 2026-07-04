@@ -1,0 +1,150 @@
+name: Deploy Dagster to EKS
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'infrastructure/helm/values.yaml'
+      - 'infrastructure/terraform/**'
+
+concurrency:
+  group: deploy-dagster-to-eks
+  cancel-in-progress: false
+
+jobs:
+  # github.event.head_commit.modified only reflects the single head commit of
+  # the push (misses multi-commit pushes and can be empty on some merge
+  # commits) and contains() on that array only matches whole elements, not
+  # path prefixes -- dorny/paths-filter diffs the actual push range and
+  # supports glob patterns, so it is used here instead for both jobs' gates.
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      helm: ${{ steps.filter.outputs.helm }}
+      terraform: ${{ steps.filter.outputs.terraform }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            helm:
+              - 'infrastructure/helm/values.yaml'
+            terraform:
+              - 'infrastructure/terraform/**'
+
+  deploy-app:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.helm == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ap-southeast-1
+
+      - name: Terraform Init (read remote state, no apply)
+        working-directory: ./infrastructure/terraform
+        run: terraform init
+
+      - name: Read Terraform outputs
+        id: tf-outputs
+        working-directory: ./infrastructure/terraform
+        run: |
+          {
+            echo "eks_cluster_name=$(terraform output -raw eks_cluster_name)"
+            echo "ecr_repository_url=$(terraform output -raw ecr_repository_url)"
+            echo "rds_address=$(terraform output -raw rds_address)"
+            echo "rds_username=$(terraform output -raw rds_username)"
+            echo "rds_dbname=$(terraform output -raw rds_dbname)"
+            echo "dagster_sa_role_arn=$(terraform output -raw dagster_sa_role_arn)"
+            echo "external_secrets_sa_role_arn=$(terraform output -raw external_secrets_sa_role_arn)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Deploy Dagster to EKS
+        uses: ./.github/actions/deploy-dagster-to-eks
+        with:
+          aws-role-arn: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          eks-cluster-name: ${{ steps.tf-outputs.outputs.eks_cluster_name }}
+          ecr-repository-url: ${{ steps.tf-outputs.outputs.ecr_repository_url }}
+          rds-address: ${{ steps.tf-outputs.outputs.rds_address }}
+          rds-username: ${{ steps.tf-outputs.outputs.rds_username }}
+          rds-dbname: ${{ steps.tf-outputs.outputs.rds_dbname }}
+          dagster-sa-role-arn: ${{ steps.tf-outputs.outputs.dagster_sa_role_arn }}
+          external-secrets-sa-role-arn: ${{ steps.tf-outputs.outputs.external_secrets_sa_role_arn }}
+
+  deploy-infra:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.terraform == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ap-southeast-1
+
+      - name: Terraform Init
+        working-directory: ./infrastructure/terraform
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: ./infrastructure/terraform
+        run: terraform apply -auto-approve
+
+      - name: Read Terraform outputs
+        id: tf-outputs
+        working-directory: ./infrastructure/terraform
+        run: |
+          {
+            echo "eks_cluster_name=$(terraform output -raw eks_cluster_name)"
+            echo "ecr_repository_url=$(terraform output -raw ecr_repository_url)"
+            echo "rds_address=$(terraform output -raw rds_address)"
+            echo "rds_username=$(terraform output -raw rds_username)"
+            echo "rds_dbname=$(terraform output -raw rds_dbname)"
+            echo "dagster_sa_role_arn=$(terraform output -raw dagster_sa_role_arn)"
+            echo "external_secrets_sa_role_arn=$(terraform output -raw external_secrets_sa_role_arn)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Deploy Dagster to EKS
+        uses: ./.github/actions/deploy-dagster-to-eks
+        with:
+          aws-role-arn: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          eks-cluster-name: ${{ steps.tf-outputs.outputs.eks_cluster_name }}
+          ecr-repository-url: ${{ steps.tf-outputs.outputs.ecr_repository_url }}
+          rds-address: ${{ steps.tf-outputs.outputs.rds_address }}
+          rds-username: ${{ steps.tf-outputs.outputs.rds_username }}
+          rds-dbname: ${{ steps.tf-outputs.outputs.rds_dbname }}
+          dagster-sa-role-arn: ${{ steps.tf-outputs.outputs.dagster_sa_role_arn }}
+          external-secrets-sa-role-arn: ${{ steps.tf-outputs.outputs.external_secrets_sa_role_arn }}

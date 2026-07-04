@@ -1,0 +1,436 @@
+# Helm values for the official Dagster chart (https://github.com/dagster-io/dagster/blob/master/helm/dagster/values.yaml),
+# customized for FinOps Data Stack running on EKS. Deploy with:
+#   helm repo add dagster https://dagster-io.github.io/helm
+#   helm upgrade --install dagster dagster/dagster -n dagster -f infrastructure/helm/values.yaml \
+#     --set dagster-user-deployments.deployments[0].image.repository=<ecr_repository_url> \
+#     --set dagster-user-deployments.deployments[0].image.tag=<image_tag> \
+#     --set postgresql.postgresqlHost=<rds_address> \
+#     --set postgresql.postgresqlUsername=<rds_username> \
+#     --set postgresql.postgresqlDatabase=<rds_dbname>
+#
+# PLACEHOLDER_* values below are filled in by the CI/CD deploy pipeline via
+# --set, sourced from Terraform outputs (infrastructure/terraform/outputs.tf:
+# ecr_repository_url; infrastructure/terraform/modules/rds/outputs.tf:
+# rds_instance_address/rds_username/rds_dbname). Never hardcode secrets here —
+# the RDS password is read from an existing k8s Secret (global.postgresqlSecretName),
+# not from this file. See "Out of scope" note near the bottom.
+---
+global:
+  dagsterHome: "/opt/dagster/dagster_home"
+
+  # Reuse the IRSA-bound ServiceAccount already created by Terraform
+  # (infrastructure/terraform/modules/eks/main.tf: aws_iam_role.dagster_service_account,
+  # trust policy allows system:serviceaccount:dagster:dagster-sa) instead of
+  # letting the chart create its own. Grants webserver/daemon/run pods the
+  # IAM permissions (S3 compute logs, SageMaker, SSM) via IRSA.
+  serviceAccountName: "dagster-sa"
+
+  # Name of the k8s Secret holding the RDS password, key "postgresql-password"
+  # (required key name per the chart's own templates/secret-postgres.yaml).
+  # Created by the deploy pipeline from the AWS Secrets Manager "credentials"
+  # secret — out of scope for this file, see note near the bottom.
+  postgresqlSecretName: "dagster-pg-credentials"
+
+nameOverride: ""
+fullnameOverride: ""
+rbacEnabled: true
+imagePullSecrets: []
+
+####################################################################################################
+# Dagster Webserver
+####################################################################################################
+dagsterWebserver:
+  replicaCount: 1
+  image:
+    repository: "docker.io/dagster/dagster-k8s"
+    tag: "1.13.10" # match dagster==1.13.10 pinned in pyproject.toml
+    pullPolicy: Always
+
+  service:
+    type: ClusterIP
+    port: 80
+    annotations: {}
+
+  # Workspace is wired automatically by the dagster-user-deployments subchart
+  # below (it generates the workspace ConfigMap pointing at our gRPC server).
+  workspace:
+    enabled: false
+
+  env:
+    - name: AWS_REGION
+      value: "ap-southeast-1"
+
+  # Always-on — runs on the Core node group (On-Demand, t3a.medium), not the
+  # Spot Worker group. `node-group: core` matches the node-group label added
+  # to aws_eks_node_group in Terraform — see "Out of scope" note near the bottom.
+  nodeSelector:
+    node-group: core
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+
+  readinessProbe:
+    httpGet:
+      path: "/server_info"
+      port: 80
+    periodSeconds: 20
+    timeoutSeconds: 10
+    successThreshold: 1
+    failureThreshold: 3
+
+  livenessProbe: {}
+  startupProbe:
+    enabled: false
+
+####################################################################################################
+# Compute Log Manager — S3 (finops-data-lake-processed), so run pod stdout/stderr
+# survive Spot Worker node termination.
+####################################################################################################
+computeLogManager:
+  type: S3ComputeLogManager
+  config:
+    s3ComputeLogManager:
+      bucket: finops-data-lake-processed
+      prefix: dagster-compute-logs
+      region: ap-southeast-1
+
+pythonLogs: {}
+
+####################################################################################################
+# User Code Deployments — hosts our Dagster definitions (src/dagster/workspace.py, module
+# "src.dagster.workspace" per pyproject.toml [tool.dagster]) as a gRPC server that the
+# webserver/daemon/run pods talk to.
+####################################################################################################
+dagster-user-deployments:
+  enabled: true
+  enableSubchart: true
+  imagePullSecrets: []
+
+  deployments:
+    - name: "finops-user-code"
+      image:
+        # Filled by CI/CD from `terraform output ecr_repository_url`.
+        repository: "PLACEHOLDER_ECR_REPOSITORY_URL"
+        tag: ~ # filled by CI/CD with the built image tag
+        pullPolicy: Always
+
+      dagsterApiGrpcArgs:
+        - "-m"
+        - "src.dagster.workspace"
+      port: 3030
+      replicaCount: 1
+
+      includeConfigInLaunchedRuns:
+        enabled: true
+
+      # Redshift creds injected directly from the "dagster-pg-credentials" k8s
+      # Secret (kept in sync from AWS Secrets Manager by External Secrets
+      # Operator, see src/k8s/manifest/external-secrets/) — src/common/
+      # redshift_util.py reads these env vars directly, no boto3 call at
+      # runtime. Renamed via valueFrom.secretKeyRef because the Secret's own
+      # keys are lowercase (redshift_host, ...) and the app expects uppercase.
+      env:
+        - name: AWS_REGION
+          value: "ap-southeast-1"
+        - name: REDSHIFT_HOST
+          valueFrom:
+            secretKeyRef:
+              name: dagster-pg-credentials
+              key: redshift_host
+        - name: REDSHIFT_USER
+          valueFrom:
+            secretKeyRef:
+              name: dagster-pg-credentials
+              key: redshift_username
+        - name: REDSHIFT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: dagster-pg-credentials
+              key: redshift_password
+        - name: REDSHIFT_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: dagster-pg-credentials
+              key: redshift_dbname
+
+      # Always-on gRPC server serving definitions — runs on Core, same as
+      # webserver/daemon (see nodeSelector note there).
+      nodeSelector:
+        node-group: core
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "512Mi"
+        limits:
+          cpu: "500m"
+          memory: "1Gi"
+
+      readinessProbe:
+        enabled: true
+        periodSeconds: 20
+        timeoutSeconds: 10
+        successThreshold: 1
+        failureThreshold: 1
+
+      livenessProbe: {}
+      startupProbe:
+        enabled: false
+
+####################################################################################################
+# Scheduler
+####################################################################################################
+scheduler:
+  type: DagsterDaemonScheduler
+  config: {}
+
+####################################################################################################
+# Run Launcher — K8sRunLauncher, spawns one k8s Job per run.
+####################################################################################################
+runLauncher:
+  type: K8sRunLauncher
+
+  config:
+    k8sRunLauncher:
+      imagePullPolicy: "Always"
+      # By default the chart uses the release namespace; set explicitly to
+      # match the IRSA trust policy (system:serviceaccount:dagster:dagster-sa),
+      # so this chart must be installed with `helm ... -n dagster`.
+      jobNamespace: "dagster"
+      loadInclusterConfig: true
+
+      envVars:
+        - "AWS_REGION=ap-southeast-1"
+
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "512Mi"
+        limits:
+          cpu: "1"
+          memory: "1Gi"
+
+      failPodOnRunFailure: false
+
+      # Raw pod spec override (rendered verbatim into dagster.yaml's
+      # run_launcher.config.run_k8s_config.pod_spec_config, merged into the
+      # launched pod's V1PodSpec) so run pods land on the Worker Spot node
+      # group (infrastructure/terraform/modules/eks/main.tf,
+      # aws_eks_node_group.worker_workload). The taint spotWorker=true:NoSchedule
+      # already exists there and is matched below; the node-group: worker
+      # label matches the node-group label added to aws_eks_node_group in
+      # Terraform — see "Out of scope" note near the bottom.
+      runK8sConfig:
+        podSpecConfig:
+          nodeSelector:
+            node-group: worker
+          tolerations:
+            - key: "spotWorker"
+              operator: "Equal"
+              value: "true"
+              effect: "NoSchedule"
+        # Redshift creds for the run's main container — same rationale as
+        # dagster-user-deployments.deployments[0].env above (renamed from the
+        # k8s Secret's lowercase keys to the uppercase names the app reads).
+        containerConfig:
+          env:
+            - name: REDSHIFT_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: dagster-pg-credentials
+                  key: redshift_host
+            - name: REDSHIFT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: dagster-pg-credentials
+                  key: redshift_username
+            - name: REDSHIFT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: dagster-pg-credentials
+                  key: redshift_password
+            - name: REDSHIFT_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: dagster-pg-credentials
+                  key: redshift_dbname
+
+####################################################################################################
+# PostgreSQL — external RDS instance (aws_db_instance.dagster_meta), not chart-managed.
+####################################################################################################
+postgresql:
+  enabled: false # use the existing RDS instance, not a chart-managed PostgreSQL pod
+
+  # Filled by CI/CD from Terraform outputs (infrastructure/terraform/modules/rds/outputs.tf:
+  # rds_instance_address, rds_username, rds_dbname). None of these three are secret values.
+  postgresqlHost: "PLACEHOLDER_RDS_HOST"
+  postgresqlUsername: "PLACEHOLDER_RDS_USERNAME"
+  postgresqlDatabase: "PLACEHOLDER_RDS_DBNAME"
+
+  service:
+    port: 5432
+
+# We manage the RDS password ourselves via global.postgresqlSecretName
+# (key "postgresql-password") — do not let the chart generate a secret from
+# a plaintext password value in this file (that's what
+# generatePostgresqlPasswordSecret: true would do).
+generatePostgresqlPasswordSecret: false
+generateCeleryConfigSecret: false # not using Celery — see runLauncher above
+
+####################################################################################################
+# RabbitMQ / Redis / Flower — only used by CeleryK8sRunLauncher. Not used here: this project
+# uses K8sRunLauncher (see runLauncher above), one plain k8s Job per run, no Celery broker.
+####################################################################################################
+rabbitmq:
+  enabled: false
+
+redis:
+  enabled: false
+  internal: false
+
+flower:
+  enabled: false
+
+####################################################################################################
+# Ingress — disabled. No ALB/ingress controller is provisioned in Terraform; access the
+# webserver via `kubectl port-forward` until one is added.
+####################################################################################################
+ingress:
+  enabled: false
+
+####################################################################################################
+# Dagster Daemon — runs schedules, sensors, and the run queue.
+####################################################################################################
+dagsterDaemon:
+  enabled: true
+
+  image:
+    repository: "docker.io/dagster/dagster-k8s"
+    tag: "1.13.10"
+    pullPolicy: Always
+
+  heartbeatTolerance: 1800
+
+  runCoordinator:
+    enabled: true
+    type: QueuedRunCoordinator
+    config:
+      queuedRunCoordinator:
+        # Matches max_size = 3 of the Worker Spot node group — avoids run
+        # pods pending due to insufficient nodes.
+        maxConcurrentRuns: 3
+        tagConcurrencyLimits: []
+        dequeueUseThreads: true
+        dequeueNumWorkers: 4
+
+  runMonitoring:
+    enabled: true
+    startTimeoutSeconds: 300
+    pollIntervalSeconds: 120
+    # Retry once with a new run worker if the Spot Worker node hosting a run
+    # is reclaimed mid-run, instead of failing the run outright (Worker node
+    # group is capacity_type = SPOT, see infrastructure/terraform/modules/eks).
+    maxResumeRunAttempts: 1
+    freeSlotsAfterRunEndSeconds: 0
+
+  runRetries:
+    enabled: true
+    maxRetries: 0
+
+  sensors:
+    useThreads: true
+    numWorkers: 4
+
+  schedules:
+    useThreads: true
+    numWorkers: 4
+
+  env:
+    - name: AWS_REGION
+      value: "ap-southeast-1"
+
+  # Always-on — runs on the Core node group, same as webserver. `node-group: core`
+  # matches the node-group label added to aws_eks_node_group in Terraform —
+  # see "Out of scope" note near the bottom.
+  nodeSelector:
+    node-group: core
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+
+  livenessProbe: {}
+  readinessProbe: {}
+  startupProbe: {}
+
+####################################################################################################
+# busybox — used by the chart's own DB-readiness init containers.
+####################################################################################################
+busybox:
+  image:
+    repository: "docker.io/busybox"
+    tag: "1.28"
+    pullPolicy: "IfNotPresent"
+
+extraManifests: []
+
+# One-off instance migration job — leave disabled by default; enable only when
+# running `helm upgrade` after a Dagster version bump that requires a schema migration.
+# See: https://docs.dagster.io/deployment/guides/kubernetes/how-to-migrate-your-instance
+migrate:
+  enabled: false
+
+####################################################################################################
+# Telemetry — disabled, matching this project's convention (see .agents/, and the original
+# hand-written dagster.yaml this file replaces).
+####################################################################################################
+telemetry:
+  enabled: false
+
+serviceAccount:
+  # Do not create a new ServiceAccount — reuse the IRSA-bound "dagster-sa"
+  # via global.serviceAccountName above. rbacEnabled above still grants
+  # dagster-sa the Role permissions it needs (create Jobs/Pods, read Secrets)
+  # via a RoleBinding the chart creates regardless of serviceAccount.create.
+  create: false
+  name: ""
+  annotations: {}
+
+retention:
+  enabled: false
+
+concurrency:
+  enabled: false
+
+# [DEPRECATED by the upstream chart] pipelineRun — superseded by
+# dagster-user-deployments above; intentionally omitted.
+
+additionalInstanceConfig: {}
+
+####################################################################################################
+# Out of scope for this file (tracked as follow-up infra work, not implemented here):
+#
+# 1. Create the k8s Secret "dagster-pg-credentials" (global.postgresqlSecretName above) with a
+#    single key "postgresql-password", synced from the AWS Secrets Manager "credentials" secret
+#    (infrastructure/terraform/modules/secrets). Required key name verified against the chart's
+#    own templates/secret-postgres.yaml.
+# 2. [DONE] "node-group: core"/"node-group: worker" labels added to
+#    aws_eks_node_group.core_system/worker_workload in
+#    infrastructure/terraform/modules/eks/main.tf — nodeSelector fields above
+#    now match real infra. The worker group's taint (spotWorker=true:NoSchedule)
+#    already existed and is matched by the toleration under runLauncher above.
+# 3. CI/CD wiring to fill every PLACEHOLDER_* value above via `helm --set` from Terraform outputs
+#    at deploy time (ecr_repository_url, rds_instance_address/rds_username/rds_dbname).
+# 4. `helm repo add dagster https://dagster-io.github.io/helm` + chart version pin — this project
+#    does not vendor the chart, it is installed from the upstream Dagster Helm repo.
+# 5. Create the k8s ServiceAccount "dagster-sa" (global.serviceAccountName above), annotated with
+#    eks.amazonaws.com/role-arn = module.eks.dagster_sa_role_arn (the IRSA role Terraform creates).
+#    Not created by Terraform (which only creates the IAM role, not the k8s object) or by the Helm
+#    chart (serviceAccount.create is false above) — must be created by the deploy pipeline.
+####################################################################################################
