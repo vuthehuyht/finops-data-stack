@@ -51,6 +51,18 @@ def test_define_ml_jobs_returns_bundle_with_three_assets() -> None:
     assert isinstance(bundle, MlJobBundle)
     assert len(bundle.assets) == 3
     assert len(bundle.jobs) == 1
+    assert len(bundle.schedules) == 1
+
+
+def test_ml_quarterly_retrain_job_schedule_runs_on_first_of_each_quarter() -> None:
+    from src.dagster.ml_job import define_ml_jobs
+
+    bundle = define_ml_jobs()
+    schedule = bundle.schedules[0]
+    assert schedule.name == "ml_quarterly_retrain_job_schedule"
+    assert schedule.cron_schedule == "0 2 1 1,4,7,10 *"
+    assert schedule.execution_timezone == "Asia/Ho_Chi_Minh"
+    assert schedule.job_name == "ml_quarterly_retrain_job"
 
 
 def test_define_ml_jobs_asset_keys() -> None:

@@ -26,7 +26,7 @@ Data Mesh / Lakehouse architecture on AWS, orchestrated by **Dagster** (Software
 6. Results Publishing: `COPY` the Batch Transform output file directly into Redshift Gold (`FCT_ML_FORECAST_RESULTS`, delete-then-insert by `TRADING_DATE` for idempotency) + dashboard.
 
 ### 2. Quarterly Re-training Pipeline (after new financial statements are published)
-1. Historical Data Preparation: aggregate feature set from the last 12-24 months from Redshift.
+1. Historical Data Preparation: export the full history of `FACT_ML_FEATURE_SET` from Redshift (no lookback filter — dataset is small enough that a window isn't needed).
 2. Training Job (SageMaker GPU) → model artifact pushed to S3.
 3. Model Registration: version the model on S3 (`<model_name>/<version>/model.tar.gz` + `metadata.json` with evaluation metrics) — not SageMaker Model Registry.
 4. Model Evaluation & Approval: compare Challenger vs Champion.

@@ -40,7 +40,7 @@ Luồng này chạy tự động sau khi thị trường chứng khoán đóng c
 ### 4.2. Luồng tái huấn luyện định kỳ (Quarterly Re-training Pipeline)
 Luồng này chạy định kỳ hàng Quý (sau khi các doanh nghiệp công bố đầy đủ BCTC mới).
 
-1.  **Historical Data Preparation:** Thu thập và tổng hợp dữ liệu Feature Set của 12-24 tháng gần nhất từ Redshift.
+1.  **Historical Data Preparation:** Xuất toàn bộ lịch sử `FACT_ML_FEATURE_SET` từ Redshift (không lọc theo lookback — dữ liệu đủ nhỏ nên không cần giới hạn cửa sổ thời gian).
 2.  **Training Job (SageMaker):** Khởi chạy SageMaker Training Job (GPU). Sau khi hoàn tất, model artifact (`model.tar.gz`) được đẩy lên **Amazon S3**.
 3.  **Model Registration:** Versioning model bằng cấu trúc thư mục trên S3 (`s3://finops-model-artifacts/<model_name>/<version>/`, gồm `model.tar.gz` + `metadata.json` chứa metrics đánh giá) — không dùng SageMaker Model Registry API.
 4.  **Model Evaluation & Approval:** So sánh mô hình mới (Challenger) vs mô hình hiện tại (Champion). Nếu đạt yêu cầu, quản trị viên (hoặc auto-approve script) phê duyệt model trong Registry.

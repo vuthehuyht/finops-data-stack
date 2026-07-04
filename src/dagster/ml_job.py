@@ -28,6 +28,12 @@ from src.ml.training_job import launch_training_job
 _ACTIVE_VERSION_PARAM = "/finops/model/active_version"
 _EVALUATION_THRESHOLD_PARAM = "/finops/model/evaluation_threshold"
 
+_TIMEZONE = "Asia/Ho_Chi_Minh"
+# 02:00 ICT on the 1st day of each quarter (Jan/Apr/Jul/Oct) — the job can
+# still be launched manually at any time via the Dagster UI regardless of
+# this schedule.
+_QUARTERLY_CRON = "0 2 1 1,4,7,10 *"
+
 _TRAINING_DATASET_ASSET_KEY = dagster_lib.asset_key(["ML", "GOLD_ML_TRAINING_DATASET"])
 _TRAINING_JOB_ASSET_KEY = dagster_lib.asset_key(["ML", "ML_TRAINING_JOB"])
 _MODEL_EVALUATION_ASSET_KEY = dagster_lib.asset_key(["ML", "ML_MODEL_EVALUATION"])
@@ -39,6 +45,7 @@ class MlJobBundle:
 
     assets: list[dagster.AssetsDefinition] = field(default_factory=list)
     jobs: list[dagster.JobDefinition] = field(default_factory=list)
+    schedules: list[dagster.ScheduleDefinition] = field(default_factory=list)
 
 
 class MlTrainingDatasetConfig(dagster.Config):
@@ -255,4 +262,14 @@ def define_ml_jobs() -> MlJobBundle:
         ],
         tags={"type": "ml"},
     )
-    return MlJobBundle(assets=assets, jobs=[job])
+    schedule = dagster.ScheduleDefinition(
+        job=job,
+        cron_schedule=_QUARTERLY_CRON,
+        execution_timezone=_TIMEZONE,
+        name="ml_quarterly_retrain_job_schedule",
+        description=(
+            "Quarterly ML re-training schedule (1st of Jan/Apr/Jul/Oct). "
+            "The job can also be launched manually via the Dagster UI at any time."
+        ),
+    )
+    return MlJobBundle(assets=assets, jobs=[job], schedules=[schedule])

@@ -9,30 +9,34 @@ from typing import Any
 from src.common.redshift_util import execute_query
 
 _SOURCE_TABLE = "MART.FACT_ML_FEATURE_SET"
-_DEFAULT_LOOKBACK_MONTHS = 24
 
 
-def _date_filter_clause(lookback_months: int) -> str:
+def _date_filter_clause(lookback_months: int | None) -> str:
     """Build the WHERE clause for filtering by lookback months.
 
     Args:
-        lookback_months: Number of months of history to include.
+        lookback_months: Number of months of history to include, or `None`
+            for the full history (no filter — `FACT_ML_FEATURE_SET` is
+            small enough that a lookback window isn't needed).
 
     Returns:
-        A WHERE clause string.
+        A WHERE clause string, or an empty string if `lookback_months` is `None`.
     """
+    if lookback_months is None:
+        return ""
     return f"WHERE TRADING_DATE >= DATEADD(month, -{lookback_months}, CURRENT_DATE)"
 
 
 def build_unload_query(
-    s3_url: str, iam_role_arn: str, lookback_months: int = _DEFAULT_LOOKBACK_MONTHS
+    s3_url: str, iam_role_arn: str, lookback_months: int | None = None
 ) -> str:
-    """Build a Redshift UNLOAD query exporting recent ML training data to S3.
+    """Build a Redshift UNLOAD query exporting ML training data to S3.
 
     Args:
         s3_url: Destination S3 prefix (must start with "s3://").
         iam_role_arn: IAM Role ARN authorizing Redshift to write to S3.
-        lookback_months: Number of months of history to include.
+        lookback_months: Number of months of history to include, or `None`
+            (default) for the full history.
 
     Returns:
         A complete UNLOAD SQL statement.
@@ -45,7 +49,7 @@ def build_unload_query(
 
     select_query = (
         f"SELECT * FROM {_SOURCE_TABLE} {_date_filter_clause(lookback_months)}"
-    )
+    ).strip()
     return (
         f"UNLOAD ('{select_query}')\n"
         f"TO '{s3_url}'\n"
@@ -59,7 +63,7 @@ def unload_training_dataset(
     cursor: Any,
     s3_url: str,
     iam_role_arn: str,
-    lookback_months: int = _DEFAULT_LOOKBACK_MONTHS,
+    lookback_months: int | None = None,
 ) -> int:
     """Run the UNLOAD query and return the number of rows exported.
 
@@ -67,7 +71,8 @@ def unload_training_dataset(
         cursor: An open psycopg2 cursor (see `RedshiftResource.get_connection`).
         s3_url: Destination S3 prefix.
         iam_role_arn: IAM Role ARN authorizing Redshift to write to S3.
-        lookback_months: Number of months of history to include.
+        lookback_months: Number of months of history to include, or `None`
+            (default) for the full history.
 
     Returns:
         The number of rows exported.
@@ -80,7 +85,7 @@ def unload_training_dataset(
 
     count_query = (
         f"SELECT COUNT(*) FROM {_SOURCE_TABLE} {_date_filter_clause(lookback_months)}"
-    )
+    ).strip()
     execute_query(cursor, count_query)
     row_count = cursor.fetchone()[0]
     if row_count == 0:

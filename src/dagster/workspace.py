@@ -56,9 +56,7 @@ def _create_definitions() -> dagster.Definitions:
         ],
         schedules=[
             *ingest.schedules,
-            *load.schedules,
-            *silver.schedules,
-            *mart.schedules,
+            *ml.schedules,
         ],
         sensors=[*load.sensors, *silver.sensors, *mart.sensors, *inference.sensors],
         resources=_get_resources(),
