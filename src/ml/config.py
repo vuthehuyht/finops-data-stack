@@ -1,0 +1,81 @@
+"""Configuration constants for the ML training pipeline.
+
+Column lists are explicit (not inferred from the FACT_ML_FEATURE_SET schema)
+so that new columns added to the dbt model don't silently change the model's
+input shape.
+"""
+
+WINDOW_SIZE = 30
+
+MODEL_NAME = "finops-multimodal-regressor"
+
+TARGET_COLUMN = "LABEL_NEXT_5D_RETURN"
+
+# Daily-changing signals fed into the LSTM branch as a WINDOW_SIZE-day sequence.
+SEQUENCE_FEATURE_COLUMNS = [
+    "PRICE_MOMENTUM_1M",
+    "PRICE_MOMENTUM_3M",
+    "VOLATILITY_30D",
+    "RELATIVE_STRENGTH_VS_VNINDEX",
+    "MOVING_AVERAGE_20D",
+    "MOVING_AVERAGE_50D",
+    "MOVING_AVERAGE_200D",
+    "NEWS_COUNT",
+    "DAILY_NEWS_SENTIMENT_SCORE",
+    "SENTIMENT_MOMENTUM_7D",
+    "NEWS_VELOCITY",
+    "ANALYST_REPORT_COUNT",
+    "ANALYST_BUY_COUNT",
+    "AVG_ANALYST_TARGET_PRICE",
+    "CORPORATE_EVENT_COUNT",
+    "DIVIDEND_EVENT_COUNT",
+    "FED_RATE",
+    "TREASURY_10Y",
+    "TREASURY_5Y",
+    "REAL_INTEREST_RATE",
+    "USD_VND_RATE",
+    "EXCHANGE_RATE_VOLATILITY_30D",
+    "BRENT_CRUDE_PRICE",
+    "WTI_PRICE",
+    "GOLD_PRICE",
+    "STEEL_HRC_PRICE",
+    "GASOLINE_SINGAPORE_PRICE",
+    "BALTIC_DIRTY_TANKER_INDEX",
+    "BRENT_PRICE_MOMENTUM_1M",
+    "CRACK_SPREAD_PROXY",
+    "FOREIGN_BUY_RATIO_10D",
+    "NET_FOREIGN_FLOW_1M",
+    "NET_FOREIGN_FLOW_MOMENTUM_1M",
+    "PROP_TRADING_NET_VAL_5D",
+    "PROP_VS_FOREIGN_CORRELATION_10D",
+    "INSIDER_SENTIMENT_SIGNAL",
+    "INSIDER_BUY_VOLUME_RATIO",
+]
+
+# Slow-changing, quarter-driven snapshot fed into the MLP branch.
+TABULAR_FEATURE_COLUMNS = [
+    "REVENUE_GROWTH_YOY",
+    "NET_PROFIT_GROWTH_YOY",
+    "GROSS_MARGIN",
+    "NET_MARGIN",
+    "OPERATING_MARGIN",
+    "ROE",
+    "ROA",
+    "ASSET_GROWTH_YOY",
+    "DEBT_TO_EQUITY",
+    "CURRENT_RATIO",
+    "CASH_TO_ASSETS",
+    "EQUITY_MULTIPLIER",
+    "PE_RATIO",
+    "PB_RATIO",
+    "OPERATING_CASH_FLOW_TO_NET_INCOME",
+    "FREE_CASH_FLOW",
+    "CASH_FLOW_TO_DEBT",
+    "CPI_VALUE",
+]
+
+LSTM_HIDDEN_SIZE = 64
+LSTM_NUM_LAYERS = 1
+MLP_HIDDEN_SIZES = (32, 16)
+FUSION_HIDDEN_SIZE = 32
+DROPOUT_RATE = 0.2
