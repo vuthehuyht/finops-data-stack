@@ -42,10 +42,11 @@ src/
 ├── load/        # Load layer (S3 -> Redshift)
 ├── transform/   # dbt project (transformation)
 ├── pipeline/    # Legacy orchestration helpers (src/pipeline/dagster/ predates src/dagster/)
+├── ml/          # ML training pipeline: model code, dataset windowing, SageMaker training job
 ├── k8s/         # Kubernetes manifests
 ```
 
-*(Note: `src/ml/` and `src/docker/` are planned but not yet created.)*
+*(Note: `src/docker/` is planned but not yet created. Inference-time SageMaker Serverless Endpoint deployment is a separate, not-yet-implemented sub-project.)*
 
 ## Metadata Governance (names only, see docs for detail)
 

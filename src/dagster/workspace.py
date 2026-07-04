@@ -10,6 +10,7 @@ from src.dagster import (
     ddl_job,
     ingest_job,
     load_job,
+    ml_job,
     resources,
     transform_job,
 )
@@ -24,6 +25,8 @@ def _get_resources() -> dict[str, Any]:
         "redshift": resources.redshift,
         "load_config": resources.load_config,
         "dbt_config": resources.dbt_config,
+        "sagemaker": resources.sagemaker_config,
+        "ssm": resources.ssm,
     }
 
 
@@ -34,10 +37,11 @@ def _create_definitions() -> dagster.Definitions:
     silver = transform_job.define_silver_jobs()
     mart = transform_job.define_mart_jobs()
     dbt = dbt_assets.get_dbt_project_assets()
+    ml = ml_job.define_ml_jobs()
 
     return dagster_lib.definitions(
         code_location_name="finops",
-        assets=[*ingest.assets, *load.assets, dbt],
+        assets=[*ingest.assets, *load.assets, dbt, *ml.assets],
         jobs=[
             *ingest.jobs,
             *load.jobs,
@@ -45,6 +49,7 @@ def _create_definitions() -> dagster.Definitions:
             *mart.jobs,
             dbt_assets.dbt_build_job,
             ddl_job.execute_ddl_job,
+            *ml.jobs,
         ],
         schedules=[
             *ingest.schedules,

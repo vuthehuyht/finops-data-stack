@@ -16,9 +16,23 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 
-from src.ml.config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS, WINDOW_SIZE
-from src.ml.dataset import StockSequenceDataset, time_based_split
-from src.ml.model import FusionModel
+try:
+    # Package-relative import: used when pytest imports this module as
+    # `src.ml.train` from the repo root, where the `src` package resolves.
+    from src.ml.config import (
+        SEQUENCE_FEATURE_COLUMNS,
+        TABULAR_FEATURE_COLUMNS,
+        WINDOW_SIZE,
+    )
+    from src.ml.dataset import StockSequenceDataset, time_based_split
+    from src.ml.model import FusionModel
+except ImportError:
+    # Sibling import: SageMaker script mode copies `source_dir`'s contents
+    # flat into /opt/ml/input/data/code/, so there is no `src` package there
+    # — config.py/dataset.py/model.py/train.py are plain siblings.
+    from config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS, WINDOW_SIZE
+    from dataset import StockSequenceDataset, time_based_split
+    from model import FusionModel
 
 
 @dataclass
@@ -110,6 +124,18 @@ def main() -> None:
     train_dataset = StockSequenceDataset(train_df, window_size=args.window_size)
     val_dataset = StockSequenceDataset(val_df, window_size=args.window_size)
     test_dataset = StockSequenceDataset(test_df, window_size=args.window_size)
+
+    for split_name, dataset in (
+        ("train", train_dataset),
+        ("val", val_dataset),
+        ("test", test_dataset),
+    ):
+        if len(dataset) == 0:
+            raise ValueError(
+                f"{split_name} split produced 0 windows (need >= "
+                f"WINDOW_SIZE={args.window_size} trading rows per ticker) — "
+                "widen the date range."
+            )
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size)

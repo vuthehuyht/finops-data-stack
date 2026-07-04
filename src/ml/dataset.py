@@ -5,12 +5,25 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
-from src.ml.config import (
-    SEQUENCE_FEATURE_COLUMNS,
-    TABULAR_FEATURE_COLUMNS,
-    TARGET_COLUMN,
-    WINDOW_SIZE,
-)
+try:
+    # Package-relative import: used when pytest imports this module as
+    # `src.ml.dataset` from the repo root, where the `src` package resolves.
+    from src.ml.config import (
+        SEQUENCE_FEATURE_COLUMNS,
+        TABULAR_FEATURE_COLUMNS,
+        TARGET_COLUMN,
+        WINDOW_SIZE,
+    )
+except ImportError:
+    # Sibling import: SageMaker script mode copies `source_dir`'s contents
+    # flat into /opt/ml/input/data/code/, so there is no `src` package there
+    # — config.py is a plain sibling of dataset.py in that directory.
+    from config import (
+        SEQUENCE_FEATURE_COLUMNS,
+        TABULAR_FEATURE_COLUMNS,
+        TARGET_COLUMN,
+        WINDOW_SIZE,
+    )
 
 _DATE_COLUMN = "TRADING_DATE"
 _TICKER_COLUMN = "TICKER"

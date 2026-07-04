@@ -158,3 +158,50 @@ def test_workspace_has_transform_sensors() -> None:
         assert "load_job_sensor" in sensor_names
         assert "silver_job_sensor" in sensor_names
         assert "mart_job_sensor" in sensor_names
+
+
+def test_workspace_definitions_include_ml_job() -> None:
+    """workspace.py must register the ML quarterly re-training job."""
+    with unittest.mock.patch.dict(
+        os.environ,
+        {
+            "FINOPS_RAW_BUCKET": "test-bucket",
+            "REDSHIFT_IAM_ROLE_ARN": "arn:aws:iam::123:role/test",
+            "REDSHIFT_HOST": "localhost",
+            "REDSHIFT_PASSWORD": "test",
+        },
+    ):
+        import src.dagster.workspace
+
+        reload(src.dagster.workspace)
+        defs = src.dagster.workspace.defs
+        assert "ml_quarterly_retrain_job" in defs.job_names
+
+
+def test_workspace_definitions_include_ml_assets() -> None:
+    """workspace.py must register all three ML assets."""
+    with unittest.mock.patch.dict(
+        os.environ,
+        {
+            "FINOPS_RAW_BUCKET": "test-bucket",
+            "REDSHIFT_IAM_ROLE_ARN": "arn:aws:iam::123:role/test",
+            "REDSHIFT_HOST": "localhost",
+            "REDSHIFT_PASSWORD": "test",
+        },
+    ):
+        import src.dagster.workspace
+
+        reload(src.dagster.workspace)
+        defs = src.dagster.workspace.defs
+        asset_keys = set(defs.assets_defs_by_key.keys())
+        assert AssetKey(["ML", "GOLD_ML_TRAINING_DATASET"]) in asset_keys
+        assert AssetKey(["ML", "ML_TRAINING_JOB"]) in asset_keys
+        assert AssetKey(["ML", "ML_MODEL_EVALUATION"]) in asset_keys
+
+
+def test_workspace_resources_include_sagemaker_and_ssm() -> None:
+    from src.dagster.workspace import _get_resources
+
+    resource_keys = _get_resources().keys()
+    assert "sagemaker" in resource_keys
+    assert "ssm" in resource_keys

@@ -6,13 +6,27 @@ See docs/ml-architecture-design.md section 2 for the architecture rationale.
 import torch
 from torch import nn
 
-from src.ml.config import (
-    DROPOUT_RATE,
-    FUSION_HIDDEN_SIZE,
-    LSTM_HIDDEN_SIZE,
-    LSTM_NUM_LAYERS,
-    MLP_HIDDEN_SIZES,
-)
+try:
+    # Package-relative import: used when pytest imports this module as
+    # `src.ml.model` from the repo root, where the `src` package resolves.
+    from src.ml.config import (
+        DROPOUT_RATE,
+        FUSION_HIDDEN_SIZE,
+        LSTM_HIDDEN_SIZE,
+        LSTM_NUM_LAYERS,
+        MLP_HIDDEN_SIZES,
+    )
+except ImportError:
+    # Sibling import: SageMaker script mode copies `source_dir`'s contents
+    # flat into /opt/ml/input/data/code/, so there is no `src` package there
+    # — config.py is a plain sibling of model.py in that directory.
+    from config import (
+        DROPOUT_RATE,
+        FUSION_HIDDEN_SIZE,
+        LSTM_HIDDEN_SIZE,
+        LSTM_NUM_LAYERS,
+        MLP_HIDDEN_SIZES,
+    )
 
 
 class TimeSeriesBranch(nn.Module):
