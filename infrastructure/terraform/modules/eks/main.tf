@@ -263,7 +263,7 @@ resource "aws_iam_policy" "dagster_sa_permissions" {
           "arn:aws:ssm:*:*:parameter/${var.project_name}/model/*"
         ]
       },
-      # SageMaker orchestration permissions (Training, Serverless Endpoint, Invoke)
+      # SageMaker orchestration permissions (Training, Batch Transform)
       {
         Effect = "Allow"
         Action = [
@@ -273,14 +273,9 @@ resource "aws_iam_policy" "dagster_sa_permissions" {
           "sagemaker:CreateModel",
           "sagemaker:DeleteModel",
           "sagemaker:DescribeModel",
-          "sagemaker:CreateEndpointConfig",
-          "sagemaker:DeleteEndpointConfig",
-          "sagemaker:DescribeEndpointConfig",
-          "sagemaker:CreateEndpoint",
-          "sagemaker:DeleteEndpoint",
-          "sagemaker:DescribeEndpoint",
-          "sagemaker:UpdateEndpoint",
-          "sagemaker:InvokeEndpoint",
+          "sagemaker:CreateTransformJob",
+          "sagemaker:DescribeTransformJob",
+          "sagemaker:StopTransformJob",
           "iam:PassRole" # Required PassRole for SageMaker execution role
         ]
         Resource = "*"
