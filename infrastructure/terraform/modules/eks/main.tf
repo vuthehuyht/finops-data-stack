@@ -579,3 +579,132 @@ resource "aws_cloudwatch_event_target" "karpenter_scheduled_change" {
   arn  = aws_sqs_queue.karpenter_interruption.arn
 }
 
+# 9.4. IAM Policy for the Karpenter controller -- scoped EC2 provisioning,
+# instance-profile management (Karpenter v1.x creates/manages the instance
+# profile itself from karpenter_node's role name), PassRole restricted to
+# the node role, read-only Describe/pricing/ssm, and interruption queue access.
+resource "aws_iam_policy" "karpenter_controller_permissions" {
+  name        = "${var.project_name}-karpenter-controller-policy"
+  description = "Permissions for the Karpenter controller to provision/terminate EC2 nodes for the EKS cluster"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowScopedEC2InstanceActions"
+        Effect = "Allow"
+        Resource = [
+          "arn:aws:ec2:*::image/*",
+          "arn:aws:ec2:*::snapshot/*",
+          "arn:aws:ec2:*:*:security-group/*",
+          "arn:aws:ec2:*:*:subnet/*",
+          "arn:aws:ec2:*:*:launch-template/*"
+        ]
+        Action = [
+          "ec2:RunInstances",
+          "ec2:CreateFleet"
+        ]
+      },
+      {
+        Sid      = "AllowScopedEC2LaunchTemplateActions"
+        Effect   = "Allow"
+        Resource = "arn:aws:ec2:*:*:launch-template/*"
+        Action   = ["ec2:CreateLaunchTemplate", "ec2:DeleteLaunchTemplate"]
+      },
+      {
+        Sid      = "AllowScopedInstanceActions"
+        Effect   = "Allow"
+        Resource = "arn:aws:ec2:*:*:instance/*"
+        Action   = ["ec2:TerminateInstances"]
+      },
+      {
+        Sid    = "AllowScopedResourceCreationTagging"
+        Effect = "Allow"
+        Resource = [
+          "arn:aws:ec2:*:*:fleet/*",
+          "arn:aws:ec2:*:*:instance/*",
+          "arn:aws:ec2:*:*:volume/*",
+          "arn:aws:ec2:*:*:network-interface/*",
+          "arn:aws:ec2:*:*:launch-template/*",
+          "arn:aws:ec2:*:*:spot-instances-request/*"
+        ]
+        Action = "ec2:CreateTags"
+        Condition = {
+          StringEquals = {
+            "ec2:CreateAction" = ["RunInstances", "CreateFleet", "CreateLaunchTemplate"]
+          }
+        }
+      },
+      {
+        Sid      = "AllowInstanceProfileManagement"
+        Effect   = "Allow"
+        Resource = "*"
+        Action = [
+          "iam:CreateInstanceProfile",
+          "iam:TagInstanceProfile",
+          "iam:AddRoleToInstanceProfile",
+          "iam:RemoveRoleFromInstanceProfile",
+          "iam:DeleteInstanceProfile",
+          "iam:GetInstanceProfile"
+        ]
+      },
+      {
+        Sid      = "AllowPassingNodeRole"
+        Effect   = "Allow"
+        Resource = aws_iam_role.karpenter_node.arn
+        Action   = "iam:PassRole"
+      },
+      {
+        Sid      = "AllowReadActions"
+        Effect   = "Allow"
+        Resource = "*"
+        Action = [
+          "ec2:DescribeImages",
+          "ec2:DescribeInstances",
+          "ec2:DescribeInstanceTypes",
+          "ec2:DescribeInstanceTypeOfferings",
+          "ec2:DescribeLaunchTemplates",
+          "ec2:DescribeSubnets",
+          "ec2:DescribeSecurityGroups",
+          "ec2:DescribeSpotPriceHistory",
+          "ec2:DescribeAvailabilityZones",
+          "eks:DescribeCluster",
+          "pricing:GetProducts",
+          "ssm:GetParameter"
+        ]
+      },
+      {
+        Sid      = "AllowInterruptionQueueActions"
+        Effect   = "Allow"
+        Resource = aws_sqs_queue.karpenter_interruption.arn
+        Action   = ["sqs:DeleteMessage", "sqs:GetQueueUrl", "sqs:ReceiveMessage"]
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "karpenter_controller_permissions_attach" {
+  role       = aws_iam_role.karpenter_controller.name
+  policy_arn = aws_iam_policy.karpenter_controller_permissions.arn
+}
+
+# 9.5. Tag subnets + the EKS-auto-created cluster security group for
+# Karpenter's subnetSelectorTerms/securityGroupSelectorTerms discovery
+# (EC2NodeClass, src/k8s/manifest/karpenter/nodepool.yaml). Deliberately NOT
+# var.eks_node_sg_id -- that SG is only used for the cluster's
+# vpc_config.security_group_ids and is NOT what gets attached to node EC2
+# instances (see the cluster_security_group_id output comment in
+# ../../outputs.tf, verified empirically against a running node).
+resource "aws_ec2_tag" "karpenter_subnet_discovery" {
+  for_each    = toset(var.private_app_subnet_ids)
+  resource_id = each.value
+  key         = "karpenter.sh/discovery"
+  value       = aws_eks_cluster.main.name
+}
+
+resource "aws_ec2_tag" "karpenter_sg_discovery" {
+  resource_id = aws_eks_cluster.main.vpc_config[0].cluster_security_group_id
+  key         = "karpenter.sh/discovery"
+  value       = aws_eks_cluster.main.name
+}
+
