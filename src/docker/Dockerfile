@@ -7,9 +7,12 @@ COPY --from=ghcr.io/astral-sh/uv:0.6 /uv /usr/local/bin/uv
 
 WORKDIR /app
 
-# Install Python dependencies — exclude dev, dagster (webserver UI), and ml groups
+# Install Python dependencies — exclude dev, dagster (webserver UI), and torch
+# (only needed inside the SageMaker training/inference containers, not here;
+# sagemaker SDK stays in base dependencies since the Dagster orchestrator
+# calls it to launch training jobs -- see src/ml/training_job.py).
 COPY pyproject.toml uv.lock README.md ./
-RUN uv sync --no-dev --no-group dagster --no-group ml --frozen --no-cache
+RUN uv sync --no-dev --no-group dagster --no-group ml-torch --frozen --no-cache
 
 ENV PATH="/app/.venv/bin:$PATH"
 

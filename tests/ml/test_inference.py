@@ -121,9 +121,9 @@ def test_load_model_from_s3_success() -> None:
     fake_state_dict = {}
     with (
         unittest.mock.patch(
-            "src.ml.inference.torch.load", return_value=fake_state_dict
+            "torch.load", return_value=fake_state_dict
         ) as mock_torch_load,
-        unittest.mock.patch("src.ml.inference.FusionModel") as mock_fusion_model_class,
+        unittest.mock.patch("src.ml.model.FusionModel") as mock_fusion_model_class,
     ):
         mock_model = unittest.mock.MagicMock()
         mock_fusion_model_class.return_value = mock_model

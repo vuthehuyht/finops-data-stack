@@ -33,3 +33,9 @@ variable "cluster_admin_principal_arns" {
   default     = []
   description = "Additional IAM principal ARNs (e.g. human operators running kubectl/helm manually) granted EKS cluster-admin access via Access Entries"
 }
+
+variable "slack_api_token" {
+  type        = string
+  sensitive   = true
+  description = "Slack API token for Dagster alerts"
+}

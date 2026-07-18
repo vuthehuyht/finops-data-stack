@@ -31,6 +31,10 @@ resource "aws_eks_cluster" "main" {
   role_arn = aws_iam_role.eks_cluster.arn
   version  = "1.36"
 
+  upgrade_policy {
+    support_type = "STANDARD"
+  }
+
   vpc_config {
     subnet_ids              = var.private_app_subnet_ids
     security_group_ids      = [var.eks_node_sg_id]

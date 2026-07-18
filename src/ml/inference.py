@@ -3,25 +3,33 @@
 No AWS dependency — reused by both the Dagster daily inference pipeline
 (src/dagster/inference_job.py) and the SageMaker serving entrypoint
 (src/ml/serve.py).
+
+`torch` is imported lazily (inside the two functions that need it) rather
+than at module level: the Dagster orchestrator only calls the
+torch-independent functions here (check_feature_null_rate,
+build_latest_window, next_trading_day) and does not have torch installed
+(it runs in a separate, lighter image than the SageMaker training/inference
+containers, which do have it) -- see src/docker/Dockerfile.
 """
 
 import datetime
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
-import torch
+
+if TYPE_CHECKING:
+    import torch
 
 try:
     # Package-relative import: used when pytest imports this module as
     # `src.ml.inference` from the repo root, where the `src` package resolves.
     from src.ml.config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS
-    from src.ml.model import FusionModel
 except ImportError:
     # Sibling import: SageMaker script mode copies `source_dir`'s contents
     # flat into /opt/ml/input/data/code/, so there is no `src` package there
     # — config.py is a plain sibling of inference.py in that directory.
     from config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS
-    from model import FusionModel
 
 _DATE_COLUMN = "TRADING_DATE"
 _TICKER_COLUMN = "TICKER"
@@ -113,7 +121,7 @@ def build_latest_window(
     return sequence, tabular
 
 
-def predict_from_payload(model: torch.nn.Module, payload: dict) -> dict:
+def predict_from_payload(model: "torch.nn.Module", payload: dict) -> dict:
     """Run a forward pass given a JSON-deserialized inference payload.
 
     Args:
@@ -123,6 +131,8 @@ def predict_from_payload(model: torch.nn.Module, payload: dict) -> dict:
     Returns:
         `{"predicted_return": <float>}`.
     """
+    import torch
+
     sequence = torch.tensor([payload["sequence"]], dtype=torch.float32)
     tabular = torch.tensor([payload["tabular"]], dtype=torch.float32)
     with torch.no_grad():
@@ -130,7 +140,7 @@ def predict_from_payload(model: torch.nn.Module, payload: dict) -> dict:
     return {"predicted_return": prediction.item()}
 
 
-def load_model_from_s3(s3_client, bucket: str, key: str) -> torch.nn.Module:
+def load_model_from_s3(s3_client, bucket: str, key: str) -> "torch.nn.Module":
     """Download model.tar.gz from S3, extract it, and load it.
 
     Loads the weights into a FusionModel instance.
@@ -138,6 +148,13 @@ def load_model_from_s3(s3_client, bucket: str, key: str) -> torch.nn.Module:
     import os
     import tarfile
     import tempfile
+
+    import torch
+
+    try:
+        from src.ml.model import FusionModel
+    except ImportError:
+        from model import FusionModel
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tarball_path = os.path.join(tmpdir, "model.tar.gz")

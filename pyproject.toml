@@ -28,6 +28,8 @@ dependencies = [
     "prometheus-client>=0.25.0",
     "psutil>=7.2.2",
     "yfinance>=1.4.1",
+    "sagemaker>=3.8.0",
+    "dagster-postgres>=0.29.10",
 ]
 
 [dependency-groups]
@@ -45,9 +47,8 @@ dev = [
 dagster = [
     "dagster-webserver==1.13.10",
 ]
-ml = [
+ml-torch = [
     "torch>=2.2.0",
-    "sagemaker>=3.8.0",
 ]
 
 [tool.dagster]

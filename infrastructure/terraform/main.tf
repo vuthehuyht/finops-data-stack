@@ -42,6 +42,7 @@ module "secrets" {
 
   fireant_email    = var.fireant_email
   fireant_password = var.fireant_password
+  slack_api_token  = var.slack_api_token
 }
 
 # Call Module SSM Parameter Store (Model metadata, endpoint name, thresholds)
