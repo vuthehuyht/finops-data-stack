@@ -79,6 +79,8 @@ jobs:
             echo "rds_dbname=$(terraform output -raw rds_dbname)"
             echo "dagster_sa_role_arn=$(terraform output -raw dagster_sa_role_arn)"
             echo "external_secrets_sa_role_arn=$(terraform output -raw external_secrets_sa_role_arn)"
+            echo "karpenter_controller_role_arn=$(terraform output -raw karpenter_controller_role_arn)"
+            echo "karpenter_interruption_queue_name=$(terraform output -raw karpenter_interruption_queue_name)"
           } >> "$GITHUB_OUTPUT"
 
       - name: Deploy Dagster to EKS
@@ -92,6 +94,8 @@ jobs:
           rds-dbname: ${{ steps.tf-outputs.outputs.rds_dbname }}
           dagster-sa-role-arn: ${{ steps.tf-outputs.outputs.dagster_sa_role_arn }}
           external-secrets-sa-role-arn: ${{ steps.tf-outputs.outputs.external_secrets_sa_role_arn }}
+          karpenter-controller-role-arn: ${{ steps.tf-outputs.outputs.karpenter_controller_role_arn }}
+          karpenter-interruption-queue-name: ${{ steps.tf-outputs.outputs.karpenter_interruption_queue_name }}
 
   deploy-infra:
     needs: detect-changes
@@ -137,6 +141,8 @@ jobs:
             echo "rds_dbname=$(terraform output -raw rds_dbname)"
             echo "dagster_sa_role_arn=$(terraform output -raw dagster_sa_role_arn)"
             echo "external_secrets_sa_role_arn=$(terraform output -raw external_secrets_sa_role_arn)"
+            echo "karpenter_controller_role_arn=$(terraform output -raw karpenter_controller_role_arn)"
+            echo "karpenter_interruption_queue_name=$(terraform output -raw karpenter_interruption_queue_name)"
           } >> "$GITHUB_OUTPUT"
 
       - name: Deploy Dagster to EKS
@@ -150,3 +156,5 @@ jobs:
           rds-dbname: ${{ steps.tf-outputs.outputs.rds_dbname }}
           dagster-sa-role-arn: ${{ steps.tf-outputs.outputs.dagster_sa_role_arn }}
           external-secrets-sa-role-arn: ${{ steps.tf-outputs.outputs.external_secrets_sa_role_arn }}
+          karpenter-controller-role-arn: ${{ steps.tf-outputs.outputs.karpenter_controller_role_arn }}
+          karpenter-interruption-queue-name: ${{ steps.tf-outputs.outputs.karpenter_interruption_queue_name }}
