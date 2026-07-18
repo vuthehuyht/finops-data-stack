@@ -496,3 +496,86 @@ resource "aws_eks_access_entry" "karpenter_node" {
   type          = "EC2_LINUX"
 }
 
+# 9.3. SQS queue + EventBridge rules for Spot interruption handling --
+# Karpenter drains a node proactively (~2 min warning) instead of reacting
+# only after the pod is killed.
+resource "aws_sqs_queue" "karpenter_interruption" {
+  name                      = "${var.project_name}-karpenter-interruption-queue"
+  message_retention_seconds = 300
+  sqs_managed_sse_enabled   = true
+
+  tags = {
+    Environment = var.environment
+  }
+}
+
+resource "aws_sqs_queue_policy" "karpenter_interruption" {
+  queue_url = aws_sqs_queue.karpenter_interruption.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = ["events.amazonaws.com", "sqs.amazonaws.com"]
+        }
+        Action   = "sqs:SendMessage"
+        Resource = aws_sqs_queue.karpenter_interruption.arn
+      }
+    ]
+  })
+}
+
+resource "aws_cloudwatch_event_rule" "karpenter_spot_interruption" {
+  name = "${var.project_name}-karpenter-spot-interruption"
+  event_pattern = jsonencode({
+    source      = ["aws.ec2"]
+    detail-type = ["EC2 Spot Instance Interruption Warning"]
+  })
+}
+
+resource "aws_cloudwatch_event_rule" "karpenter_instance_state_change" {
+  name = "${var.project_name}-karpenter-instance-state-change"
+  event_pattern = jsonencode({
+    source      = ["aws.ec2"]
+    detail-type = ["EC2 Instance State-change Notification"]
+  })
+}
+
+resource "aws_cloudwatch_event_rule" "karpenter_rebalance_recommendation" {
+  name = "${var.project_name}-karpenter-rebalance-recommendation"
+  event_pattern = jsonencode({
+    source      = ["aws.ec2"]
+    detail-type = ["EC2 Instance Rebalance Recommendation"]
+  })
+}
+
+resource "aws_cloudwatch_event_rule" "karpenter_scheduled_change" {
+  name = "${var.project_name}-karpenter-scheduled-change"
+  event_pattern = jsonencode({
+    source      = ["aws.health"]
+    detail-type = ["AWS Health Event"]
+  })
+}
+
+resource "aws_cloudwatch_event_target" "karpenter_spot_interruption" {
+  rule = aws_cloudwatch_event_rule.karpenter_spot_interruption.name
+  arn  = aws_sqs_queue.karpenter_interruption.arn
+}
+
+resource "aws_cloudwatch_event_target" "karpenter_instance_state_change" {
+  rule = aws_cloudwatch_event_rule.karpenter_instance_state_change.name
+  arn  = aws_sqs_queue.karpenter_interruption.arn
+}
+
+resource "aws_cloudwatch_event_target" "karpenter_rebalance_recommendation" {
+  rule = aws_cloudwatch_event_rule.karpenter_rebalance_recommendation.name
+  arn  = aws_sqs_queue.karpenter_interruption.arn
+}
+
+resource "aws_cloudwatch_event_target" "karpenter_scheduled_change" {
+  rule = aws_cloudwatch_event_rule.karpenter_scheduled_change.name
+  arn  = aws_sqs_queue.karpenter_interruption.arn
+}
+
