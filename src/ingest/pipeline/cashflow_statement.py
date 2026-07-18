@@ -15,6 +15,15 @@ _COL_MAP: dict[str, str] = {
     "Purchases of fixed assets and other long term assets": "capex",
 }
 
+# Bank stocks (ACB, VCB, TCB...) report cashflow under different item_en labels.
+# No aggregate "financing activities" line was found for banks — cff stays None.
+_BANK_COL_MAP: dict[str, str] = {
+    "Net cash from operating activities": "cfo",
+    "Net cash from investing activities": "cfi",
+    "Net Increase/(Decrease) in cash and cash equivalents": "net_cash_flow",
+    "Purchases of fixed assets and other long term assets": "capex",
+}
+
 
 class CashflowStatementPipeline(BaseIngestPipeline):
     """Pipeline to ingest corporate cashflow statements into S3 Bronze."""
@@ -57,7 +66,7 @@ class CashflowStatementPipeline(BaseIngestPipeline):
                     )
                 )
                 if not df.empty:
-                    row = _pivot_to_row(df, _COL_MAP, symbol)
+                    row = _pivot_to_row(df, _select_col_map(df), symbol)
                     if row is not None:
                         all_dfs.append(row)
             except Exception as e:
@@ -72,10 +81,30 @@ class CashflowStatementPipeline(BaseIngestPipeline):
         return pd.concat(all_dfs, ignore_index=True)
 
 
+def _select_col_map(df: pd.DataFrame) -> dict[str, str] | None:
+    """Pick whichever of _COL_MAP/_BANK_COL_MAP matches more item_en values.
+
+    Some labels (e.g. capex) are shared between corporate and bank
+    statements, so a bare "any match" check would wrongly pick the corporate
+    map for a bank stock. Comparing match counts avoids that.
+    """
+    best_col_map = None
+    best_count = 0
+    for col_map in (_COL_MAP, _BANK_COL_MAP):
+        count = df["item_en"].isin(set(col_map.keys())).sum()
+        if count > best_count:
+            best_count = count
+            best_col_map = col_map
+    return best_col_map
+
+
 def _pivot_to_row(
-    df: pd.DataFrame, col_map: dict[str, str], symbol: str
+    df: pd.DataFrame, col_map: dict[str, str] | None, symbol: str
 ) -> pd.DataFrame | None:
     """Unpivot long-format VCI financial data into a single wide-format row."""
+    if col_map is None:
+        return None
+
     period_cols = [c for c in df.columns if c not in ("item", "item_en", "item_id")]
     if not period_cols:
         return None

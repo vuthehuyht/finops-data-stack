@@ -7,8 +7,6 @@ from src.ingest.client.vnstock_client import VnStockClient
 from src.ingest.pipeline.base import DEFAULT_TICKER_SYMBOLS, BaseIngestPipeline
 
 # Maps VCI item_en labels to schema column names.
-# Bank stocks use different balance sheet structures — missing columns are filled
-# with None by BaseIngestPipeline.standardize().
 _COL_MAP: dict[str, str] = {
     "Total Assets": "total_assets",
     "CURRENT ASSETS": "current_assets",
@@ -18,6 +16,15 @@ _COL_MAP: dict[str, str] = {
     "Short-term borrowings": "short_term_debt",
     "Long-term borrowings": "long_term_debt",
     "Capital and reserves": "equity",
+}
+
+# Bank stocks (ACB, VCB, TCB...) report under different item_en labels — no
+# current/non-current split, no inventory, no simple short/long-term debt line.
+_BANK_COL_MAP: dict[str, str] = {
+    "TOTAL ASSETS": "total_assets",
+    "Cash and precious metals": "cash",
+    "TOTAL LIABILITIES": "total_liabilities",
+    "OWNER'S EQUITY": "equity",
 }
 
 
@@ -65,7 +72,7 @@ class BalanceSheetPipeline(BaseIngestPipeline):
                     )
                 )
                 if not df.empty:
-                    row = _pivot_to_row(df, _COL_MAP, symbol)
+                    row = _pivot_to_row(df, _select_col_map(df), symbol)
                     if row is not None:
                         all_dfs.append(row)
             except Exception as e:
@@ -78,10 +85,31 @@ class BalanceSheetPipeline(BaseIngestPipeline):
         return pd.concat(all_dfs, ignore_index=True)
 
 
+def _select_col_map(df: pd.DataFrame) -> dict[str, str] | None:
+    """Pick whichever of _COL_MAP/_BANK_COL_MAP matches more item_en values.
+
+    Some labels (e.g. "Cash and cash equivalents" vs bank-only lines) overlap
+    only partially between corporate and bank statements, so a bare "any
+    match" check would wrongly pick the corporate map for a bank stock.
+    Comparing match counts avoids that.
+    """
+    best_col_map = None
+    best_count = 0
+    for col_map in (_COL_MAP, _BANK_COL_MAP):
+        count = df["item_en"].isin(set(col_map.keys())).sum()
+        if count > best_count:
+            best_count = count
+            best_col_map = col_map
+    return best_col_map
+
+
 def _pivot_to_row(
-    df: pd.DataFrame, col_map: dict[str, str], symbol: str
+    df: pd.DataFrame, col_map: dict[str, str] | None, symbol: str
 ) -> pd.DataFrame | None:
     """Unpivot long-format VCI financial data into a single wide-format row."""
+    if col_map is None:
+        return None
+
     period_cols = [c for c in df.columns if c not in ("item", "item_en", "item_id")]
     if not period_cols:
         return None

@@ -114,6 +114,41 @@ def test_cashflow_statement_pipeline_returns_empty_when_no_matching_items(
     assert result_df.empty
 
 
+def _make_bank_long_df(period_col: str = "2026-Q1") -> pd.DataFrame:
+    """Return long-format VCI cashflow statement DataFrame with bank item_en labels."""
+    return pd.DataFrame(
+        {
+            "item_en": [
+                "Net cash from operating activities",
+                "Net cash from investing activities",
+                "Net Increase/(Decrease) in cash and cash equivalents",
+                "Purchases of fixed assets and other long term assets",
+            ],
+            "item": ["x"] * 4,
+            "item_id": range(4),
+            period_col: [500.0, -200.0, 200.0, -150.0],
+        }
+    )
+
+
+@patch("src.ingest.pipeline.cashflow_statement.VnStockClient")
+def test_cashflow_statement_pipeline_falls_back_to_bank_col_map(
+    mock_client_class: MagicMock,
+) -> None:
+    """Verify fetch falls back to bank item_en labels if corporate labels miss."""
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
+    mock_client.call_api_with_retry.return_value = _make_bank_long_df("2026-Q1")
+
+    pipeline = CashflowStatementPipeline(batch_date="2026-06-18", symbols=["ACB"])
+    result_df = pipeline.fetch()
+
+    assert len(result_df) == 1
+    assert result_df["ticker"].iloc[0] == "ACB"
+    assert result_df["cfo"].iloc[0] == 500.0
+    assert result_df["net_cash_flow"].iloc[0] == 200.0
+
+
 @patch("src.ingest.pipeline.cashflow_statement.VnStockClient")
 def test_cashflow_statement_pipeline_multiple_symbols_concatenated(
     mock_client_class: MagicMock,

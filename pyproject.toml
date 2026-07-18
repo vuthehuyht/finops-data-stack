@@ -77,7 +77,7 @@ ignore = []
 force-single-line = false
 split-on-trailing-comma = true
 force-sort-within-sections = false
-known-first-party = ["src"]
+known-first-party = ["src", "scripts"]
 known-third-party = ["dagster"]
 
 [tool.ruff.lint.per-file-ignores]
@@ -98,6 +98,8 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--import-mode=importlib"
 filterwarnings = [
     "ignore:The `__fields__` attribute is deprecated:DeprecationWarning",
     "ignore:Class `MultiAssetSensorDefinition` is superseded:dagster.SupersessionWarning",
