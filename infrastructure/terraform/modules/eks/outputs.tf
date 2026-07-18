@@ -33,3 +33,17 @@ output "cluster_security_group_id" {
   description = "The ID of the security group EKS auto-creates and attaches to managed node group instances (distinct from var.eks_node_sg_id, which is only used for the cluster's vpc_config.security_group_ids and is NOT what gets attached to node EC2 instances by default -- verified against the running node's actual attached security groups)"
 }
 
+output "karpenter_controller_role_arn" {
+  value       = aws_iam_role.karpenter_controller.arn
+  description = "The ARN of the IAM role for the Karpenter controller ServiceAccount (IRSA)"
+}
+
+output "karpenter_node_role_name" {
+  value       = aws_iam_role.karpenter_node.name
+  description = "The IAM role name Karpenter's EC2NodeClass uses to launch nodes and manage their instance profile"
+}
+
+output "karpenter_interruption_queue_name" {
+  value       = aws_sqs_queue.karpenter_interruption.name
+  description = "The SQS queue name Karpenter uses for Spot interruption/rebalance notifications"
+}

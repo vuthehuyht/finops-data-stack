@@ -89,3 +89,18 @@ output "github_actions_deploy_role_arn" {
   value       = module.eks.github_actions_deploy_role_arn
   description = "The ARN of the IAM role assumed by the GitHub Actions CI/CD deploy pipeline"
 }
+
+output "karpenter_controller_role_arn" {
+  value       = module.eks.karpenter_controller_role_arn
+  description = "The ARN of the IAM role for the Karpenter controller ServiceAccount (IRSA)"
+}
+
+output "karpenter_node_role_name" {
+  value       = module.eks.karpenter_node_role_name
+  description = "The IAM role name Karpenter's EC2NodeClass uses to launch nodes and manage their instance profile"
+}
+
+output "karpenter_interruption_queue_name" {
+  value       = module.eks.karpenter_interruption_queue_name
+  description = "The SQS queue name Karpenter uses for Spot interruption/rebalance notifications"
+}
