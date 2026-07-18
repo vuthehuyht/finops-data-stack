@@ -20,12 +20,13 @@ Sử dụng mô hình VPC tiêu chuẩn để cô lập tài nguyên trên 2 Ava
 ## 2. Tính toán & Điều phối (Compute)
 
 * **Amazon EKS (Elastic Kubernetes Service)**:
-  * **Control Plane**: Managed bởi AWS (v1.30).
-  * **Hybrid Node Groups**: Đặt trong Private App Subnets để đảm bảo cân bằng giữa độ ổn định và chi phí:
-    * **Core Node Group (On-Demand)**: Sử dụng `t3.medium` (hoặc `t3a.medium`), dung lượng mong muốn là 1 node để chạy các pod Core ổn định 24/7 (Dagster Webserver, Dagster Daemon, CoreDNS). *(Lưu ý: Trong môi trường Lab, ưu tiên dùng `t3a.medium` để tiết kiệm 10% chi phí).*
-    * **Worker Node Group (Spot)**: Sử dụng Spot instances nhỏ như `t3.medium`, `t3a.medium` (hoặc `t3a.small` cho Lab để tiết kiệm chi phí). Cấu hình co giãn từ 0 đến 3/5 nodes để chạy các job xử lý dữ liệu nặng. *(Lưu ý: Trong môi trường Lab, cấu hình desired_size = 0 để thực hiện scale-to-zero khi nhàn rỗi).*
-  * **Autoscaling**: Cấu hình Cluster Autoscaler để tự động tăng/giảm số lượng Spot node theo workload thực tế của Dagster.
-* **Amazon ECR (Elastic Container Registry)**: Lưu trữ các private container images của Dagster, dbt và crawlers. Tích hợp Lifecycle Policy tự động dọn dẹp các images không tag và chỉ lưu giữ tối đa 10 images gần nhất để tiết kiệm chi phí lưu trữ *(hoặc chỉ 5 images gần nhất trong môi trường Lab)*.
+  * **Control Plane**: Managed bởi AWS (v1.36).
+  * **Core Node Group (On-Demand, static)**: Đặt trong Private App Subnets, sử dụng `t3a.medium`, dung lượng 1-2 node để chạy các pod Core ổn định 24/7 (Dagster Webserver, Dagster Daemon, CoreDNS). Pod chạy trên node group này khai báo `nodeSelector: {node-group: core}`.
+  * **Karpenter (Dynamic Spot Provisioning)**: Thay cho Worker Node Group tĩnh + Cluster Autoscaler trước đây. Karpenter tự động launch/terminate Spot node theo nhu cầu thực tế của các job xử lý dữ liệu nặng (`NodePool`/`EC2NodeClass` tại `src/k8s/manifest/karpenter/nodepool.yaml`), scale từ 0 khi nhàn rỗi. Pod worker khai báo `nodeSelector: {node-group: worker}` kèm toleration `spotWorker=true:NoSchedule`. Hạ tầng hỗ trợ gồm:
+    * IRSA role cho Karpenter controller + IAM policy scoped theo tag để provision/terminate EC2.
+    * Node IAM role riêng cho instance do Karpenter launch, đăng ký qua EKS access entry.
+    * SQS queue + EventBridge rules để xử lý Spot interruption notice.
+* **Amazon ECR (Elastic Container Registry)**: Lưu trữ các private container images của Dagster, dbt và crawlers. Tích hợp Lifecycle Policy tự động dọn dẹp images không tag sau 7 ngày và chỉ giữ lại tối đa 5 images gần nhất để tiết kiệm chi phí lưu trữ. Repository bật `force_delete` để cho phép destroy khi vẫn còn images bên trong.
 
 ## 3. Lưu trữ & Warehouse (Storage & DWH)
 
