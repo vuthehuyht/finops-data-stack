@@ -821,8 +821,12 @@ resource "aws_iam_role_policy_attachment" "karpenter_controller_permissions_atta
 # instances (see the cluster_security_group_id output comment in
 # ../../outputs.tf, verified empirically against a running node).
 resource "aws_ec2_tag" "karpenter_subnet_discovery" {
-  for_each    = toset(var.private_app_subnet_ids)
-  resource_id = each.value
+  # count, not for_each: subnet IDs are unknown until apply (module.vpc's
+  # aws_subnet resources), but the *number* of subnets is always statically
+  # known -- for_each requires its full key set known at plan time, which
+  # unknown-until-apply values can't satisfy.
+  count       = length(var.private_app_subnet_ids)
+  resource_id = var.private_app_subnet_ids[count.index]
   key         = "karpenter.sh/discovery"
   value       = aws_eks_cluster.main.name
 }
