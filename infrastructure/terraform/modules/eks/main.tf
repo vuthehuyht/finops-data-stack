@@ -689,7 +689,7 @@ resource "aws_iam_policy" "karpenter_controller_permissions" {
         Sid      = "AllowScopedResourceTagging"
         Effect   = "Allow"
         Resource = "arn:aws:ec2:*:*:instance/*"
-        Action    = "ec2:CreateTags"
+        Action   = "ec2:CreateTags"
         Condition = {
           StringEquals = {
             "aws:ResourceTag/kubernetes.io/cluster/${aws_eks_cluster.main.name}" = "owned"
