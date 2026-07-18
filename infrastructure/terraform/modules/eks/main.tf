@@ -682,7 +682,7 @@ resource "aws_iam_policy" "karpenter_controller_permissions" {
         Condition = {
           StringEquals = {
             "aws:RequestTag/kubernetes.io/cluster/${aws_eks_cluster.main.name}" = "owned"
-            "ec2:CreateAction" = ["RunInstances", "CreateFleet", "CreateLaunchTemplate"]
+            "ec2:CreateAction"                                                  = ["RunInstances", "CreateFleet", "CreateLaunchTemplate"]
           }
           StringLike = {
             "aws:RequestTag/karpenter.sh/nodepool" = "*"
