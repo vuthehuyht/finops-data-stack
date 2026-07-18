@@ -119,7 +119,7 @@ resource "aws_eks_node_group" "core_system" {
   scaling_config {
     desired_size = 1
     min_size     = 1
-    max_size     = 2 # Allow Cluster Autoscaler to scale out once (was locked to 1)
+    max_size     = 2 # Allows the node group to scale out once (was locked to 1)
   }
 
   update_config {
@@ -522,6 +522,18 @@ resource "aws_sqs_queue_policy" "karpenter_interruption" {
         }
         Action   = "sqs:SendMessage"
         Resource = aws_sqs_queue.karpenter_interruption.arn
+      },
+      {
+        Sid       = "DenyInsecureTransport"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "sqs:*"
+        Resource  = aws_sqs_queue.karpenter_interruption.arn
+        Condition = {
+          Bool = {
+            "aws:SecureTransport" = "false"
+          }
+        }
       }
     ]
   })
@@ -583,6 +595,11 @@ resource "aws_cloudwatch_event_target" "karpenter_scheduled_change" {
 # instance-profile management (Karpenter v1.x creates/manages the instance
 # profile itself from karpenter_node's role name), PassRole restricted to
 # the node role, read-only Describe/pricing/ssm, and interruption queue access.
+# Needed to scope the instance-profile ARNs below to this account (IAM ARNs
+# require an explicit account ID, unlike the EC2 ARNs elsewhere in this file
+# which use "*" for account/region).
+data "aws_caller_identity" "current" {}
+
 resource "aws_iam_policy" "karpenter_controller_permissions" {
   name        = "${var.project_name}-karpenter-controller-policy"
   description = "Permissions for the Karpenter controller to provision/terminate EC2 nodes for the EKS cluster"
@@ -591,14 +608,13 @@ resource "aws_iam_policy" "karpenter_controller_permissions" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "AllowScopedEC2InstanceActions"
+        Sid    = "AllowScopedEC2InstanceAccessActions"
         Effect = "Allow"
         Resource = [
           "arn:aws:ec2:*::image/*",
           "arn:aws:ec2:*::snapshot/*",
           "arn:aws:ec2:*:*:security-group/*",
-          "arn:aws:ec2:*:*:subnet/*",
-          "arn:aws:ec2:*:*:launch-template/*"
+          "arn:aws:ec2:*:*:subnet/*"
         ]
         Action = [
           "ec2:RunInstances",
@@ -606,16 +622,46 @@ resource "aws_iam_policy" "karpenter_controller_permissions" {
         ]
       },
       {
-        Sid      = "AllowScopedEC2LaunchTemplateActions"
+        Sid      = "AllowScopedEC2LaunchTemplateAccessActions"
         Effect   = "Allow"
         Resource = "arn:aws:ec2:*:*:launch-template/*"
-        Action   = ["ec2:CreateLaunchTemplate", "ec2:DeleteLaunchTemplate"]
+        Action = [
+          "ec2:RunInstances",
+          "ec2:CreateFleet"
+        ]
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/kubernetes.io/cluster/${aws_eks_cluster.main.name}" = "owned"
+          }
+          StringLike = {
+            "aws:ResourceTag/karpenter.sh/nodepool" = "*"
+          }
+        }
       },
       {
-        Sid      = "AllowScopedInstanceActions"
-        Effect   = "Allow"
-        Resource = "arn:aws:ec2:*:*:instance/*"
-        Action   = ["ec2:TerminateInstances"]
+        Sid    = "AllowScopedEC2InstanceActionsWithTags"
+        Effect = "Allow"
+        Resource = [
+          "arn:aws:ec2:*:*:fleet/*",
+          "arn:aws:ec2:*:*:instance/*",
+          "arn:aws:ec2:*:*:volume/*",
+          "arn:aws:ec2:*:*:network-interface/*",
+          "arn:aws:ec2:*:*:launch-template/*",
+          "arn:aws:ec2:*:*:spot-instances-request/*"
+        ]
+        Action = [
+          "ec2:RunInstances",
+          "ec2:CreateFleet",
+          "ec2:CreateLaunchTemplate"
+        ]
+        Condition = {
+          StringEquals = {
+            "aws:RequestTag/kubernetes.io/cluster/${aws_eks_cluster.main.name}" = "owned"
+          }
+          StringLike = {
+            "aws:RequestTag/karpenter.sh/nodepool" = "*"
+          }
+        }
       },
       {
         Sid    = "AllowScopedResourceCreationTagging"
@@ -631,28 +677,106 @@ resource "aws_iam_policy" "karpenter_controller_permissions" {
         Action = "ec2:CreateTags"
         Condition = {
           StringEquals = {
+            "aws:RequestTag/kubernetes.io/cluster/${aws_eks_cluster.main.name}" = "owned"
             "ec2:CreateAction" = ["RunInstances", "CreateFleet", "CreateLaunchTemplate"]
+          }
+          StringLike = {
+            "aws:RequestTag/karpenter.sh/nodepool" = "*"
           }
         }
       },
       {
-        Sid      = "AllowInstanceProfileManagement"
+        Sid      = "AllowScopedResourceTagging"
         Effect   = "Allow"
-        Resource = "*"
+        Resource = "arn:aws:ec2:*:*:instance/*"
+        Action    = "ec2:CreateTags"
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/kubernetes.io/cluster/${aws_eks_cluster.main.name}" = "owned"
+          }
+          StringLike = {
+            "aws:ResourceTag/karpenter.sh/nodepool" = "*"
+          }
+          "ForAllValues:StringEquals" = {
+            "aws:TagKeys" = ["eks:eks-cluster-name", "karpenter.sh/nodeclaim", "Name"]
+          }
+        }
+      },
+      {
+        Sid    = "AllowScopedDeletion"
+        Effect = "Allow"
+        Resource = [
+          "arn:aws:ec2:*:*:instance/*",
+          "arn:aws:ec2:*:*:launch-template/*"
+        ]
+        Action = ["ec2:TerminateInstances", "ec2:DeleteLaunchTemplate"]
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/kubernetes.io/cluster/${aws_eks_cluster.main.name}" = "owned"
+          }
+          StringLike = {
+            "aws:ResourceTag/karpenter.sh/nodepool" = "*"
+          }
+        }
+      },
+      {
+        Sid      = "AllowScopedInstanceProfileCreationActions"
+        Effect   = "Allow"
+        Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:instance-profile/*"
+        Action   = ["iam:CreateInstanceProfile"]
+        Condition = {
+          StringEquals = {
+            "aws:RequestTag/kubernetes.io/cluster/${aws_eks_cluster.main.name}" = "owned"
+          }
+          StringLike = {
+            "aws:RequestTag/karpenter.k8s.aws/ec2nodeclass" = "*"
+          }
+        }
+      },
+      {
+        Sid      = "AllowScopedInstanceProfileTagActions"
+        Effect   = "Allow"
+        Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:instance-profile/*"
+        Action   = ["iam:TagInstanceProfile"]
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/kubernetes.io/cluster/${aws_eks_cluster.main.name}" = "owned"
+            "aws:RequestTag/kubernetes.io/cluster/${aws_eks_cluster.main.name}"  = "owned"
+          }
+          StringLike = {
+            "aws:ResourceTag/karpenter.k8s.aws/ec2nodeclass" = "*"
+            "aws:RequestTag/karpenter.k8s.aws/ec2nodeclass"  = "*"
+          }
+        }
+      },
+      {
+        Sid      = "AllowScopedInstanceProfileActions"
+        Effect   = "Allow"
+        Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:instance-profile/*"
         Action = [
-          "iam:CreateInstanceProfile",
-          "iam:TagInstanceProfile",
           "iam:AddRoleToInstanceProfile",
           "iam:RemoveRoleFromInstanceProfile",
-          "iam:DeleteInstanceProfile",
-          "iam:GetInstanceProfile"
+          "iam:DeleteInstanceProfile"
         ]
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/kubernetes.io/cluster/${aws_eks_cluster.main.name}" = "owned"
+          }
+          StringLike = {
+            "aws:ResourceTag/karpenter.k8s.aws/ec2nodeclass" = "*"
+          }
+        }
       },
       {
         Sid      = "AllowPassingNodeRole"
         Effect   = "Allow"
         Resource = aws_iam_role.karpenter_node.arn
         Action   = "iam:PassRole"
+        Condition = {
+          StringEquals = {
+            "iam:PassedToService" = "ec2.amazonaws.com"
+          }
+        }
       },
       {
         Sid      = "AllowReadActions"
@@ -669,6 +793,7 @@ resource "aws_iam_policy" "karpenter_controller_permissions" {
           "ec2:DescribeSpotPriceHistory",
           "ec2:DescribeAvailabilityZones",
           "eks:DescribeCluster",
+          "iam:GetInstanceProfile",
           "pricing:GetProducts",
           "ssm:GetParameter"
         ]
