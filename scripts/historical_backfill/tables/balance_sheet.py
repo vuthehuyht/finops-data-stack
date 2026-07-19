@@ -6,10 +6,28 @@ import pandas as pd
 from vnstock import Vnstock as VnstockV4
 
 from scripts.historical_backfill import writer
+from scripts.historical_backfill.config import VNSTOCK_REQUEST_DELAY_SECONDS
 from scripts.historical_backfill.gap_log import GapLogger
 from src.ingest.client.vnstock_client import VnStockClient
 
 TABLE_NAME = "balance_sheet"
+
+# Full declared output schema — every row is reindexed to this column set so
+# corporate rows (COL_MAP) and bank rows (BANK_COL_MAP) never write a
+# different number of columns into the same shared CSV file.
+SCHEMA_COLUMNS = [
+    "ticker",
+    "period",
+    "year",
+    "total_assets",
+    "current_assets",
+    "cash",
+    "inventory",
+    "total_liabilities",
+    "short_term_debt",
+    "long_term_debt",
+    "equity",
+]
 
 COL_MAP: dict[str, str] = {
     "Total Assets": "total_assets",
@@ -56,7 +74,12 @@ def _pivot_all_periods(df: pd.DataFrame, symbol: str) -> pd.DataFrame:
     if col_map is None:
         return pd.DataFrame()
 
-    period_cols = [c for c in df.columns if c not in ("item", "item_en", "item_id")]
+    # VCI sometimes mixes in an annual-only column (e.g. "2018") alongside
+    # quarterly ones even when period="quarter" was requested — "-" filters
+    # those malformed labels out before the "YYYY-Qn" split below.
+    period_cols = [
+        c for c in df.columns if c not in ("item", "item_en", "item_id") and "-" in c
+    ]
     filtered = df[df["item_en"].isin(set(col_map.keys()))].set_index("item_en")
 
     rows = []
@@ -66,7 +89,7 @@ def _pivot_all_periods(df: pd.DataFrame, symbol: str) -> pd.DataFrame:
         row["ticker"] = symbol
         row["period"] = quarter
         row["year"] = year_str
-        rows.append(row)
+        rows.append(row.reindex(columns=SCHEMA_COLUMNS))
 
     return pd.concat(rows, ignore_index=True)
 
@@ -79,7 +102,7 @@ def run(
     gap_logger: GapLogger,
 ) -> None:
     """Fetch quarterly balance sheets for each symbol across every year in range."""
-    client = VnStockClient()
+    client = VnStockClient(request_delay_seconds=VNSTOCK_REQUEST_DELAY_SECONDS)
     start_year = int(start_date.split("-")[0])
     end_year = int(end_date.split("-")[0])
 

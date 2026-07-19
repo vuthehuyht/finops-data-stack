@@ -118,7 +118,12 @@ def _pivot_to_row(
     if col_map is None:
         return None
 
-    period_cols = [c for c in df.columns if c not in ("item", "item_en", "item_id")]
+    # VCI sometimes mixes in an annual-only column (e.g. "2018") alongside
+    # quarterly ones — "-" filters those malformed labels out before picking
+    # the latest quarter below.
+    period_cols = [
+        c for c in df.columns if c not in ("item", "item_en", "item_id") and "-" in c
+    ]
     if not period_cols:
         return None
 

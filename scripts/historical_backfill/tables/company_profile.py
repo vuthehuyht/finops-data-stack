@@ -5,6 +5,7 @@ from pathlib import Path
 from vnstock import Company
 
 from scripts.historical_backfill import writer
+from scripts.historical_backfill.config import VNSTOCK_REQUEST_DELAY_SECONDS
 from scripts.historical_backfill.gap_log import GapLogger
 from src.ingest.client.vnstock_client import VnStockClient
 
@@ -28,7 +29,7 @@ def run(
     gap_logger: GapLogger,
 ) -> None:
     """Fetch the current company profile snapshot for each symbol, once each."""
-    client = VnStockClient()
+    client = VnStockClient(request_delay_seconds=VNSTOCK_REQUEST_DELAY_SECONDS)
 
     for symbol in symbols:
         if writer.is_done(output_dir, TABLE_NAME, symbol):

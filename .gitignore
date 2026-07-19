@@ -71,3 +71,6 @@ PR_DESCRIPTION.md
 
 # tmp
 .tmp*
+
+# Historical backfill script output
+data/raw/

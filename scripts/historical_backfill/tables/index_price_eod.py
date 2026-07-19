@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from scripts.historical_backfill import writer
+from scripts.historical_backfill.config import VNSTOCK_REQUEST_DELAY_SECONDS
 from scripts.historical_backfill.gap_log import GapLogger
 from src.ingest.client.vnstock_client import VnStockClient
 
@@ -18,7 +19,7 @@ def run(
     gap_logger: GapLogger,
 ) -> None:
     """Fetch daily index prices for the fixed VN market indices over the range."""
-    client = VnStockClient()
+    client = VnStockClient(request_delay_seconds=VNSTOCK_REQUEST_DELAY_SECONDS)
 
     for index_name in DEFAULT_INDICES:
         if writer.is_done(output_dir, TABLE_NAME, index_name):

@@ -12,6 +12,7 @@ import pandas as pd
 from vnstock import Vnstock as VnstockV4
 
 from scripts.historical_backfill import writer
+from scripts.historical_backfill.config import VNSTOCK_REQUEST_DELAY_SECONDS
 from scripts.historical_backfill.gap_log import GapLogger
 from src.ingest.client.vnstock_client import VnStockClient
 
@@ -25,7 +26,12 @@ COL_MAP: dict[str, str] = {
 
 def _pivot_all_periods(df: pd.DataFrame, symbol: str) -> pd.DataFrame:
     """Unpivot VCI long-format ratio data periods to one row per quarter."""
-    period_cols = [c for c in df.columns if c not in ("item", "item_en", "item_id")]
+    # VCI sometimes mixes in an annual-only column (e.g. "2018") alongside
+    # quarterly ones even when period="quarter" was requested — "-" filters
+    # those malformed labels out before the "YYYY-Qn" split below.
+    period_cols = [
+        c for c in df.columns if c not in ("item", "item_en", "item_id") and "-" in c
+    ]
     items_needed = set(COL_MAP.keys())
     filtered = df[df["item_en"].isin(items_needed)].set_index("item_en")
     if filtered.empty:
@@ -51,7 +57,7 @@ def run(
     gap_logger: GapLogger,
 ) -> None:
     """Fetch quarterly financial ratios for each symbol, filtered to the date range."""
-    client = VnStockClient()
+    client = VnStockClient(request_delay_seconds=VNSTOCK_REQUEST_DELAY_SECONDS)
     start_year = int(start_date.split("-")[0])
     end_year = int(end_date.split("-")[0])
 
