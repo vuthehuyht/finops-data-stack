@@ -40,15 +40,16 @@ NEWS_WITH_VELOCITY AS (
 ),
 
 ANALYST_LATEST AS (
-  -- Most recent analyst report per ticker per day
+  -- Most recent analyst report per ticker per day.
+  -- FireAnt only exposes free-text title/description, not a structured
+  -- recommendation or target price, so those signals stay NULL placeholders
+  -- until an NLP pass extracts them from DESCRIPTION.
   SELECT
     TICKER,
     PUBLISH_DATE AS DATE,
     COUNT(*) AS ANALYST_REPORT_COUNT,
-    -- Number of BUY recommendations on the day
-    SUM(CASE WHEN UPPER(RECOMMENDATION) IN ('BUY', 'OUTPERFORM', 'OVERWEIGHT') THEN 1 ELSE 0 END)
-      AS ANALYST_BUY_COUNT,
-    AVG(TARGET_PRICE) AS AVG_ANALYST_TARGET_PRICE
+    NULL::INTEGER AS ANALYST_BUY_COUNT,
+    NULL::NUMERIC(18, 4) AS AVG_ANALYST_TARGET_PRICE
   FROM {{ ref('STG_ANALYST_REPORTS') }}
   GROUP BY 1, 2
 ),

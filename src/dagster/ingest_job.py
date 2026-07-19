@@ -20,11 +20,9 @@ from src.ingest.pipeline.commodities_price import CommoditiesPricePipeline
 from src.ingest.pipeline.company_profile import CompanyProfilePipeline
 from src.ingest.pipeline.corporate_events import CorporateEventsPipeline
 from src.ingest.pipeline.exchange_rates import ExchangeRatesPipeline
-from src.ingest.pipeline.financial_ratios import FinancialRatiosPipeline
 from src.ingest.pipeline.foreign_trading import ForeignTradingPipeline
 from src.ingest.pipeline.income_statement import IncomeStatementPipeline
 from src.ingest.pipeline.index_price_eod import IndexPriceEodPipeline
-from src.ingest.pipeline.insider_transactions import InsiderTransactionsPipeline
 from src.ingest.pipeline.interest_rates import InterestRatesPipeline
 from src.ingest.pipeline.macro_indicators import MacroIndicatorsPipeline
 from src.ingest.pipeline.news_articles import NewsArticlesPipeline
@@ -298,34 +296,6 @@ def raw_cashflow_statement(
 
 
 @dagster_lib.asset(
-    key=dagster_lib.asset_key(["INPUT", "RAW_FINANCIAL_RATIOS"]),
-    group_name="INPUT",
-    kinds={"python", "s3"},
-    description="Fetch financial ratios (market cap, shares) and upload to S3.",
-)
-def raw_financial_ratios(
-    context,
-    config: IngestAssetConfig,
-    s3: S3Resource,
-    s3bucket: S3BucketResource,
-) -> dagster.Output[None]:
-    context.log.info(
-        "Starting financial ratios ingestion for %d symbols on date %s",
-        len(config.symbols),
-        config.batch_date,
-    )
-    pipeline = FinancialRatiosPipeline(
-        batch_date=config.batch_date,
-        symbols=config.symbols,
-        s3_client=s3.get_client(),
-        bucket_name=s3bucket.raw_bucket,
-        logger=context.log,
-    )
-    s3_url = pipeline.run()
-    return _build_output(s3_url, config.batch_date, config.symbols)
-
-
-@dagster_lib.asset(
     key=dagster_lib.asset_key(["INPUT", "RAW_COMPANY_PROFILE"]),
     group_name="INPUT",
     kinds={"python", "s3"},
@@ -510,34 +480,6 @@ def raw_corporate_events(
 
 
 @dagster_lib.asset(
-    key=dagster_lib.asset_key(["INPUT", "RAW_INSIDER_TRANSACTIONS"]),
-    group_name="INPUT",
-    kinds={"python", "s3"},
-    description="Fetch insider trading transactions and upload to S3 Bronze.",
-)
-def raw_insider_transactions(
-    context,
-    config: IngestAssetConfig,
-    s3: S3Resource,
-    s3bucket: S3BucketResource,
-) -> dagster.Output[None]:
-    context.log.info(
-        "Starting insider transactions ingestion for %d symbols on date %s",
-        len(config.symbols),
-        config.batch_date,
-    )
-    pipeline = InsiderTransactionsPipeline(
-        batch_date=config.batch_date,
-        symbols=config.symbols,
-        s3_client=s3.get_client(),
-        bucket_name=s3bucket.raw_bucket,
-        logger=context.log,
-    )
-    s3_url = pipeline.run()
-    return _build_output(s3_url, config.batch_date, config.symbols)
-
-
-@dagster_lib.asset(
     key=dagster_lib.asset_key(["INPUT", "RAW_ANALYST_REPORTS"]),
     group_name="INPUT",
     kinds={"python", "s3"},
@@ -573,7 +515,6 @@ _ALL_INGEST_ASSETS: list[dagster.AssetsDefinition] = [
     raw_balance_sheet,
     raw_income_statement,
     raw_cashflow_statement,
-    raw_financial_ratios,
     raw_company_profile,
     raw_macro_indicators,
     raw_interest_rates,
@@ -581,7 +522,6 @@ _ALL_INGEST_ASSETS: list[dagster.AssetsDefinition] = [
     raw_commodities_price,
     raw_news_articles,
     raw_corporate_events,
-    raw_insider_transactions,
     raw_analyst_reports,
 ]
 

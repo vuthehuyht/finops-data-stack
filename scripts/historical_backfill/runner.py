@@ -23,11 +23,9 @@ from scripts.historical_backfill.tables import (
     company_profile,
     corporate_events,
     exchange_rates,
-    financial_ratios,
     foreign_trading,
     income_statement,
     index_price_eod,
-    insider_transactions,
     interest_rates,
     macro_indicators,
     news_articles,
@@ -43,7 +41,6 @@ TABLE_REGISTRY = {
     "balance_sheet": balance_sheet.run,
     "income_statement": income_statement.run,
     "cashflow_statement": cashflow_statement.run,
-    "financial_ratios": financial_ratios.run,
     "company_profile": company_profile.run,
     "macro_indicators": macro_indicators.run,
     "interest_rates": interest_rates.run,
@@ -51,7 +48,6 @@ TABLE_REGISTRY = {
     "commodities_price": commodities_price.run,
     "news_articles": news_articles.run,
     "corporate_events": corporate_events.run,
-    "insider_transactions": insider_transactions.run,
     "analyst_reports": analyst_reports.run,
 }
 
