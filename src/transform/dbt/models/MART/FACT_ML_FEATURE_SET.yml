@@ -168,3 +168,5 @@ models:
         data_type: VARCHAR(256)
       - name: BATCH_DATE
         data_type: DATE
+      - name: PE_RATIO
+      - name: PB_RATIO

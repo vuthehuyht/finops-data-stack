@@ -33,3 +33,4 @@ sources:
             data_type: VARCHAR(256)
           - name: _CONATA_LOADED_AT
             data_type: TIMESTAMP
+          - name: OUTSTANDING_SHARE
