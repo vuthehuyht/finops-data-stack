@@ -3,7 +3,12 @@
 Tài liệu này định nghĩa các quy tắc xử lý dữ liệu từ tầng Bronze (Raw) lên tầng Silver (Cleaned) và tầng Gold (Feature Engineering) để phục vụ cho các mô hình Machine Learning/Deep Learning.
 
 ## 1. Tầng Silver (Cleaned Data & Type Casting)
-Mục tiêu của tầng này là làm sạch dữ liệu thô (được lưu dưới dạng String), ép về đúng kiểu dữ liệu (Type Casting) và chuẩn hóa đơn vị. Các biến đổi này được thực hiện bằng **dbt**.
+Mục tiêu của tầng này là làm sạch dữ liệu thô (được lưu dưới dạng String), ép về đúng kiểu dữ liệu (Type Casting) và chuẩn hóa đơn vị. 
+
+> **[UPDATE - Kiến trúc Tinh gọn]**: Theo yêu cầu phát triển linh hoạt, hệ thống tạm thời loại bỏ dbt và DuckDB. Toàn bộ logic Transform & Feature Engineering được xử lý thủ công bằng Python thuần (Pandas) tại `scripts/dataset_builder.py`.
+> Bộ tính năng hiện tại đã được chắt lọc lại thành **24 Core Features**, bao gồm:
+> - **6 Sequence Features (LSTM)**: `close`, `volume`, `sma_20`, `sma_50`, `rsi_14`, `macd`.
+> - **18 Tabular Features (MLP)**: `market_cap`, `pe_ratio`, `pb_ratio`, `roe`, `roa`, `price_momentum_1m`, `price_momentum_3m`, `volatility_30d`, `relative_strength_vs_vnindex`, `revenue_growth_yoy`, `net_profit_growth_yoy`, `gross_margin`, `debt_to_equity`, `operating_cash_flow_to_net_income`, `foreign_buy_ratio_10d`, `net_foreign_flow_momentum_1m`, `prop_trading_net_val_5d`, `prop_vs_foreign_correlation_10d`.
 
 ### Quy tắc chung:
 *   **Dates:** Chuyển đổi định dạng `YYYY-MM-DD` hoặc `DD/MM/YYYY` về chuẩn `DATE`.

@@ -113,8 +113,13 @@ class StockSequenceDataset(Dataset):
         self, index: int
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         window = self._windows[index]
-        sequence = window[self._sequence_columns].to_numpy(dtype=np.float32)
-        tabular = window[self._tabular_columns].iloc[-1].to_numpy(dtype=np.float32)
+        sequence = window[self._sequence_columns].fillna(0.0).to_numpy(dtype=np.float32)
+        tabular = (
+            window[self._tabular_columns]
+            .iloc[-1]
+            .fillna(0.0)
+            .to_numpy(dtype=np.float32)
+        )
         target = np.float32(window[self._target_column].iloc[-1])
         return (
             torch.from_numpy(sequence),

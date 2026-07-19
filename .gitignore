@@ -74,3 +74,4 @@ PR_DESCRIPTION.md
 
 # Historical backfill script output
 data/*
+models/
