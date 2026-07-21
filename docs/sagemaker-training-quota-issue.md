@@ -17,11 +17,13 @@ quan đến IAM role hay CDK stack của project.
    execution role — stack `FinopsMlSandboxStack`, output `BucketName` =
    `finops-ml-sandbox-artifacts`, `ExecutionRoleArn` =
    `arn:aws:iam::654654329682:role/FinopsMlSandboxStack-SageMakerExecutionRole7843F3B8-eWJT9AlLI3Sw`).
-2. `trigger_sagemaker_training.py` chạy qua bước build features
-   (`scripts/dataset_builder.py`, 39,180 rows) và upload S3 thành công.
-3. Lời gọi `ModelTrainer.train(...)` (gọi `CreateTrainingJob`) fail với:
 
-   ```
+1. `trigger_sagemaker_training.py` chạy qua bước build features
+   (`scripts/dataset_builder.py`, 39,180 rows) và upload S3 thành công.
+
+1. Lời gọi `ModelTrainer.train(...)` (gọi `CreateTrainingJob`) fail với:
+
+   ```text
    ResourceLimitExceeded: An error occurred (ResourceLimitExceeded) when
    calling the CreateTrainingJob operation: The account-level service limit
    'ml.m5.large for training job usage' is 0 Instances, with current
@@ -29,7 +31,7 @@ quan đến IAM role hay CDK stack của project.
    AWS Service Quotas to request an increase for this quota.
    ```
 
-4. Kiểm tra toàn bộ quota SageMaker training job trong account
+1. Kiểm tra toàn bộ quota SageMaker training job trong account
    (`aws service-quotas list-service-quotas --service-code sagemaker`, lọc
    `*for training job usage*`) — **tất cả loại instance đều = 0**, xác nhận
    đây là mặc định toàn account, không riêng gì `ml.m5.large`.
