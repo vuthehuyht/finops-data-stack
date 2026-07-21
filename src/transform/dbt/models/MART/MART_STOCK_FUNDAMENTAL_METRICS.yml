@@ -57,8 +57,10 @@ models:
       - name: EQUITY_MULTIPLIER
         data_type: NUMERIC(18, 6)
         description: total_assets / equity
+      - name: PE_RATIO
         data_type: NUMERIC(18, 4)
         description: market_cap / net_profit_after_tax (trailing)
+      - name: PB_RATIO
         data_type: NUMERIC(18, 4)
         description: market_cap / equity
       - name: OPERATING_CASH_FLOW_TO_NET_INCOME

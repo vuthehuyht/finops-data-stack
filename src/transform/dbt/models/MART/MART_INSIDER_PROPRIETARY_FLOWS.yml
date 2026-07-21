@@ -39,10 +39,6 @@ models:
       - name: PROP_VS_FOREIGN_CORRELATION_10D
         data_type: NUMERIC(18, 6)
         description: 10-day rolling Pearson correlation between prop and foreign net values
-        data_type: SMALLINT
-        description: "-1 (net sell), 0 (neutral), +1 (net buy) based on insider transactions on this day"
-        data_type: NUMERIC(18, 6)
-        description: insider_buy_vol / insider_total_vol on announcement date
       - name: DATACORE_CREATE_DATETIME
         data_type: TIMESTAMP
       - name: DATACORE_CREATE_PROGRAM
