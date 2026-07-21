@@ -1,6 +1,12 @@
 # Makefile to setup and run dev_local environment for FinOps Data Stack
 
-.PHONY: help setup dev lint format test clean dev_local dev_local_up dev_local_down up down lint-sql format-sql ci ci_up ci_down infra infra_plan infra_up infra_down bootstrap
+.PHONY: help setup dev lint format test clean dev_local dev_local_up dev_local_down up down lint-sql format-sql ci ci_up ci_down infra infra_plan infra_up infra_down bootstrap build_push_image deploy_eks
+
+# Variables for Docker and ECR
+AWS_REGION ?= ap-southeast-1
+ECR_REPO ?= $(shell terraform -chdir=infrastructure/terraform output -raw ecr_repository_url)
+ECR_HOST ?= $(firstword $(subst /, ,$(ECR_REPO)))
+IMAGE_TAG ?= latest
 
 # Default target when running `make`
 help:
@@ -18,6 +24,8 @@ help:
 	@echo "  make lint           - Check code style and formatting issues with ruff"
 	@echo "  make format         - Automatically format and fix lint issues with ruff"
 	@echo "  make test           - Run all unit tests with pytest"
+	@echo "  make build_push_image - Build Docker image and push to AWS ECR"
+	@echo "  make deploy_eks     - Deploy the FinOps Data Stack to EKS via Helm"
 	@echo "  make clean          - Clean up temporary files, logs, and caches"
 
 # Initialize dev_local environment
@@ -135,3 +143,28 @@ up down plan:
 # Clean cache and temporary files (Cross-platform support)
 clean:
 	@uv run python scripts/clean.py
+
+# Build and push Docker image to ECR
+build_push_image:
+	@echo "Authenticating Docker with ECR..."
+	aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(ECR_HOST)
+	@echo "Building Docker image..."
+	docker build -t finops-dagster-app:$(IMAGE_TAG) -f src/docker/Dockerfile .
+	@echo "Tagging Docker image..."
+	docker tag finops-dagster-app:$(IMAGE_TAG) $(ECR_REPO):$(IMAGE_TAG)
+	@echo "Pushing Docker image to ECR..."
+	docker push $(ECR_REPO):$(IMAGE_TAG)
+
+# Deploy to EKS using Helm
+deploy_eks:
+	@echo "Updating kubeconfig for EKS cluster..."
+	aws eks update-kubeconfig --region $(AWS_REGION) --name finops-eks-cluster
+	@echo "Ensuring namespaces exist..."
+	kubectl create namespace dagster --dry-run=client -o yaml | kubectl apply -f -
+	@echo "Applying External Secrets manifests..."
+	kubectl apply -f src/k8s/manifest/external-secrets/
+	@echo "Adding Dagster Helm repository..."
+	helm repo add dagster https://dagster-io.github.io/helm
+	helm repo update
+	@echo "Deploying Dagster to EKS with Helm..."
+	helm upgrade --install finops-dagster dagster/dagster -f infrastructure/helm/values.yaml -n dagster --create-namespace

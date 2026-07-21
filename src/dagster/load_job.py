@@ -237,7 +237,9 @@ def define_load_jobs() -> LoadJobBundle:
     ] = {}
     input_to_asset: dict[dagster.AssetKey, dagster.AssetsDefinition] = {}
 
-    for param in _read_load_job_parameter(_JOB_DEFINITION_FILE):
+    parameters = list(_read_load_job_parameter(_JOB_DEFINITION_FILE))
+
+    for param in parameters:
         asset = _create_raw_data_asset(param)
         bundle.assets.append(asset)
 
@@ -275,5 +277,35 @@ def define_load_jobs() -> LoadJobBundle:
         bundle.sensors.append(
             _create_load_sensor(sensor_keys, sensor_jobs, input_to_job, input_to_asset)
         )
+
+    @dagster.config_mapping(config_schema={"batch_date": str})
+    def load_all_config_mapping(val: dict) -> dict:
+        batch_date = val["batch_date"]
+        raw_bucket = os.getenv("FINOPS_RAW_BUCKET", "finops-raw-dev")
+        ops = {}
+        for param in parameters:
+            asset_py_id = param.asset_key.to_python_identifier()
+            ops[asset_py_id] = {
+                "config": {
+                    "s3_url": f"s3://{raw_bucket}/data_storage/{param.table_name.lower()}/{batch_date}/",
+                    "batch_date": batch_date,
+                }
+            }
+        return {"ops": ops}
+
+    load_all_job = dagster_lib.define_asset_job(
+        "load_all_raw_data_job",
+        selection=bundle.assets,
+        config=load_all_config_mapping,
+        tags={
+            "limit_concurrent_job_runs_to_1": "load_all_raw_data_job",
+            "type": "load",
+        },
+        description=(
+            "Load all raw data tables concurrently from S3 "
+            "to Redshift for a given batch_date."
+        ),
+    )
+    bundle.jobs.append(load_all_job)
 
     return bundle
