@@ -69,7 +69,7 @@ jobs:
 
       # Yaml linting using official GHA Reviewdog Action
       - name: Yamllint with Reviewdog
-        uses: reviewdog/action-yamllint@5b102912b709ce540ded49b3dae09ecb4711bbe3 #1.23.0
+        uses: reviewdog/action-yamllint@5b102912b709ce540ded49b3dae09ecb4711bbe3 # 1.23.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-review
