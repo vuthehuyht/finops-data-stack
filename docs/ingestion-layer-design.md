@@ -1,13 +1,15 @@
 # Ingestion Layer Design Specification
 
 ## 1. Overview
+
 Ingestion Layer (Tầng thu thập dữ liệu) là bước khởi đầu của toàn bộ Data Pipeline. Nhiệm vụ cốt lõi là thu thập dữ liệu thô từ các nguồn khác nhau (APIs chứng khoán, cổng thông tin vĩ mô, tin tức doanh nghiệp...), chuẩn hóa tên cột và tiêm trường metadata hệ thống (`_CONATA_*`), lưu trữ tạm thời dưới dạng file Parquet nén Snappy, và tải lên AWS S3 (Bronze Layer/Raw).
 
 Tài liệu này đặc tả chi tiết kiến trúc hướng đối tượng cho Ingestion Layer, cách tổ chức 17 file logic pipeline độc lập tương ứng với 17 bảng dữ liệu thô, cơ chế an toàn (Retry & Rate Limiting), cách tích hợp vào Dagster và kế hoạch kiểm thử.
 
----
+______________________________________________________________________
 
 ## 2. Directory Structure
+
 Để đảm bảo tách biệt trách nhiệm rõ ràng, logic Ingestion (Crawl/API -> S3) sẽ nằm hoàn toàn dưới thư mục `src/ingest/`. Thư mục `src/load/` cũ sẽ chỉ đảm nhiệm việc tải dữ liệu từ S3 vào Redshift.
 
 ```text
@@ -51,14 +53,16 @@ src/ingest/
     └── analyst_reports.py      # Thu thập báo cáo phân tích doanh nghiệp (RAW_ANALYST_REPORTS)
 ```
 
----
+______________________________________________________________________
 
 ## 3. Shared Components Design
 
 ### A. Base Client (`src/ingest/client/base_client.py`)
+
 Mọi Client kết nối nguồn dữ liệu bên ngoài phải kế thừa từ `BaseClient` để thừa hưởng các cơ chế an toàn:
-*   **Rate Limiting**: Giãn cách có cấu hình giữa các request thông qua `request_delay_seconds`.
-*   **Exponential Backoff Retry**: Sử dụng thư viện `tenacity` để tự động thử lại tối đa 3 lần khi gặp lỗi kết nối hoặc lỗi dịch vụ từ phía API nguồn.
+
+- **Rate Limiting**: Giãn cách có cấu hình giữa các request thông qua `request_delay_seconds`.
+- **Exponential Backoff Retry**: Sử dụng thư viện `tenacity` để tự động thử lại tối đa 3 lần khi gặp lỗi kết nối hoặc lỗi dịch vụ từ phía API nguồn.
 
 ```python
 import logging
@@ -107,6 +111,7 @@ class BaseClient:
 ```
 
 ### B. Base Ingest Pipeline (`src/ingest/pipeline/base.py`)
+
 Lớp trừu tượng định nghĩa khung sườn (Template Method) cho vòng đời Ingestion. Các tham số như `batch_date` và `symbols` được truyền tĩnh qua constructor khi Dagster khởi tạo.
 
 ```python
@@ -255,11 +260,12 @@ class BaseIngestPipeline(abc.ABC):
 
 > **Note — `ProprietaryTradingPipeline`:** `fetch()` raises `NotImplementedError`. vnstock v4 does not expose proprietary trading data for any supported source (VCI, KBS). The pipeline skeleton exists in `src/ingest/pipeline/proprietary_trading.py` but requires a paid data source (FiinTrade or Vietstock) to implement.
 
----
+______________________________________________________________________
 
 ## 4. Data Flow Lifecycle & Diagrams
 
 ### Sequence Diagram
+
 ```mermaid
 sequenceDiagram
     autonumber
@@ -286,45 +292,53 @@ sequenceDiagram
     B-->>D: Trả về s3_url của file Parquet
 ```
 
----
+______________________________________________________________________
 
 ## 5. Dagster Integration & Downstream Trigger
-Mỗi file pipeline con trong `pipeline/` sẽ được gọi bởi một Dagster Asset tương ứng. 
 
-1.  **INPUT Asset**: Dagster Asset thuộc nhóm `INPUT` khởi tạo class pipeline tương ứng bằng cách truyền tham số cấu hình (tĩnh) qua constructor, gọi phương thức `.run()` và nhận về `s3_url` để đưa vào metadata của Asset Output.
-2.  **Redshift Load Sensor (`load_job_sensor`)**: Cảm biến này theo dõi các asset nhóm `INPUT` được materialized, trích xuất `s3_url` và `batch_date` từ metadata, sau đó kích hoạt Job nạp dữ liệu tương ứng trong `src/dagster/load_job.py` để thực thi lệnh `COPY` vào Redshift Bronze tables.
+Mỗi file pipeline con trong `pipeline/` sẽ được gọi bởi một Dagster Asset tương ứng.
 
----
+1. **INPUT Asset**: Dagster Asset thuộc nhóm `INPUT` khởi tạo class pipeline tương ứng bằng cách truyền tham số cấu hình (tĩnh) qua constructor, gọi phương thức `.run()` và nhận về `s3_url` để đưa vào metadata của Asset Output.
+1. **Redshift Load Sensor (`load_job_sensor`)**: Cảm biến này theo dõi các asset nhóm `INPUT` được materialized, trích xuất `s3_url` và `batch_date` từ metadata, sau đó kích hoạt Job nạp dữ liệu tương ứng trong `src/dagster/load_job.py` để thực thi lệnh `COPY` vào Redshift Bronze tables.
+
+______________________________________________________________________
 
 ## 6. Error Handling & Security
-*   **Không Catch-and-Ignore Exception**: Mọi ngoại lệ trong quá trình lấy dữ liệu, ghi file, và tải lên S3 đều phải để văng tự do (fail loudly) để hệ thống điều phối (Dagster) ghi nhận lỗi và gửi thông báo cảnh báo kịp thời.
-*   **Bảo mật Thông tin nhạy cảm**: Tuyệt đối không lưu cứng (hardcode) các API keys, AWS credentials trong code. Các API clients phải truy xuất các giá trị này qua biến môi trường hoặc AWS Secrets Manager đã được Dagster resource bọc sẵn.
-*   **Cơ chế Fallback & Mocking**: Đối với các nguồn dữ liệu nhạy cảm hoặc không có API miễn phí ổn định (`RAW_PROPRIETARY_TRADING`, `RAW_INSIDER_TRANSACTIONS`), pipeline thực hiện cơ chế cào đa tầng (Primary API -> HTML Scraper -> Fallback Mock Generator). Khi kích hoạt Mock Generator, dữ liệu mô phỏng sẽ được tự động tạo dựa trên tương quan dữ liệu giá thực tế (EOD) của ngày batch để toàn bộ pipeline không bao giờ bị dừng đột ngột. Cột `_CONATA_SOURCE` sẽ ghi lại chính xác nguồn dữ liệu thực tế được sử dụng (`api://`, `scrape://`, hoặc `mock://`) để phục vụ kiểm toán dữ liệu.
 
----
+- **Không Catch-and-Ignore Exception**: Mọi ngoại lệ trong quá trình lấy dữ liệu, ghi file, và tải lên S3 đều phải để văng tự do (fail loudly) để hệ thống điều phối (Dagster) ghi nhận lỗi và gửi thông báo cảnh báo kịp thời.
+- **Bảo mật Thông tin nhạy cảm**: Tuyệt đối không lưu cứng (hardcode) các API keys, AWS credentials trong code. Các API clients phải truy xuất các giá trị này qua biến môi trường hoặc AWS Secrets Manager đã được Dagster resource bọc sẵn.
+- **Cơ chế Fallback & Mocking**: Đối với các nguồn dữ liệu nhạy cảm hoặc không có API miễn phí ổn định (`RAW_PROPRIETARY_TRADING`, `RAW_INSIDER_TRANSACTIONS`), pipeline thực hiện cơ chế cào đa tầng (Primary API -> HTML Scraper -> Fallback Mock Generator). Khi kích hoạt Mock Generator, dữ liệu mô phỏng sẽ được tự động tạo dựa trên tương quan dữ liệu giá thực tế (EOD) của ngày batch để toàn bộ pipeline không bao giờ bị dừng đột ngột. Cột `_CONATA_SOURCE` sẽ ghi lại chính xác nguồn dữ liệu thực tế được sử dụng (`api://`, `scrape://`, hoặc `mock://`) để phục vụ kiểm toán dữ liệu.
+
+______________________________________________________________________
 
 ## 7. Testing & Verification Plan
 
 ### Unit Tests
 
 **Client tests** (`tests/ingest/client/`):
-*   `test_base_client.py`: Verifies retry fires up to 3 times on failure and rate limiting enforces minimum spacing between calls.
-*   `test_vnstock_client.py`: Mocks `Vnstock()` to verify price and news fetch calls.
-*   `test_world_bank_client.py`: Mocks `httpx.get` to verify indicator fetching and empty-response handling.
-*   `test_yahoo_finance_client.py`: Mocks `yfinance` to verify single-ticker history fetching.
-*   `test_fireant_client.py`: Mocks `requests` to verify login auth flow and paginated report fetching.
+
+- `test_base_client.py`: Verifies retry fires up to 3 times on failure and rate limiting enforces minimum spacing between calls.
+- `test_vnstock_client.py`: Mocks `Vnstock()` to verify price and news fetch calls.
+- `test_world_bank_client.py`: Mocks `httpx.get` to verify indicator fetching and empty-response handling.
+- `test_yahoo_finance_client.py`: Mocks `yfinance` to verify single-ticker history fetching.
+- `test_fireant_client.py`: Mocks `requests` to verify login auth flow and paginated report fetching.
 
 **Pipeline tests** (`tests/ingest/`):
-*   `test_base_pipeline.py`: Uses a concrete test subclass of `BaseIngestPipeline` to verify: column uppercasing, `schema_columns` filtering, missing-column fill-with-None, `_CONATA_*` metadata injection, and S3 upload path format (boto3 mocked via `unittest.mock.patch`).
-*   Per-pipeline files (`test_stock_price_eod_pipeline.py`, `test_balance_sheet_pipeline.py`, etc.): Each verifies the `fetch()` implementation for that pipeline using mocked clients.
+
+- `test_base_pipeline.py`: Uses a concrete test subclass of `BaseIngestPipeline` to verify: column uppercasing, `schema_columns` filtering, missing-column fill-with-None, `_CONATA_*` metadata injection, and S3 upload path format (boto3 mocked via `unittest.mock.patch`).
+- Per-pipeline files (`test_stock_price_eod_pipeline.py`, `test_balance_sheet_pipeline.py`, etc.): Each verifies the `fetch()` implementation for that pipeline using mocked clients.
 
 ### Lệnh thực thi
-*   **Chạy Unit Tests**:
-    ```bash
-    uv run pytest tests/ingest/
-    ```
-*   **Linter & Code Format**:
-    ```bash
-    uv run ruff check src/ingest/
-    uv run ruff format src/ingest/
-    ```
+
+- **Chạy Unit Tests**:
+
+  ```bash
+  uv run pytest tests/ingest/
+  ```
+
+- **Linter & Code Format**:
+
+  ```bash
+  uv run ruff check src/ingest/
+  uv run ruff format src/ingest/
+  ```

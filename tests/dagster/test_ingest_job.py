@@ -47,9 +47,9 @@ def test_define_ingest_jobs_returns_bundle() -> None:
 
     bundle = define_ingest_jobs()
     assert isinstance(bundle, IngestJobBundle)
-    assert len(bundle.assets) == 17
-    assert len(bundle.jobs) == 17
-    assert len(bundle.schedules) == 17
+    assert len(bundle.assets) == 15
+    assert len(bundle.jobs) == 15
+    assert len(bundle.schedules) == 15
 
 
 def test_define_ingest_jobs_asset_keys() -> None:
@@ -103,6 +103,6 @@ def test_define_ingest_jobs_returns_cached_instance() -> None:
 def test_all_ingest_assets_have_input_group() -> None:
     from src.dagster.ingest_job import _ALL_INGEST_ASSETS
 
-    assert len(_ALL_INGEST_ASSETS) == 17
+    assert len(_ALL_INGEST_ASSETS) == 15
     for asset in _ALL_INGEST_ASSETS:
         assert asset.group_names_by_key[asset.key] == "INPUT"

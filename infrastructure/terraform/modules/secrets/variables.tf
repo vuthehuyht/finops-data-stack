@@ -75,3 +75,8 @@ variable "fireant_password" {
   sensitive   = true
   description = "FireAnt account password, for analyst reports ingestion"
 }
+
+variable "slack_api_token" {
+  type      = string
+  sensitive = true
+}

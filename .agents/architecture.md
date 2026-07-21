@@ -11,7 +11,7 @@ Data Mesh / Lakehouse architecture on AWS, orchestrated by **Dagster** (Software
 - **Data Lake (Bronze)**: Amazon S3 — raw data in Parquet/JSON.
 - **Data Warehouse (Silver/Gold)**: Amazon Redshift Serverless.
 - **Transformation**: dbt (data build tool).
-- **Machine Learning**: Amazon SageMaker — on-demand Training, Serverless Inference, Model Registry.
+- **Machine Learning**: Amazon SageMaker — on-demand Training (GPU), Batch Transform for daily inference. Model versioning via S3 path + SSM Parameter Store (not SageMaker Model Registry).
 - **Security**: AWS IAM, KMS, Secrets Manager, VPC.
 - **CI/CD**: GitHub Actions → deploy to EKS.
 
@@ -22,15 +22,15 @@ Data Mesh / Lakehouse architecture on AWS, orchestrated by **Dagster** (Software
 2. Sensor & Loading (S3 → Redshift Bronze): trigger `COPY` to load raw tables.
 3. Transformation (dbt Silver & Gold): type casting + `DATACORE_*` metadata, then feature engineering at Gold (Mart) layer.
 4. Data Quality Gate: validate `fact_ml_feature_set` meets standards before continuing.
-5. ML Inference: call SageMaker Serverless Endpoint (scale-to-zero).
-6. Results Publishing: write forecast results to Redshift Gold + dashboard.
+5. ML Inference: run SageMaker Batch Transform Job (Serverless Batch). Output is self-contained (`ticker` + `predicted_return` per line, no output-line-position matching). The published `TRADING_DATE` is the next trading day after the feature anchor date, not the anchor date itself.
+6. Results Publishing: `COPY` the Batch Transform output file directly into Redshift Gold (`FCT_ML_FORECAST_RESULTS`, delete-then-insert by `TRADING_DATE` for idempotency) + dashboard.
 
 ### 2. Quarterly Re-training Pipeline (after new financial statements are published)
-1. Historical Data Preparation: aggregate feature set from the last 12-24 months from Redshift.
+1. Historical Data Preparation: export the full history of `FACT_ML_FEATURE_SET` from Redshift (no lookback filter — dataset is small enough that a window isn't needed).
 2. Training Job (SageMaker GPU) → model artifact pushed to S3.
-3. Model Registration into SageMaker Model Registry with evaluation metrics.
+3. Model Registration: version the model on S3 (`<model_name>/<version>/model.tar.gz` + `metadata.json` with evaluation metrics) — not SageMaker Model Registry.
 4. Model Evaluation & Approval: compare Challenger vs Champion.
-5. Serverless Deployment: update endpoint to use the newly approved version.
+5. Model Promotion: update active model version in SSM Parameter Store.
 
 ## `src/` Directory Structure (Flywheel Architecture)
 
@@ -42,10 +42,11 @@ src/
 ├── load/        # Load layer (S3 -> Redshift)
 ├── transform/   # dbt project (transformation)
 ├── pipeline/    # Legacy orchestration helpers (src/pipeline/dagster/ predates src/dagster/)
+├── ml/          # ML training pipeline: model code, dataset windowing, SageMaker training job
 ├── k8s/         # Kubernetes manifests
 ```
 
-*(Note: `src/ml/` and `src/docker/` are planned but not yet created.)*
+*(Note: Inference-time SageMaker Batch Transform job is orchestrated dynamically using SageMakerResource helper methods.)*
 
 ## Metadata Governance (names only, see docs for detail)
 

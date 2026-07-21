@@ -140,10 +140,6 @@ models:
         data_type: NUMERIC(18, 4)
       - name: PROP_VS_FOREIGN_CORRELATION_10D
         data_type: NUMERIC(18, 6)
-      - name: INSIDER_SENTIMENT_SIGNAL
-        data_type: SMALLINT
-      - name: INSIDER_BUY_VOLUME_RATIO
-        data_type: NUMERIC(18, 6)
       # Target labels — ML target ONLY, never use as input features
       - name: LABEL_NEXT_5D_RETURN
         data_type: NUMERIC(18, 6)
@@ -172,3 +168,5 @@ models:
         data_type: VARCHAR(256)
       - name: BATCH_DATE
         data_type: DATE
+      - name: PE_RATIO
+      - name: PB_RATIO

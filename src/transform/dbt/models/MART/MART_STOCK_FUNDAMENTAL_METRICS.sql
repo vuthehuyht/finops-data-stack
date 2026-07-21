@@ -6,7 +6,7 @@
 }}
 
 -- Latest quarterly snapshot per ticker from each fundamental table.
--- Joined with daily FINANCIAL_RATIOS (market cap, shares outstanding) so that
+-- Joined with daily STOCK_PRICE_EOD so that
 -- the output granularity is Ticker + Date (daily), with quarterly data forward-filled.
 
 WITH INCOME_WITH_YOY AS (
@@ -72,7 +72,7 @@ CASHFLOW_LATEST AS (
 
 SELECT
   R.TICKER::VARCHAR(256) AS TICKER,
-  R.DATE::DATE AS DATE,
+  R.TRADING_DATE::DATE AS TRADING_DATE,
   -- Revenue & profit growth (YoY, quarterly)
   CASE
     WHEN I.REVENUE_YOY > 0
@@ -125,14 +125,13 @@ SELECT
     WHEN B.EQUITY != 0
       THEN B.TOTAL_ASSETS / B.EQUITY
   END::NUMERIC(18, 6) AS EQUITY_MULTIPLIER,
-  -- Valuation multiples (market cap from daily data, profit from quarterly)
   CASE
-    WHEN I.NET_PROFIT_AFTER_TAX != 0
-      THEN R.MARKET_CAP / I.NET_PROFIT_AFTER_TAX
+    WHEN I.NET_PROFIT_AFTER_TAX != 0 AND CP.OUTSTANDING_SHARE IS NOT NULL
+      THEN (R.CLOSE_PRICE * CP.OUTSTANDING_SHARE) / I.NET_PROFIT_AFTER_TAX
   END::NUMERIC(18, 4) AS PE_RATIO,
   CASE
-    WHEN B.EQUITY != 0
-      THEN R.MARKET_CAP / B.EQUITY
+    WHEN B.EQUITY != 0 AND CP.OUTSTANDING_SHARE IS NOT NULL
+      THEN (R.CLOSE_PRICE * CP.OUTSTANDING_SHARE) / B.EQUITY
   END::NUMERIC(18, 4) AS PB_RATIO,
   -- Cash flow ratios
   CASE
@@ -145,7 +144,7 @@ SELECT
       THEN CF.CFO / (B.SHORT_TERM_DEBT + B.LONG_TERM_DEBT)
   END::NUMERIC(18, 6) AS CASH_FLOW_TO_DEBT,
   {{ datacore_common_metadata() }}
-FROM {{ ref('STG_FINANCIAL_RATIOS') }} AS R
+FROM {{ ref('STG_STOCK_PRICE_EOD') }} AS R
 LEFT JOIN INCOME_LATEST AS I
   ON
     R.TICKER = I.TICKER
@@ -155,3 +154,6 @@ LEFT JOIN BALANCE_WITH_YOY AS B
 LEFT JOIN CASHFLOW_LATEST AS CF
   ON
     R.TICKER = CF.TICKER
+LEFT JOIN {{ ref('STG_COMPANY_PROFILE') }} AS CP
+  ON
+    R.TICKER = CP.TICKER

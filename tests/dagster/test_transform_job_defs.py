@@ -24,7 +24,7 @@ def test_transform_job_defs_csv() -> None:
 
         rows = list(reader)
         row_count = len(rows)
-        assert row_count == 17, f"Row count must be exactly 17. Found: {row_count}"
+        assert row_count == 15, f"Row count must be exactly 15. Found: {row_count}"
 
         for i, row in enumerate(rows, start=1):
             assert len(row) == 4, f"Row {i} does not have 4 columns: {row}"

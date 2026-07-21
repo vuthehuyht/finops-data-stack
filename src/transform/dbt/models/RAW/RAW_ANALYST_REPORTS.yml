@@ -21,11 +21,11 @@ sources:
             data_type: VARCHAR(256)
           - name: PUBLISH_DATE
             data_type: VARCHAR(256)
-          - name: RECOMMENDATION
+          - name: TITLE
             data_type: VARCHAR(256)
-          - name: TARGET_PRICE
-            data_type: VARCHAR(256)
-          - name: REPORT_PDF_URL
+          - name: DESCRIPTION
+            data_type: VARCHAR(8000)
+          - name: FILE_NAME
             data_type: VARCHAR(256)
           - name: BATCH_DATE
             data_type: DATE

@@ -1,8 +1,10 @@
 """Ingestion pipeline for RAW_FOREIGN_TRADING."""
 
+import os
+
 import pandas as pd
 
-from src.ingest.client.vnstock_client import VnStockClient
+from src.ingest.client.fireant_client import FireAntClient
 from src.ingest.pipeline.base import DEFAULT_TICKER_SYMBOLS, BaseIngestPipeline
 
 
@@ -15,7 +17,7 @@ class ForeignTradingPipeline(BaseIngestPipeline):
 
     @property
     def source_uri_prefix(self) -> str:
-        return "api://vnstock/foreign_trading"
+        return "api://fireant/historical-quotes"
 
     @property
     def schema_columns(self) -> list[str]:
@@ -31,26 +33,39 @@ class ForeignTradingPipeline(BaseIngestPipeline):
 
     def fetch(self) -> pd.DataFrame:
         """Fetch foreign trading logs for symbols on the batch date."""
-        client = VnStockClient()
+        client = FireAntClient(
+            email=os.environ["FIREANT_EMAIL"], password=os.environ["FIREANT_PASSWORD"]
+        )
         all_dfs = []
         targets = self.symbols or DEFAULT_TICKER_SYMBOLS
 
         for symbol in targets:
             try:
-                stock_obj = client.client.stock(symbol=symbol, source="TCBS")
-                if not hasattr(stock_obj, "trading"):
+                quotes = client.get_historical_quotes(
+                    symbol, start_date=self.batch_date, end_date=self.batch_date
+                )
+                if not quotes:
                     continue
 
-                # Query foreign flow directly via client retry runner
-                df = client.call_api_with_retry(
-                    stock_obj.trading.foreign_flow,
-                    start=self.batch_date,
-                    end=self.batch_date,
-                )
-                if not df.empty:
-                    if "TICKER" not in df.columns and "symbol" not in df.columns:
-                        df["ticker"] = symbol
-                    all_dfs.append(df)
+                rows = []
+                for q in quotes:
+                    buy_val = q.get("buyForeignValue", 0)
+                    sell_val = q.get("sellForeignValue", 0)
+                    net_val = buy_val - sell_val
+                    rows.append(
+                        {
+                            "ticker": symbol,
+                            "trading_date": q.get("date", "")[:10],
+                            "buy_vol": q.get("buyForeignQuantity", 0),
+                            "sell_vol": q.get("sellForeignQuantity", 0),
+                            "buy_val": buy_val,
+                            "sell_val": sell_val,
+                            "net_val": net_val,
+                        }
+                    )
+
+                if rows:
+                    all_dfs.append(pd.DataFrame(rows))
             except Exception as e:
                 self.logger.error(
                     "Failed to fetch foreign trading for %s: %s", symbol, e

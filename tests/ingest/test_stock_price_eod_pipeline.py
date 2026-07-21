@@ -91,7 +91,7 @@ def test_stock_price_eod_pipeline_fetch_adds_value_column(
 def test_stock_price_eod_pipeline_fetch_adds_adjusted_close_column(
     mock_client_class: MagicMock,
 ) -> None:
-    """Verify fetch adds NULL adjusted_close column when vnstock v4 doesn't return it."""
+    """Verify fetch adds NULL adjusted_close column when vnstock v4 omits it."""
     mock_client = MagicMock()
     mock_client_class.return_value = mock_client
     mock_client.get_stock_price_eod.return_value = pd.DataFrame([_make_vnstock_row()])

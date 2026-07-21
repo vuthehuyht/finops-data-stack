@@ -134,6 +134,43 @@ def test_balance_sheet_pipeline_multiple_symbols_concatenated(
     assert mock_client.call_api_with_retry.call_count == 2
 
 
+def _make_bank_long_df(period_col: str = "2026-Q1") -> pd.DataFrame:
+    """Return long-format VCI balance sheet DataFrame with bank item_en labels."""
+    return pd.DataFrame(
+        {
+            "item_en": [
+                "TOTAL ASSETS",
+                "Cash and precious metals",
+                "TOTAL LIABILITIES",
+                "OWNER'S EQUITY",
+            ],
+            "item": ["x"] * 4,
+            "item_id": range(4),
+            period_col: [9000.0, 500.0, 6000.0, 3000.0],
+        }
+    )
+
+
+@patch("src.ingest.pipeline.balance_sheet.VnStockClient")
+def test_balance_sheet_pipeline_falls_back_to_bank_col_map(
+    mock_client_class: MagicMock,
+) -> None:
+    """Verify fetch falls back to bank item_en labels if corporate labels miss."""
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
+    mock_client.call_api_with_retry.return_value = _make_bank_long_df("2026-Q1")
+
+    pipeline = BalanceSheetPipeline(batch_date="2026-06-18", symbols=["ACB"])
+    result_df = pipeline.fetch()
+
+    assert len(result_df) == 1
+    assert result_df["ticker"].iloc[0] == "ACB"
+    assert result_df["total_assets"].iloc[0] == 9000.0
+    assert result_df["cash"].iloc[0] == 500.0
+    assert result_df["total_liabilities"].iloc[0] == 6000.0
+    assert result_df["equity"].iloc[0] == 3000.0
+
+
 @patch("src.ingest.pipeline.balance_sheet.VnStockClient")
 def test_balance_sheet_defaults_to_vn30_when_no_symbols(
     mock_client_class: MagicMock,

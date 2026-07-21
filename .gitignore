@@ -30,6 +30,9 @@ dbt_packages/
 logs/
 .user.yml
 
+# CDK
+cdk.out/
+
 # ML
 *.tar.gz
 .ipynb_checkpoints/
@@ -71,3 +74,7 @@ PR_DESCRIPTION.md
 
 # tmp
 .tmp*
+
+# Historical backfill script output
+data/*
+models/

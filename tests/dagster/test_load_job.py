@@ -45,7 +45,7 @@ def test_read_load_job_parameter_count() -> None:
     from src.dagster.load_job import _JOB_DEFINITION_FILE, _read_load_job_parameter
 
     params = list(_read_load_job_parameter(_JOB_DEFINITION_FILE))
-    assert len(params) == 17
+    assert len(params) == 15
 
 
 def test_read_load_job_parameter_first_row() -> None:
@@ -101,10 +101,10 @@ def test_define_load_jobs_returns_bundle() -> None:
 
     bundle = define_load_jobs()
     assert isinstance(bundle, LoadJobBundle)
-    assert len(bundle.assets) == 17
-    assert len(bundle.jobs) == 17
+    assert len(bundle.assets) == 15
+    assert len(bundle.jobs) == 15
     assert len(bundle.schedules) == 0  # all SENSOR, no SCHEDULE rows
-    assert len(bundle.sensors) == 1  # one sensor monitoring all 17 INPUT assets
+    assert len(bundle.sensors) == 1  # one sensor monitoring all 15 INPUT assets
 
 
 def test_define_load_jobs_asset_keys() -> None:

@@ -119,3 +119,45 @@ class FireAntClient(BaseClient):
             offset += _PAGE_SIZE
 
         return all_reports
+
+    def _fetch_quotes_page(
+        self, symbol: str, start_date: str, end_date: str, offset: int
+    ) -> list[dict]:
+        """Fetch a single page of historical quotes from FireAnt API."""
+        response = requests.get(
+            f"{_BASE_URL}/symbols/{symbol}/historical-quotes",
+            headers=self._headers,
+            params={
+                "startDate": start_date,
+                "endDate": end_date,
+                "offset": offset,
+                "limit": _PAGE_SIZE,
+            },
+            timeout=30,
+        )
+        if response.status_code == 404:
+            return []
+        response.raise_for_status()
+        return response.json()
+
+    def get_historical_quotes(
+        self, symbol: str, start_date: str, end_date: str
+    ) -> list[dict]:
+        """Fetch historical quotes (contains foreign and proprietary flow)."""
+        all_quotes: list[dict] = []
+        offset = 0
+
+        while True:
+            page = self.call_api_with_retry(
+                self._fetch_quotes_page, symbol, start_date, end_date, offset
+            )
+            if not page:
+                break
+            all_quotes.extend(page)
+
+            # If the page is smaller than the limit, it's the last page.
+            if len(page) < _PAGE_SIZE:
+                break
+            offset += _PAGE_SIZE
+
+        return all_quotes

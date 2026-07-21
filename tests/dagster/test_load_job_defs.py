@@ -26,7 +26,7 @@ def test_load_job_defs_csv():
 
         rows = list(reader)
         row_count = len(rows)
-        assert row_count == 17, f"Row count must be exactly 17. Found: {row_count}"
+        assert row_count == 15, f"Row count must be exactly 15. Found: {row_count}"
 
         for i, row in enumerate(rows, start=1):
             assert len(row) == 5, f"Row {i} does not have 5 columns: {row}"
@@ -46,5 +46,6 @@ def test_load_job_defs_csv():
                 f"Row {i}: trigger_type must be 'SENSOR'. Found '{trigger_type}'"
             )
             assert trigger_parameter == "", (
-                f"Row {i}: trigger_parameter must be empty for SENSOR type. Found '{trigger_parameter}'"
+                f"Row {i}: trigger_parameter must be empty for SENSOR type. "
+                f"Found '{trigger_parameter}'"
             )

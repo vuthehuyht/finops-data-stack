@@ -35,3 +35,4 @@
         data_type: VARCHAR(256)
       - name: DATACORE_UPDATE_BY
         data_type: VARCHAR(256)
+      - name: OUTSTANDING_SHARE

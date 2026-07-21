@@ -22,7 +22,7 @@ models:
         data_type: VARCHAR(256)
         data_tests:
           - not_null
-      - name: DATE
+      - name: TRADING_DATE
         data_type: DATE
         data_tests:
           - not_null
@@ -85,3 +85,5 @@ models:
         data_type: VARCHAR(256)
       - name: BATCH_DATE
         data_type: DATE
+      - name: PE_RATIO
+      - name: PB_RATIO

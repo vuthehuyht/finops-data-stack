@@ -246,7 +246,8 @@ def _build_dbt_args(
             f"{os.environ.get('DBT_TARGET_PATH', 'target')}/prod_compile_artifacts"
         )
         context.log.info(
-            "Compiling dbt projects for prod to refer prod tables for upstream dependencies."
+            "Compiling dbt projects for prod to refer prod tables for"
+            " upstream dependencies."
         )
         _compile_dbt(context, dbt, prod_compile_path)
         dbt_args += [
@@ -303,6 +304,77 @@ def send_full_refresh_notification(
             logger.error(f"Failed to send full refresh notification: {e}")
 
 
+def _skip_for_no_materialization(
+    dagster_event: DbtAssetEvent,
+    context: dagster.AssetExecutionContext,
+) -> Iterator[DbtAssetEvent]:
+    """Pass through check/observation events; log-and-drop the rest when
+    `no_materialization` is set."""
+    if isinstance(dagster_event, dagster.AssetCheckResult | dagster.AssetObservation):
+        yield dagster_event
+    elif isinstance(dagster_event, dagster.AssetMaterialization):
+        context.log.info(
+            "Skipping AssetMaterialization event:"
+            f" {dagster_event.asset_key.to_user_string()}."
+        )
+    elif isinstance(dagster_event, dagster.Output):
+        context.log.info(
+            f"Skipping Output event: {dagster_event.output_name.replace('__', '/')}."
+        )
+
+
+def _process_output_event(
+    dagster_event: dagster.Output,
+    context: dagster.AssetExecutionContext,
+    dbt_config: resources.DbtConfigResource,
+    redshift: resources.RedshiftResource,
+) -> Iterator[DbtAssetEvent]:
+    """Decide whether to materialize an `Output` event based on update cadence."""
+    is_prod_env = os.getenv("DAGSTER_WORKSPACE_ENVIRONMENT") == "prod"
+    asset_key = dagster.AssetKey(
+        dagster_event.output_name.split("__", 2 if is_prod_env else 3)
+    )
+
+    metadata = {}
+    try:
+        metadata = get_dbt_asset_dependency().specs_by_key[asset_key].metadata
+    except Exception:
+        pass
+
+    is_view = metadata.get("dagster-dbt/materialization_type", "") == "view"
+    row_count = None if is_view else fetch_row_count(asset_key, redshift, context.log)
+
+    context.add_output_metadata(
+        metadata={
+            "full_refresh": dbt_config.full_refresh,
+            "empty": dbt_config.empty,
+            "no_data_test": dbt_config.no_data_test,
+            "variables": dbt_config.variables,
+            "dagster/row_count": row_count if row_count is not None else 0,
+        },
+        output_name=dagster_event.output_name,
+    )
+
+    table_name = metadata.get("dagster/table_name", asset_key.path[-1])
+    expected_updates_per_day = (
+        get_expected_update_count_before_materialize(metadata) if metadata else 1
+    )
+    update_count = fetch_update_count_from_entity_status_table(
+        table_name, redshift, context
+    )
+
+    if should_materialize(expected_updates_per_day, update_count):
+        context.log.info(
+            f"should_materialize({expected_updates_per_day}, {update_count}) == True"
+        )
+        yield dagster_event
+    else:
+        context.log.info(
+            f"Skipped because should_materialize({expected_updates_per_day},"
+            f" {update_count}) == False"
+        )
+
+
 def _process_dbt_event(
     dagster_event: DbtAssetEvent,
     context: dagster.AssetExecutionContext,
@@ -323,63 +395,9 @@ def _process_dbt_event(
             )
 
     if dbt_config.no_materialization:
-        if isinstance(
-            dagster_event, dagster.AssetCheckResult | dagster.AssetObservation
-        ):
-            yield dagster_event
-        elif isinstance(dagster_event, dagster.AssetMaterialization):
-            context.log.info(
-                f"Skipping AssetMaterialization event: {dagster_event.asset_key.to_user_string()}."
-            )
-        elif isinstance(dagster_event, dagster.Output):
-            context.log.info(
-                f"Skipping Output event: {dagster_event.output_name.replace('__', '/')}."
-            )
+        yield from _skip_for_no_materialization(dagster_event, context)
     elif isinstance(dagster_event, dagster.Output):
-        is_prod_env = os.getenv("DAGSTER_WORKSPACE_ENVIRONMENT") == "prod"
-        asset_key = dagster.AssetKey(
-            dagster_event.output_name.split("__", 2 if is_prod_env else 3)
-        )
-
-        metadata = {}
-        try:
-            metadata = get_dbt_asset_dependency().specs_by_key[asset_key].metadata
-        except Exception:
-            pass
-
-        is_view = metadata.get("dagster-dbt/materialization_type", "") == "view"
-        row_count = (
-            None if is_view else fetch_row_count(asset_key, redshift, context.log)
-        )
-
-        context.add_output_metadata(
-            metadata={
-                "full_refresh": dbt_config.full_refresh,
-                "empty": dbt_config.empty,
-                "no_data_test": dbt_config.no_data_test,
-                "variables": dbt_config.variables,
-                "dagster/row_count": row_count if row_count is not None else 0,
-            },
-            output_name=dagster_event.output_name,
-        )
-
-        table_name = metadata.get("dagster/table_name", asset_key.path[-1])
-        expected_updates_per_day = (
-            get_expected_update_count_before_materialize(metadata) if metadata else 1
-        )
-        update_count = fetch_update_count_from_entity_status_table(
-            table_name, redshift, context
-        )
-
-        if should_materialize(expected_updates_per_day, update_count):
-            context.log.info(
-                f"should_materialize({expected_updates_per_day}, {update_count}) == True"
-            )
-            yield dagster_event
-        else:
-            context.log.info(
-                f"Skipped because should_materialize({expected_updates_per_day}, {update_count}) == False"
-            )
+        yield from _process_output_event(dagster_event, context, dbt_config, redshift)
     else:
         yield dagster_event
 

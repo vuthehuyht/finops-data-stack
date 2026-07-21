@@ -30,6 +30,12 @@ inputs:
   external-secrets-sa-role-arn:
     description: "IAM role ARN for the external-secrets-sa IRSA ServiceAccount (terraform output external_secrets_sa_role_arn)"
     required: true
+  karpenter-controller-role-arn:
+    description: "IAM role ARN for the karpenter IRSA ServiceAccount (terraform output karpenter_controller_role_arn)"
+    required: true
+  karpenter-interruption-queue-name:
+    description: "SQS queue name Karpenter uses for Spot interruption notifications (terraform output karpenter_interruption_queue_name)"
+    required: true
 
 runs:
   using: "composite"
@@ -77,6 +83,31 @@ runs:
           annotations:
             eks.amazonaws.com/role-arn: ${{ inputs.external-secrets-sa-role-arn }}
         EOF
+        cat <<EOF | kubectl apply -f -
+        apiVersion: v1
+        kind: ServiceAccount
+        metadata:
+          name: karpenter
+          namespace: kube-system
+          annotations:
+            eks.amazonaws.com/role-arn: ${{ inputs.karpenter-controller-role-arn }}
+        EOF
+
+    - name: Install/upgrade Karpenter
+      shell: bash
+      run: |
+        helm upgrade --install karpenter oci://public.ecr.aws/karpenter/karpenter \
+          -n kube-system \
+          --version "1.11.3" \
+          --set settings.clusterName=${{ inputs.eks-cluster-name }} \
+          --set settings.interruptionQueue=${{ inputs.karpenter-interruption-queue-name }} \
+          --set serviceAccount.create=false \
+          --set serviceAccount.name=karpenter \
+          --wait
+
+    - name: Apply Karpenter NodePool and EC2NodeClass manifests
+      shell: bash
+      run: kubectl apply -f src/k8s/manifest/karpenter/
 
     - name: Install/upgrade External Secrets Operator
       shell: bash

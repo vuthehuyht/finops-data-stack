@@ -31,6 +31,10 @@ resource "aws_eks_cluster" "main" {
   role_arn = aws_iam_role.eks_cluster.arn
   version  = "1.36"
 
+  upgrade_policy {
+    support_type = "STANDARD"
+  }
+
   vpc_config {
     subnet_ids              = var.private_app_subnet_ids
     security_group_ids      = [var.eks_node_sg_id]
@@ -119,7 +123,7 @@ resource "aws_eks_node_group" "core_system" {
   scaling_config {
     desired_size = 1
     min_size     = 1
-    max_size     = 2 # Allow Cluster Autoscaler to scale out once (was locked to 1)
+    max_size     = 2 # Allows the node group to scale out once (was locked to 1)
   }
 
   update_config {
@@ -134,51 +138,6 @@ resource "aws_eks_node_group" "core_system" {
 
   tags = {
     Name        = "${var.project_name}-core-system-node"
-    Environment = var.environment
-  }
-}
-
-# 4.2. Worker Workload Node Group (Spot - Cost savings, auto-scaling)
-resource "aws_eks_node_group" "worker_workload" {
-  cluster_name    = aws_eks_cluster.main.name
-  node_group_name = "${var.project_name}-worker-workload-ng"
-  node_role_arn   = aws_iam_role.eks_nodes.arn
-  subnet_ids      = var.private_app_subnet_ids
-
-  capacity_type  = "SPOT"
-  instance_types = ["t3a.medium", "t3a.small"] # Cheap AMD instances
-
-  # Used by K8s nodeSelector (infrastructure/helm/values.yaml) to pin run
-  # pods to this node group; paired with the spotWorker taint below.
-  labels = {
-    "node-group" = "worker"
-  }
-
-  scaling_config {
-    desired_size = 0 # Start at 0 to save idle costs
-    min_size     = 0
-    max_size     = 3 # Cap at 3 to prevent runaway scaling costs
-  }
-
-  # Configure taints to prevent system pods from running on Spot Nodes
-  taint {
-    key    = "spotWorker"
-    value  = "true"
-    effect = "NO_SCHEDULE"
-  }
-
-  update_config {
-    max_unavailable = 1
-  }
-
-  depends_on = [
-    aws_iam_role_policy_attachment.eks_worker_node_policy,
-    aws_iam_role_policy_attachment.eks_cni_policy,
-    aws_iam_role_policy_attachment.eks_registry_policy
-  ]
-
-  tags = {
-    Name        = "${var.project_name}-worker-workload-node"
     Environment = var.environment
   }
 }
@@ -263,7 +222,7 @@ resource "aws_iam_policy" "dagster_sa_permissions" {
           "arn:aws:ssm:*:*:parameter/${var.project_name}/model/*"
         ]
       },
-      # SageMaker orchestration permissions (Training, Serverless Endpoint, Invoke)
+      # SageMaker orchestration permissions (Training, Batch Transform)
       {
         Effect = "Allow"
         Action = [
@@ -273,14 +232,9 @@ resource "aws_iam_policy" "dagster_sa_permissions" {
           "sagemaker:CreateModel",
           "sagemaker:DeleteModel",
           "sagemaker:DescribeModel",
-          "sagemaker:CreateEndpointConfig",
-          "sagemaker:DeleteEndpointConfig",
-          "sagemaker:DescribeEndpointConfig",
-          "sagemaker:CreateEndpoint",
-          "sagemaker:DeleteEndpoint",
-          "sagemaker:DescribeEndpoint",
-          "sagemaker:UpdateEndpoint",
-          "sagemaker:InvokeEndpoint",
+          "sagemaker:CreateTransformJob",
+          "sagemaker:DescribeTransformJob",
+          "sagemaker:StopTransformJob",
           "iam:PassRole" # Required PassRole for SageMaker execution role
         ]
         Resource = "*"
@@ -465,13 +419,9 @@ resource "aws_eks_access_policy_association" "cluster_admins" {
   }
 }
 
-# 9. IRSA: IAM Role for Cluster Autoscaler (ASG auto-discovery -- EKS Managed
-# Node Group ASGs are already auto-tagged by AWS with
-# k8s.io/cluster-autoscaler/enabled and k8s.io/cluster-autoscaler/<cluster-name>,
-# verified via `aws autoscaling describe-auto-scaling-groups`, so no manual
-# ASG tagging is needed here).
-resource "aws_iam_role" "cluster_autoscaler" {
-  name = "${var.project_name}-cluster-autoscaler-role"
+# 9. IRSA: IAM Role for Karpenter Controller
+resource "aws_iam_role" "karpenter_controller" {
+  name = "${var.project_name}-karpenter-controller-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -484,7 +434,7 @@ resource "aws_iam_role" "cluster_autoscaler" {
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
           StringEquals = {
-            "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = "system:serviceaccount:kube-system:cluster-autoscaler"
+            "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = "system:serviceaccount:kube-system:karpenter"
           }
         }
       }
@@ -496,43 +446,398 @@ resource "aws_iam_role" "cluster_autoscaler" {
   }
 }
 
-# 9.1. Official Cluster Autoscaler AWS policy (ASG auto-discovery variant),
-# verbatim from kubernetes/autoscaler's cloudprovider/aws/README.md.
-resource "aws_iam_policy" "cluster_autoscaler_permissions" {
-  name        = "${var.project_name}-cluster-autoscaler-policy"
-  description = "Permissions for Cluster Autoscaler to discover and scale EKS Managed Node Group ASGs"
+# 9.1. IAM Role assumed by EC2 instances that Karpenter launches. Karpenter
+# v1.x creates/manages the instance profile itself from this role's name
+# (EC2NodeClass.spec.role in src/k8s/manifest/karpenter/nodepool.yaml) --
+# no aws_iam_instance_profile resource needed here.
+resource "aws_iam_role" "karpenter_node" {
+  name = "${var.project_name}-karpenter-node-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Environment = var.environment
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "karpenter_node_worker_policy" {
+  role       = aws_iam_role.karpenter_node.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+}
+
+resource "aws_iam_role_policy_attachment" "karpenter_node_cni_policy" {
+  role       = aws_iam_role.karpenter_node.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+}
+
+resource "aws_iam_role_policy_attachment" "karpenter_node_registry_policy" {
+  role       = aws_iam_role.karpenter_node.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+}
+
+resource "aws_iam_role_policy_attachment" "karpenter_node_ssm_policy" {
+  role       = aws_iam_role.karpenter_node.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+# 9.2. EKS Access Entry so kubelets on Karpenter-launched nodes can join the
+# cluster -- required because authentication_mode = API_AND_CONFIG_MAP and
+# this project has no aws-auth ConfigMap managing node role mappings.
+resource "aws_eks_access_entry" "karpenter_node" {
+  cluster_name  = aws_eks_cluster.main.name
+  principal_arn = aws_iam_role.karpenter_node.arn
+  type          = "EC2_LINUX"
+}
+
+# 9.3. SQS queue + EventBridge rules for Spot interruption handling --
+# Karpenter drains a node proactively (~2 min warning) instead of reacting
+# only after the pod is killed.
+resource "aws_sqs_queue" "karpenter_interruption" {
+  name                      = "${var.project_name}-karpenter-interruption-queue"
+  message_retention_seconds = 300
+  sqs_managed_sse_enabled   = true
+
+  tags = {
+    Environment = var.environment
+  }
+}
+
+resource "aws_sqs_queue_policy" "karpenter_interruption" {
+  queue_url = aws_sqs_queue.karpenter_interruption.id
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
         Effect = "Allow"
-        Action = [
-          "autoscaling:DescribeAutoScalingGroups",
-          "autoscaling:DescribeAutoScalingInstances",
-          "autoscaling:DescribeLaunchConfigurations",
-          "autoscaling:DescribeScalingActivities",
-          "ec2:DescribeImages",
-          "ec2:DescribeInstanceTypes",
-          "ec2:DescribeLaunchTemplateVersions",
-          "ec2:GetInstanceTypesFromInstanceRequirements",
-          "eks:DescribeNodegroup"
-        ]
-        Resource = ["*"]
+        Principal = {
+          Service = ["events.amazonaws.com", "sqs.amazonaws.com"]
+        }
+        Action   = "sqs:SendMessage"
+        Resource = aws_sqs_queue.karpenter_interruption.arn
       },
       {
-        Effect = "Allow"
-        Action = [
-          "autoscaling:SetDesiredCapacity",
-          "autoscaling:TerminateInstanceInAutoScalingGroup"
-        ]
-        Resource = ["*"]
+        Sid       = "DenyInsecureTransport"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "sqs:*"
+        Resource  = aws_sqs_queue.karpenter_interruption.arn
+        Condition = {
+          Bool = {
+            "aws:SecureTransport" = "false"
+          }
+        }
       }
     ]
   })
 }
 
-resource "aws_iam_role_policy_attachment" "cluster_autoscaler_permissions_attach" {
-  role       = aws_iam_role.cluster_autoscaler.name
-  policy_arn = aws_iam_policy.cluster_autoscaler_permissions.arn
+resource "aws_cloudwatch_event_rule" "karpenter_spot_interruption" {
+  name = "${var.project_name}-karpenter-spot-interruption"
+  event_pattern = jsonencode({
+    source      = ["aws.ec2"]
+    detail-type = ["EC2 Spot Instance Interruption Warning"]
+  })
 }
+
+resource "aws_cloudwatch_event_rule" "karpenter_instance_state_change" {
+  name = "${var.project_name}-karpenter-instance-state-change"
+  event_pattern = jsonencode({
+    source      = ["aws.ec2"]
+    detail-type = ["EC2 Instance State-change Notification"]
+  })
+}
+
+resource "aws_cloudwatch_event_rule" "karpenter_rebalance_recommendation" {
+  name = "${var.project_name}-karpenter-rebalance-recommendation"
+  event_pattern = jsonencode({
+    source      = ["aws.ec2"]
+    detail-type = ["EC2 Instance Rebalance Recommendation"]
+  })
+}
+
+resource "aws_cloudwatch_event_rule" "karpenter_scheduled_change" {
+  name = "${var.project_name}-karpenter-scheduled-change"
+  event_pattern = jsonencode({
+    source      = ["aws.health"]
+    detail-type = ["AWS Health Event"]
+  })
+}
+
+resource "aws_cloudwatch_event_target" "karpenter_spot_interruption" {
+  rule = aws_cloudwatch_event_rule.karpenter_spot_interruption.name
+  arn  = aws_sqs_queue.karpenter_interruption.arn
+}
+
+resource "aws_cloudwatch_event_target" "karpenter_instance_state_change" {
+  rule = aws_cloudwatch_event_rule.karpenter_instance_state_change.name
+  arn  = aws_sqs_queue.karpenter_interruption.arn
+}
+
+resource "aws_cloudwatch_event_target" "karpenter_rebalance_recommendation" {
+  rule = aws_cloudwatch_event_rule.karpenter_rebalance_recommendation.name
+  arn  = aws_sqs_queue.karpenter_interruption.arn
+}
+
+resource "aws_cloudwatch_event_target" "karpenter_scheduled_change" {
+  rule = aws_cloudwatch_event_rule.karpenter_scheduled_change.name
+  arn  = aws_sqs_queue.karpenter_interruption.arn
+}
+
+# 9.4. IAM Policy for the Karpenter controller -- scoped EC2 provisioning,
+# instance-profile management (Karpenter v1.x creates/manages the instance
+# profile itself from karpenter_node's role name), PassRole restricted to
+# the node role, read-only Describe/pricing/ssm, and interruption queue access.
+# Needed to scope the instance-profile ARNs below to this account (IAM ARNs
+# require an explicit account ID, unlike the EC2 ARNs elsewhere in this file
+# which use "*" for account/region).
+data "aws_caller_identity" "current" {}
+
+resource "aws_iam_policy" "karpenter_controller_permissions" {
+  name        = "${var.project_name}-karpenter-controller-policy"
+  description = "Permissions for the Karpenter controller to provision/terminate EC2 nodes for the EKS cluster"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowScopedEC2InstanceAccessActions"
+        Effect = "Allow"
+        Resource = [
+          "arn:aws:ec2:*::image/*",
+          "arn:aws:ec2:*::snapshot/*",
+          "arn:aws:ec2:*:*:security-group/*",
+          "arn:aws:ec2:*:*:subnet/*"
+        ]
+        Action = [
+          "ec2:RunInstances",
+          "ec2:CreateFleet"
+        ]
+      },
+      {
+        Sid      = "AllowScopedEC2LaunchTemplateAccessActions"
+        Effect   = "Allow"
+        Resource = "arn:aws:ec2:*:*:launch-template/*"
+        Action = [
+          "ec2:RunInstances",
+          "ec2:CreateFleet"
+        ]
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/kubernetes.io/cluster/${aws_eks_cluster.main.name}" = "owned"
+          }
+          StringLike = {
+            "aws:ResourceTag/karpenter.sh/nodepool" = "*"
+          }
+        }
+      },
+      {
+        Sid    = "AllowScopedEC2InstanceActionsWithTags"
+        Effect = "Allow"
+        Resource = [
+          "arn:aws:ec2:*:*:fleet/*",
+          "arn:aws:ec2:*:*:instance/*",
+          "arn:aws:ec2:*:*:volume/*",
+          "arn:aws:ec2:*:*:network-interface/*",
+          "arn:aws:ec2:*:*:launch-template/*",
+          "arn:aws:ec2:*:*:spot-instances-request/*"
+        ]
+        Action = [
+          "ec2:RunInstances",
+          "ec2:CreateFleet",
+          "ec2:CreateLaunchTemplate"
+        ]
+        Condition = {
+          StringEquals = {
+            "aws:RequestTag/kubernetes.io/cluster/${aws_eks_cluster.main.name}" = "owned"
+          }
+          StringLike = {
+            "aws:RequestTag/karpenter.sh/nodepool" = "*"
+          }
+        }
+      },
+      {
+        Sid    = "AllowScopedResourceCreationTagging"
+        Effect = "Allow"
+        Resource = [
+          "arn:aws:ec2:*:*:fleet/*",
+          "arn:aws:ec2:*:*:instance/*",
+          "arn:aws:ec2:*:*:volume/*",
+          "arn:aws:ec2:*:*:network-interface/*",
+          "arn:aws:ec2:*:*:launch-template/*",
+          "arn:aws:ec2:*:*:spot-instances-request/*"
+        ]
+        Action = "ec2:CreateTags"
+        Condition = {
+          StringEquals = {
+            "aws:RequestTag/kubernetes.io/cluster/${aws_eks_cluster.main.name}" = "owned"
+            "ec2:CreateAction"                                                  = ["RunInstances", "CreateFleet", "CreateLaunchTemplate"]
+          }
+          StringLike = {
+            "aws:RequestTag/karpenter.sh/nodepool" = "*"
+          }
+        }
+      },
+      {
+        Sid      = "AllowScopedResourceTagging"
+        Effect   = "Allow"
+        Resource = "arn:aws:ec2:*:*:instance/*"
+        Action   = "ec2:CreateTags"
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/kubernetes.io/cluster/${aws_eks_cluster.main.name}" = "owned"
+          }
+          StringLike = {
+            "aws:ResourceTag/karpenter.sh/nodepool" = "*"
+          }
+          "ForAllValues:StringEquals" = {
+            "aws:TagKeys" = ["eks:eks-cluster-name", "karpenter.sh/nodeclaim", "Name"]
+          }
+        }
+      },
+      {
+        Sid    = "AllowScopedDeletion"
+        Effect = "Allow"
+        Resource = [
+          "arn:aws:ec2:*:*:instance/*",
+          "arn:aws:ec2:*:*:launch-template/*"
+        ]
+        Action = ["ec2:TerminateInstances", "ec2:DeleteLaunchTemplate"]
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/kubernetes.io/cluster/${aws_eks_cluster.main.name}" = "owned"
+          }
+          StringLike = {
+            "aws:ResourceTag/karpenter.sh/nodepool" = "*"
+          }
+        }
+      },
+      {
+        Sid      = "AllowScopedInstanceProfileCreationActions"
+        Effect   = "Allow"
+        Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:instance-profile/*"
+        Action   = ["iam:CreateInstanceProfile"]
+        Condition = {
+          StringEquals = {
+            "aws:RequestTag/kubernetes.io/cluster/${aws_eks_cluster.main.name}" = "owned"
+          }
+          StringLike = {
+            "aws:RequestTag/karpenter.k8s.aws/ec2nodeclass" = "*"
+          }
+        }
+      },
+      {
+        Sid      = "AllowScopedInstanceProfileTagActions"
+        Effect   = "Allow"
+        Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:instance-profile/*"
+        Action   = ["iam:TagInstanceProfile"]
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/kubernetes.io/cluster/${aws_eks_cluster.main.name}" = "owned"
+            "aws:RequestTag/kubernetes.io/cluster/${aws_eks_cluster.main.name}"  = "owned"
+          }
+          StringLike = {
+            "aws:ResourceTag/karpenter.k8s.aws/ec2nodeclass" = "*"
+            "aws:RequestTag/karpenter.k8s.aws/ec2nodeclass"  = "*"
+          }
+        }
+      },
+      {
+        Sid      = "AllowScopedInstanceProfileActions"
+        Effect   = "Allow"
+        Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:instance-profile/*"
+        Action = [
+          "iam:AddRoleToInstanceProfile",
+          "iam:RemoveRoleFromInstanceProfile",
+          "iam:DeleteInstanceProfile"
+        ]
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/kubernetes.io/cluster/${aws_eks_cluster.main.name}" = "owned"
+          }
+          StringLike = {
+            "aws:ResourceTag/karpenter.k8s.aws/ec2nodeclass" = "*"
+          }
+        }
+      },
+      {
+        Sid      = "AllowPassingNodeRole"
+        Effect   = "Allow"
+        Resource = aws_iam_role.karpenter_node.arn
+        Action   = "iam:PassRole"
+        Condition = {
+          StringEquals = {
+            "iam:PassedToService" = "ec2.amazonaws.com"
+          }
+        }
+      },
+      {
+        Sid      = "AllowReadActions"
+        Effect   = "Allow"
+        Resource = "*"
+        Action = [
+          "ec2:DescribeImages",
+          "ec2:DescribeInstances",
+          "ec2:DescribeInstanceTypes",
+          "ec2:DescribeInstanceTypeOfferings",
+          "ec2:DescribeLaunchTemplates",
+          "ec2:DescribeSubnets",
+          "ec2:DescribeSecurityGroups",
+          "ec2:DescribeSpotPriceHistory",
+          "ec2:DescribeAvailabilityZones",
+          "eks:DescribeCluster",
+          "iam:GetInstanceProfile",
+          "pricing:GetProducts",
+          "ssm:GetParameter"
+        ]
+      },
+      {
+        Sid      = "AllowInterruptionQueueActions"
+        Effect   = "Allow"
+        Resource = aws_sqs_queue.karpenter_interruption.arn
+        Action   = ["sqs:DeleteMessage", "sqs:GetQueueUrl", "sqs:ReceiveMessage"]
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "karpenter_controller_permissions_attach" {
+  role       = aws_iam_role.karpenter_controller.name
+  policy_arn = aws_iam_policy.karpenter_controller_permissions.arn
+}
+
+# 9.5. Tag subnets + the EKS-auto-created cluster security group for
+# Karpenter's subnetSelectorTerms/securityGroupSelectorTerms discovery
+# (EC2NodeClass, src/k8s/manifest/karpenter/nodepool.yaml). Deliberately NOT
+# var.eks_node_sg_id -- that SG is only used for the cluster's
+# vpc_config.security_group_ids and is NOT what gets attached to node EC2
+# instances (see the cluster_security_group_id output comment in
+# ../../outputs.tf, verified empirically against a running node).
+resource "aws_ec2_tag" "karpenter_subnet_discovery" {
+  # count, not for_each: subnet IDs are unknown until apply (module.vpc's
+  # aws_subnet resources), but the *number* of subnets is always statically
+  # known -- for_each requires its full key set known at plan time, which
+  # unknown-until-apply values can't satisfy.
+  count       = length(var.private_app_subnet_ids)
+  resource_id = var.private_app_subnet_ids[count.index]
+  key         = "karpenter.sh/discovery"
+  value       = aws_eks_cluster.main.name
+}
+
+resource "aws_ec2_tag" "karpenter_sg_discovery" {
+  resource_id = aws_eks_cluster.main.vpc_config[0].cluster_security_group_id
+  key         = "karpenter.sh/discovery"
+  value       = aws_eks_cluster.main.name
+}
+

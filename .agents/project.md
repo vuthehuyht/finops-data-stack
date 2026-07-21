@@ -6,7 +6,7 @@
 
 A Data Pipeline and AI system that automates collection and processing of data, and forecasts stock valuation for the Vietnamese stock market, based on Fundamental Analysis and market Sentiment Analysis.
 
-- **Automation**: end-to-end data flow from collection (Crawl/API) to storage and transformation.
+- **Automation**: end-to-end data flow currently streamlined using Pure Python/Pandas (`scripts/dataset_builder.py`) bypassing Dagster/dbt for maximum flexibility during ML testing.
 - **Smart valuation**: multimodal Deep Learning to forecast expected return and stock trend.
 - **Data governance**: strict Metadata and Data Quality standards across Raw, Cleaned, and Mart layers.
 - **Cost optimization**: runs on AWS Serverless infrastructure (Redshift Serverless, SageMaker Serverless).
