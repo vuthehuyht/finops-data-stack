@@ -331,10 +331,13 @@ ______________________________________________________________________
 ### Lệnh thực thi
 
 - **Chạy Unit Tests**:
+
   ```bash
   uv run pytest tests/ingest/
   ```
+
 - **Linter & Code Format**:
+
   ```bash
   uv run ruff check src/ingest/
   uv run ruff format src/ingest/
