@@ -34,7 +34,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "pytest>=8.0.0",
+    "pytest>=9.1.1",
     "dagster-graphql",
     "ruff>=0.3.0",
     "mypy>=1.0.0",
