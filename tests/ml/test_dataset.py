@@ -72,7 +72,7 @@ def _make_feature_df(tickers: list[str], days: int) -> pd.DataFrame:
                 row[col] = float(i)
             for col in TABULAR_FEATURE_COLUMNS:
                 row[col] = float(i) * 0.1
-            row["LABEL_NEXT_5D_RETURN"] = 0.01 * i
+            row["label_next_5d_return"] = 0.01 * i
             rows.append(row)
     return pd.DataFrame(rows)
 
@@ -133,7 +133,7 @@ def test_stock_sequence_dataset_getitem_values() -> None:
     # TABULAR_FEATURE_COLUMNS from last row: 29 * 0.1 = 2.9.
     assert np.allclose(tabular.numpy(), 2.9)
 
-    # LABEL_NEXT_5D_RETURN from last row: 29 * 0.01 = 0.29.
+    # label_next_5d_return from last row: 29 * 0.01 = 0.29.
     assert np.isclose(float(target), 0.29)
 
     # Verify chronological order: first row (day 0) has values 0.0, last row has 29.0.
@@ -145,7 +145,7 @@ def test_stock_sequence_dataset_drops_rows_with_null_target() -> None:
     from src.ml.dataset import StockSequenceDataset
 
     df = _make_feature_df(["AAA"], days=31)
-    df.loc[df.index[-1], "LABEL_NEXT_5D_RETURN"] = None
+    df.loc[df.index[-1], "label_next_5d_return"] = None
 
     dataset = StockSequenceDataset(df, window_size=30)
 

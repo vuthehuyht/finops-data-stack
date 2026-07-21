@@ -269,6 +269,96 @@ class FinOpsDatasetBuilder:
 
         return df_price
 
+    def _merge_fundamentals_asof(
+        self, df_price: pd.DataFrame, df_fund: pd.DataFrame
+    ) -> pd.DataFrame:
+        """Merge quarterly fundamentals into daily price rows via merge_asof."""
+        cols_to_merge = [
+            "report_date",
+            "net_profit_after_tax",
+            "equity",
+            "revenue_growth_yoy",
+            "net_profit_growth_yoy",
+            "gross_margin",
+            "net_margin",
+            "operating_margin",
+            "roe",
+            "roa",
+            "asset_growth_yoy",
+            "debt_to_equity",
+            "current_ratio",
+            "cash_to_assets",
+            "equity_multiplier",
+            "operating_cash_flow_to_net_income",
+            "free_cash_flow",
+            "cash_flow_to_debt",
+        ]
+        fallback_cols = [
+            "net_profit_after_tax",
+            "equity",
+            "revenue_growth_yoy",
+            "net_profit_growth_yoy",
+            "roe",
+            "roa",
+        ]
+
+        merged_list = []
+        for ticker, group in df_price.groupby("ticker"):
+            if not df_fund.empty:
+                fund_group = df_fund[df_fund["ticker"] == ticker]
+                if not fund_group.empty:
+                    # Drop duplicated report dates if any
+                    fund_group = fund_group.drop_duplicates(
+                        subset=["report_date"]
+                    ).sort_values("report_date")
+                    group = pd.merge_asof(
+                        group,
+                        fund_group[cols_to_merge],
+                        left_on="trading_date",
+                        right_on="report_date",
+                        direction="backward",
+                    )
+                else:
+                    for c in fallback_cols:
+                        group[c] = np.nan
+            merged_list.append(group)
+
+        return pd.concat(merged_list, ignore_index=True)
+
+    def _build_training_tensors(
+        self, df_price: pd.DataFrame, seq_features: list, tab_features: list
+    ) -> tuple:
+        """Slide seq_length windows per ticker into (X_seq, X_tab, y, metadata)."""
+        X_seq_list, X_tab_list, y_list, metadata_list = [], [], [], []
+
+        for ticker, group in df_price.groupby("ticker"):
+            group = group.dropna(subset=seq_features + ["label_next_5d_return"])
+            if len(group) < self.seq_length:
+                continue
+
+            seq_vals = group[seq_features].values
+            tab_vals = group[tab_features].fillna(0).values
+            target_vals = group["label_next_5d_return"].values
+            date_vals = group["trading_date"].astype(str).values
+
+            for i in range(len(group) - self.seq_length + 1):
+                window_seq = seq_vals[i : i + self.seq_length]
+                window_target = target_vals[i + self.seq_length - 1]
+                window_tab = tab_vals[i + self.seq_length - 1]
+                window_date = date_vals[i + self.seq_length - 1]
+
+                X_seq_list.append(window_seq)
+                X_tab_list.append(window_tab)
+                y_list.append(window_target)
+                metadata_list.append([ticker, window_date])
+
+        return (
+            np.array(X_seq_list),
+            np.array(X_tab_list),
+            np.array(y_list),
+            np.array(metadata_list),
+        )
+
     def build_dataset(self):
         # 1. Process Data
         df_price = self._process_prices()
@@ -291,56 +381,7 @@ class FinOpsDatasetBuilder:
         # 2. Merge Fundamentals (As-of)
         logger.info("Merging Tabular Features using merge_asof...")
         df_price = df_price.sort_values("trading_date")
-
-        merged_list = []
-        for ticker, group in df_price.groupby("ticker"):
-            if not df_fund.empty:
-                fund_group = df_fund[df_fund["ticker"] == ticker]
-                if not fund_group.empty:
-                    # Drop duplicated report dates if any
-                    fund_group = fund_group.drop_duplicates(
-                        subset=["report_date"]
-                    ).sort_values("report_date")
-                    cols_to_merge = [
-                        "report_date",
-                        "net_profit_after_tax",
-                        "equity",
-                        "revenue_growth_yoy",
-                        "net_profit_growth_yoy",
-                        "gross_margin",
-                        "net_margin",
-                        "operating_margin",
-                        "roe",
-                        "roa",
-                        "asset_growth_yoy",
-                        "debt_to_equity",
-                        "current_ratio",
-                        "cash_to_assets",
-                        "equity_multiplier",
-                        "operating_cash_flow_to_net_income",
-                        "free_cash_flow",
-                        "cash_flow_to_debt",
-                    ]
-                    group = pd.merge_asof(
-                        group,
-                        fund_group[cols_to_merge],
-                        left_on="trading_date",
-                        right_on="report_date",
-                        direction="backward",
-                    )
-                else:
-                    for c in [
-                        "net_profit_after_tax",
-                        "equity",
-                        "revenue_growth_yoy",
-                        "net_profit_growth_yoy",
-                        "roe",
-                        "roa",
-                    ]:
-                        group[c] = np.nan
-            merged_list.append(group)
-
-        df_price = pd.concat(merged_list, ignore_index=True)
+        df_price = self._merge_fundamentals_asof(df_price, df_fund)
 
         # Dynamic Valuations
         df_price["pe_ratio"] = self._safe_divide(
@@ -379,36 +420,13 @@ class FinOpsDatasetBuilder:
             if col not in df_price.columns:
                 df_price[col] = np.nan
 
-        X_seq_list, X_tab_list, y_list, metadata_list = [], [], [], []
-
-        for ticker, group in df_price.groupby("ticker"):
-            group = group.dropna(subset=seq_features + ["label_next_5d_return"])
-            if len(group) < self.seq_length:
-                continue
-
-            seq_vals = group[seq_features].values
-            tab_vals = group[tab_features].fillna(0).values
-            target_vals = group["label_next_5d_return"].values
-            date_vals = group["trading_date"].astype(str).values
-
-            for i in range(len(group) - self.seq_length + 1):
-                window_seq = seq_vals[i : i + self.seq_length]
-                window_target = target_vals[i + self.seq_length - 1]
-                window_tab = tab_vals[i + self.seq_length - 1]
-                window_date = date_vals[i + self.seq_length - 1]
-
-                X_seq_list.append(window_seq)
-                X_tab_list.append(window_tab)
-                y_list.append(window_target)
-                metadata_list.append([ticker, window_date])
-
-        X_seq = np.array(X_seq_list)
-        X_tab = np.array(X_tab_list)
-        y = np.array(y_list)
-        metadata = np.array(metadata_list)
+        X_seq, X_tab, y, metadata = self._build_training_tensors(
+            df_price, seq_features, tab_features
+        )
 
         logger.info(
-            f"Generated Tensors: X_seq: {X_seq.shape}, X_tab: {X_tab.shape}, y: {y.shape}"
+            f"Generated Tensors: X_seq: {X_seq.shape}, X_tab: {X_tab.shape}, "
+            f"y: {y.shape}"
         )
 
         # Save full dataframe for existing train.py compatibility
@@ -418,7 +436,8 @@ class FinOpsDatasetBuilder:
         )
         df_parquet.to_parquet(self.output_dir / "features.parquet", index=False)
         logger.info(
-            f"Saved full feature dataframe to {self.output_dir / 'features.parquet'} for SageMaker training!"
+            f"Saved full feature dataframe to {self.output_dir / 'features.parquet'} "
+            "for SageMaker training!"
         )
 
         np.save(self.output_dir / "X_seq.npy", X_seq)

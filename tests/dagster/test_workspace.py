@@ -78,8 +78,8 @@ def test_workspace_defs_created() -> None:
         assert src.dagster.workspace.defs is not None
 
 
-def test_workspace_has_17_load_assets() -> None:
-    """workspace.py must include all 17 Bronze load assets."""
+def test_workspace_has_15_load_assets() -> None:
+    """workspace.py must include all 15 Bronze load assets."""
     with unittest.mock.patch.dict(
         os.environ,
         {
@@ -94,11 +94,11 @@ def test_workspace_has_17_load_assets() -> None:
         reload(src.dagster.workspace)
         defs = src.dagster.workspace.defs
         bronze_keys = [k for k in defs.assets_defs_by_key.keys() if k.path[0] == "RAW"]
-        assert len(bronze_keys) == 17
+        assert len(bronze_keys) == 15
 
 
-def test_workspace_has_17_silver_assets() -> None:
-    """workspace.py must include all 17 Silver transform assets."""
+def test_workspace_has_15_silver_assets() -> None:
+    """workspace.py must include all 15 Silver transform assets."""
     with unittest.mock.patch.dict(
         os.environ,
         {
@@ -115,11 +115,11 @@ def test_workspace_has_17_silver_assets() -> None:
         silver_keys = [
             k for k in defs.assets_defs_by_key.keys() if k.path[0] == "STAGING"
         ]
-        assert len(silver_keys) == 17
+        assert len(silver_keys) == 15
 
 
 def test_workspace_has_sensor_for_load_jobs() -> None:
-    """All 17 Bronze tables are SENSOR-type — must have 1 load_job_sensor."""
+    """All 15 Bronze tables are SENSOR-type — must have 1 load_job_sensor."""
     with unittest.mock.patch.dict(
         os.environ,
         {
@@ -134,8 +134,8 @@ def test_workspace_has_sensor_for_load_jobs() -> None:
         reload(src.dagster.workspace)
         defs = src.dagster.workspace.defs
         assert (
-            len(defs.schedule_defs) == 18
-        )  # 17 schedules per ingest asset + 1 ML schedule
+            len(defs.schedule_defs) == 16
+        )  # 15 schedules per ingest asset + 1 ML schedule
         sensor_names = {s.name for s in defs.sensor_defs}
         assert "load_job_sensor" in sensor_names
 

@@ -17,7 +17,7 @@ def test_launch_training_job_constructs_model_trainer_with_expected_args() -> No
     with (
         patch(
             "src.ml.training_job.image_uris.retrieve",
-            return_value="763104351884.dkr.ecr.ap-southeast-1.amazonaws.com/pytorch-training:2.2-gpu-py310",
+            return_value="763104351884.dkr.ecr.ap-southeast-1.amazonaws.com/pytorch-training:2.6.0-gpu-py312",
         ) as mock_retrieve,
         patch(
             "src.ml.training_job.ModelTrainer", return_value=mock_trainer
@@ -27,20 +27,21 @@ def test_launch_training_job_constructs_model_trainer_with_expected_args() -> No
             role_arn="arn:aws:iam::123456789012:role/sagemaker-execution",
             input_s3_uri="s3://bucket/ml-training-data/2026-07-03/",
             hyperparameters={"epochs": "20"},
+            model_artifacts_bucket="finops-model-artifacts-dev",
         )
 
     mock_retrieve.assert_called_once_with(
         framework="pytorch",
         region="ap-southeast-1",
-        version="2.2",
-        py_version="py310",
+        version="2.6.0",
+        py_version="py312",
         instance_type="ml.g4dn.xlarge",
         image_scope="training",
     )
 
     _, kwargs = mock_cls.call_args
     assert kwargs["training_image"] == (
-        "763104351884.dkr.ecr.ap-southeast-1.amazonaws.com/pytorch-training:2.2-gpu-py310"
+        "763104351884.dkr.ecr.ap-southeast-1.amazonaws.com/pytorch-training:2.6.0-gpu-py312"
     )
     assert kwargs["source_code"].source_dir == "src/ml"
     assert kwargs["source_code"].entry_script == "train.py"
@@ -48,6 +49,11 @@ def test_launch_training_job_constructs_model_trainer_with_expected_args() -> No
     assert kwargs["compute"].instance_count == 1
     assert kwargs["role"] == "arn:aws:iam::123456789012:role/sagemaker-execution"
     assert kwargs["hyperparameters"] == {"epochs": "20"}
+    assert kwargs["sagemaker_session"] is not None
+    assert (
+        kwargs["output_data_config"].s3_output_path
+        == "s3://finops-model-artifacts-dev/ml-training-output"
+    )
 
     mock_trainer.train.assert_called_once()
     _, train_kwargs = mock_trainer.train.call_args
@@ -87,6 +93,7 @@ def test_launch_training_job_forwards_sagemaker_session() -> None:
             role_arn="arn:aws:iam::123456789012:role/sagemaker-execution",
             input_s3_uri="s3://bucket/prefix/",
             hyperparameters={},
+            model_artifacts_bucket="finops-model-artifacts-dev",
             sagemaker_session=mock_session,
         )
 

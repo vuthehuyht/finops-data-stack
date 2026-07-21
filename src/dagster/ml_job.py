@@ -147,6 +147,7 @@ def ml_training_job(
             "batch-size": str(config.batch_size),
             "learning-rate": str(config.learning_rate),
         },
+        model_artifacts_bucket=sagemaker.model_artifacts_bucket,
     )
     context.log.info(
         "Training job %s finished, model_data=%s.",

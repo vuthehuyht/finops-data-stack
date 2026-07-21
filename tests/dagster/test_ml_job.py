@@ -108,6 +108,35 @@ def test_define_ml_jobs_job_name() -> None:
     assert bundle.jobs[0].name == "ml_quarterly_retrain_job"
 
 
+def test_ml_training_job_passes_model_artifacts_bucket() -> None:
+    from src.dagster.ml_job import MlTrainingJobConfig, ml_training_job
+
+    mock_sagemaker = unittest.mock.MagicMock()
+    mock_sagemaker.execution_role_arn = (
+        "arn:aws:iam::123456789012:role/sagemaker-execution"
+    )
+    mock_sagemaker.model_artifacts_bucket = "finops-model-artifacts-dev"
+
+    context = dagster.build_asset_context()
+
+    with unittest.mock.patch("src.dagster.ml_job.launch_training_job") as mock_launch:
+        mock_launch.return_value = unittest.mock.MagicMock(
+            job_name="finops-multimodal-regressor-20260703",
+            model_data_s3_uri=(
+                "s3://bucket/finops-multimodal-regressor-20260703/output/model.tar.gz"
+            ),
+        )
+        ml_training_job(
+            context,
+            "s3://bucket/ml-training-data/2026-07-03/",
+            MlTrainingJobConfig(),
+            mock_sagemaker,
+        )
+
+    _, kwargs = mock_launch.call_args
+    assert kwargs["model_artifacts_bucket"] == "finops-model-artifacts-dev"
+
+
 def test_ml_model_evaluation_promotes_model_on_better_metrics() -> None:
     from src.dagster.ml_job import MlEvaluationConfig, ml_model_evaluation
 

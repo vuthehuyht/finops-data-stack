@@ -24,7 +24,7 @@ def test_target_column_not_in_feature_columns() -> None:
 
     assert TARGET_COLUMN not in SEQUENCE_FEATURE_COLUMNS
     assert TARGET_COLUMN not in TABULAR_FEATURE_COLUMNS
-    assert TARGET_COLUMN == "LABEL_NEXT_5D_RETURN"
+    assert TARGET_COLUMN == "label_next_5d_return"
 
 
 def test_window_size_default() -> None:

@@ -63,7 +63,7 @@ def test_get_upstream_bronze_key_all_models() -> None:
 
 def test_read_transform_job_parameter_count() -> None:
     params = list(read_transform_job_parameter(_STAGING_JOB_DEFINITION_FILE))
-    assert len(params) == 17
+    assert len(params) == 15
 
 
 def test_read_transform_job_parameter_first_row() -> None:
@@ -83,7 +83,7 @@ def test_read_transform_job_parameter_all_sensor() -> None:
 def test_define_silver_jobs_returns_bundle() -> None:
     bundle = define_silver_jobs()
     assert isinstance(bundle, SilverJobBundle)
-    assert len(bundle.jobs) == 17
+    assert len(bundle.jobs) == 15
     assert len(bundle.schedules) == 0  # all SENSOR, no schedules
     assert len(bundle.sensors) == 1  # one multi_asset_sensor
 
