@@ -167,4 +167,12 @@ deploy_eks:
 	helm repo add dagster https://dagster-io.github.io/helm
 	helm repo update
 	@echo "Deploying Dagster to EKS with Helm..."
-	helm upgrade --install finops-dagster dagster/dagster -f infrastructure/helm/values.yaml -n dagster --create-namespace
+	RDS_HOST=$$(terraform -chdir=infrastructure/terraform output -raw rds_address) && \
+	RDS_USER=$$(terraform -chdir=infrastructure/terraform output -raw rds_username) && \
+	RDS_DB=$$(terraform -chdir=infrastructure/terraform output -raw rds_dbname) && \
+	helm upgrade --install finops-dagster dagster/dagster -f infrastructure/helm/values.yaml -n dagster --create-namespace \
+		--set dagster-user-deployments.deployments\[0\].image.repository=$(ECR_REPO) \
+		--set dagster-user-deployments.deployments\[0\].image.tag=$(IMAGE_TAG) \
+		--set postgresql.postgresqlHost=$$RDS_HOST \
+		--set postgresql.postgresqlUsername=$$RDS_USER \
+		--set postgresql.postgresqlDatabase=$$RDS_DB

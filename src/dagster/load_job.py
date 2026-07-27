@@ -3,6 +3,7 @@
 import csv
 import enum
 import functools
+import json
 import os
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -300,6 +301,21 @@ def define_load_jobs() -> LoadJobBundle:
         tags={
             "limit_concurrent_job_runs_to_1": "load_all_raw_data_job",
             "type": "load",
+            "dagster-k8s/config": json.dumps(
+                {
+                    "pod_spec_config": {
+                        "containers": [
+                            {
+                                "name": "dagster",
+                                "resources": {
+                                    "requests": {"cpu": "2", "memory": "4Gi"},
+                                    "limits": {"cpu": "4", "memory": "8Gi"},
+                                },
+                            }
+                        ]
+                    }
+                }
+            ),
         },
         description=(
             "Load all raw data tables concurrently from S3 "
