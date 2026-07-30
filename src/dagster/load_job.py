@@ -3,7 +3,6 @@
 import csv
 import enum
 import functools
-import json
 import os
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -286,9 +285,16 @@ def define_load_jobs() -> LoadJobBundle:
         ops = {}
         for param in parameters:
             asset_py_id = param.asset_key.to_python_identifier()
+            if batch_date == "init":
+                s3_url = (
+                    f"s3://{raw_bucket}/raw/{param.table_name.upper()}/batch_date=init/"
+                )
+            else:
+                s3_url = f"s3://{raw_bucket}/data_storage/{param.table_name.lower()}/{batch_date}/"
+
             ops[asset_py_id] = {
                 "config": {
-                    "s3_url": f"s3://{raw_bucket}/data_storage/{param.table_name.lower()}/{batch_date}/",
+                    "s3_url": s3_url,
                     "batch_date": batch_date,
                 }
             }
@@ -298,24 +304,17 @@ def define_load_jobs() -> LoadJobBundle:
         "load_all_raw_data_job",
         selection=bundle.assets,
         config=load_all_config_mapping,
+        k8s_config={
+            "container_config": {
+                "resources": {
+                    "requests": {"cpu": "2", "memory": "4Gi"},
+                    "limits": {"cpu": "4", "memory": "8Gi"},
+                }
+            }
+        },
         tags={
             "limit_concurrent_job_runs_to_1": "load_all_raw_data_job",
             "type": "load",
-            "dagster-k8s/config": json.dumps(
-                {
-                    "pod_spec_config": {
-                        "containers": [
-                            {
-                                "name": "dagster",
-                                "resources": {
-                                    "requests": {"cpu": "2", "memory": "4Gi"},
-                                    "limits": {"cpu": "4", "memory": "8Gi"},
-                                },
-                            }
-                        ]
-                    }
-                }
-            ),
         },
         description=(
             "Load all raw data tables concurrently from S3 "

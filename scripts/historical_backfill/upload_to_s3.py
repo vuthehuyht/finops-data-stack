@@ -11,52 +11,59 @@ import boto3
 import pandas as pd
 
 
-def process_file(file_path: Path, table_name: str, bucket: str) -> None:
-    """Process and upload a single file to S3."""
-    if not file_path.is_file() or file_path.name.startswith("."):
+def process_table(table_dir: Path, bucket: str) -> None:  # noqa: C901
+    """Process and upload all files in a table directory as a single init file."""
+    if not table_dir.is_dir() or table_dir.name.startswith("."):
         return
 
-    # Use file stem as batch_date (e.g. 2021-04-19.csv -> 2021-04-19)
-    batch_date = file_path.stem
-    unix_timestamp = int(time.time())
+    table_name = table_dir.name
+    dfs = []
 
-    s3_key = (
-        f"raw/{table_name}/"
-        f"batch_date={batch_date}/"
-        f"{unix_timestamp}/{table_name}.parquet"
-    )
+    # Read all files in the directory
+    for file_path in table_dir.glob("*"):
+        if not file_path.is_file() or file_path.name.startswith("."):
+            continue
+
+        try:
+            if file_path.suffix == ".csv":
+                df = pd.read_csv(file_path)
+            elif file_path.suffix == ".parquet":
+                df = pd.read_parquet(file_path)
+            else:
+                print(f"  [SKIP] {file_path.name} (unsupported format)")
+                continue
+
+            if not df.empty:
+                dfs.append(df)
+        except Exception as e:
+            print(f"  [ERROR] reading {file_path}: {e}")
+
+    if not dfs:
+        print(f"  [SKIP] {table_name} has no valid data.")
+        return
+
+    print(f"  [START] Aggregating {table_name} data...")
+    # Concatenate all dataframes
+    final_df = pd.concat(dfs, ignore_index=True)
+
+    unix_timestamp = int(time.time())
+    s3_key = f"raw/{table_name}/batch_date=init/{unix_timestamp}/data_init.parquet"
 
     s3_client = boto3.client("s3")
 
-    if file_path.suffix == ".csv":
-        print(f"  [START] {file_path.name} -> s3://{bucket}/{s3_key}")
-        try:
-            df = pd.read_csv(file_path)
-            if df.empty:
-                print(f"  [SKIP] {file_path.name} is empty.")
-                return
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as tmp:
+            temp_path = tmp.name
 
-            with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as tmp:
-                temp_path = tmp.name
-
-            # Convert to snappy compressed parquet as required by design
-            df.to_parquet(temp_path, compression="snappy", index=False)
-            s3_client.upload_file(temp_path, bucket, s3_key)
+        # Convert to snappy compressed parquet as required by design
+        final_df.to_parquet(temp_path, compression="snappy", index=False)
+        s3_client.upload_file(temp_path, bucket, s3_key)
+        os.remove(temp_path)
+        print(f"  [DONE] {table_name} uploaded successfully to s3://{bucket}/{s3_key}")
+    except Exception as e:
+        print(f"  [ERROR] {table_name} upload failed: {e}")
+        if "temp_path" in locals() and os.path.exists(temp_path):
             os.remove(temp_path)
-            print(f"  [DONE] {file_path.name} uploaded successfully.")
-        except Exception as e:
-            print(f"  [ERROR] {file_path}: {e}")
-            if "temp_path" in locals() and os.path.exists(temp_path):
-                os.remove(temp_path)
-    elif file_path.suffix == ".parquet":
-        print(f"  [START] {file_path.name} -> s3://{bucket}/{s3_key}")
-        try:
-            s3_client.upload_file(str(file_path), bucket, s3_key)
-            print(f"  [DONE] {file_path.name} uploaded successfully.")
-        except Exception as e:
-            print(f"  [ERROR] {file_path}: {e}")
-    else:
-        print(f"  [SKIP] {file_path.name} (unsupported format)")
 
 
 def main():
@@ -76,21 +83,15 @@ def main():
         print(f"Directory {base_path} does not exist.")
         return
 
-    # Collect all tasks
-    tasks = []
-    for table_dir in base_path.iterdir():
-        if not table_dir.is_dir() or table_dir.name.startswith("."):
-            continue
+    # Collect all table directories
+    table_dirs = [
+        d for d in base_path.iterdir() if d.is_dir() and not d.name.startswith(".")
+    ]
 
-        table_name = table_dir.name
-        for file_path in table_dir.glob("*"):
-            if file_path.is_file() and not file_path.name.startswith("."):
-                tasks.append((file_path, table_name, args.bucket))
+    total_tables = len(table_dirs)
+    print(f"Found {total_tables} tables to process and upload.")
 
-    total_tasks = len(tasks)
-    print(f"Found {total_tasks} files to upload.")
-
-    if total_tasks == 0:
+    if total_tables == 0:
         return
 
     # Execute tasks concurrently
@@ -99,16 +100,14 @@ def main():
 
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
         futures = [
-            executor.submit(process_file, fpath, tname, bucket)
-            for (fpath, tname, bucket) in tasks
+            executor.submit(process_table, table_dir, args.bucket)
+            for table_dir in table_dirs
         ]
 
         for count, future in enumerate(as_completed(futures), 1):
             # To catch any uncaught exceptions from threads
             future.result()
-            if count % 50 == 0 or count == total_tasks:
-                pct = (count / total_tasks) * 100
-                print(f"Progress: {count}/{total_tasks} ({pct:.1f}%) files processed.")
+            print(f"Progress: {count}/{total_tables} tables processed.")
 
     elapsed = time.time() - start_time
     print(f"Upload complete in {elapsed:.2f} seconds!")
