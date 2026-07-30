@@ -103,6 +103,7 @@ runs:
           --set settings.interruptionQueue=${{ inputs.karpenter-interruption-queue-name }} \
           --set serviceAccount.create=false \
           --set serviceAccount.name=karpenter \
+          --set replicas=1 \
           --wait
 
     - name: Apply Karpenter NodePool and EC2NodeClass manifests
