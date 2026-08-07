@@ -1305,7 +1305,7 @@ wheels = [
 
 [[package]]
 name = "dbt-redshift"
-version = "1.11.0rc4"
+version = "1.11.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "agate" },
@@ -1317,9 +1317,9 @@ dependencies = [
     { name = "requests" },
     { name = "sqlparse" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b1/96/34c29328951b917ed14dabbb2ccb1310dba0bd9aed0a5dc3325b1fdcb63a/dbt_redshift-1.11.0rc4.tar.gz", hash = "sha256:844e0f6fa21132129f9ba5a4004e565ae4958592c185ddf830d69312caf825f0", size = 112984, upload-time = "2026-06-15T15:34:10.596Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5e/23/e4ab04b3ea2c6084983e6d914d346ddd9a7f26ec4eec243a3c5afb209cc1/dbt_redshift-1.11.0.tar.gz", hash = "sha256:95366ac6bdfca931ff0b4943637b7515dd7421018ec7fbb508ddd7271163c9fc", size = 108919, upload-time = "2026-07-16T17:03:31.203Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/46/26/d994cd6e0e9863ac3f11ebce4aa15cd8d9d6d755e8055d9d47f160e0d297/dbt_redshift-1.11.0rc4-py3-none-any.whl", hash = "sha256:0fdaaca3fe5ed72dc14ca6e45aa745bd48852920dc6a84f2cc4086918ec1a37d", size = 63309, upload-time = "2026-06-15T15:34:09.355Z" },
+    { url = "https://files.pythonhosted.org/packages/37/6c/35f19be88d864db294658bc14868b93a8a910585e5a5ca19b164c68cd56a/dbt_redshift-1.11.0-py3-none-any.whl", hash = "sha256:e1484063b3728394d1a79da8e86aac2b847bf9fc7101061c3cca719b7b951625", size = 63278, upload-time = "2026-07-16T17:03:29.891Z" },
 ]
 
 [[package]]
@@ -1543,7 +1543,7 @@ requires-dist = [
     { name = "dagster-pandas", specifier = "==0.29.10" },
     { name = "dagster-postgres", specifier = ">=0.29.10" },
     { name = "dagster-slack", specifier = "==0.29.10" },
-    { name = "dbt-redshift", specifier = ">=1.11.0rc4" },
+    { name = "dbt-redshift", specifier = ">=1.11.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "mashumaro", specifier = ">=3.9,<3.15" },
     { name = "more-itertools", specifier = ">=10.8.0" },
