@@ -92,6 +92,7 @@ known-third-party = ["dagster"]
 override-dependencies = [
     "deepdiff>=8.0.0",
     "dbt-common>=1.37.3",
+    "cryptography>=50.0.0",
 ]
 
 [build-system]
