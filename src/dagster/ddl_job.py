@@ -41,12 +41,26 @@ def execute_ddl_op(context: dagster.OpExecutionContext) -> None:
     file_queries = ddl_executor._render_ddl_queries(input_files, parameters)
 
     context.log.info("Executing DDL queries...")
-    ddl_executor.execute_ddl_queries(
-        file_queries=file_queries,
-        skip_confirmation=True,
-        parameters=parameters,
-    )
-    context.log.info("DDL Execution completed successfully.")
+
+    from src.common.redshift_util import get_redshift_connection
+
+    with get_redshift_connection() as conn:
+        conn.autocommit = False
+        with conn.cursor() as cursor:
+            try:
+                for file_path, sql in file_queries:
+                    context.log.info(f"Executing: {os.path.basename(file_path)}")
+                    cursor.execute(sql)
+                conn.commit()
+                context.log.info(
+                    "All DDL statements executed and committed successfully."
+                )
+            except Exception as e:
+                context.log.error(
+                    f"Error executing DDL from {file_path}. Rolling back."
+                )
+                conn.rollback()
+                raise e
 
 
 @dagster_lib.job(

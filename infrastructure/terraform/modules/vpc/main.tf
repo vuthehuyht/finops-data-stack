@@ -43,6 +43,7 @@ resource "aws_subnet" "private_app" {
   tags = {
     Name                              = "${var.project_name}-private-app-${count.index + 1}"
     "kubernetes.io/role/internal-elb" = "1" # For internal load balancer
+    "karpenter.sh/discovery"          = "${var.project_name}-eks-cluster"
   }
 }
 
@@ -170,7 +171,8 @@ resource "aws_security_group" "eks_nodes" {
   }
 
   tags = {
-    Name = "${var.project_name}-eks-nodes-sg"
+    Name                     = "${var.project_name}-eks-nodes-sg"
+    "karpenter.sh/discovery" = "${var.project_name}-eks-cluster"
   }
 }
 
