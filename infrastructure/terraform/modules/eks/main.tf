@@ -113,6 +113,7 @@ resource "aws_eks_node_group" "core_system" {
 
   capacity_type  = "ON_DEMAND"
   instance_types = ["t3a.medium"] # Optimization: use cheaper AMD instance type
+  disk_size      = 100
 
   # Used by K8s nodeSelector (infrastructure/helm/values.yaml) to pin the
   # always-on webserver/daemon/user-code pods to this node group.
