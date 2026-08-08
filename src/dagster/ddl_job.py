@@ -1,53 +1,67 @@
 """Execute DDL Job."""
 
+import glob
+import os
+
 import dagster
 
 import src.pipeline.dagster as dagster_lib
-from src.dagster import environment, resources
+from src.redshift import ddl_executor
 
 
-def _create_ddl_op(
-    schema: environment.SchemaType,
-    region: environment.RegionType,
-) -> dagster.OpDefinition:
-    @dagster_lib.op(
-        name=f"execute_ddl_{schema.value}_{region.value}_op",
-        config_schema={"query_template_file_paths": [str]},
+@dagster_lib.op(
+    name="execute_raw_layer_ddl_op",
+    config_schema={
+        "schema_name_raw": dagster.Field(str, default_value="raw", is_required=False),
+        "schema_name_staging": dagster.Field(
+            str, default_value="staging", is_required=False
+        ),
+        "schema_name_mart": dagster.Field(str, default_value="mart", is_required=False),
+    },
+)
+def execute_ddl_op(context: dagster.OpExecutionContext) -> None:
+    """Execute DDL for Raw Layer on Redshift."""
+    schema_name_raw = context.op_config["schema_name_raw"]
+    schema_name_staging = context.op_config["schema_name_staging"]
+    schema_name_mart = context.op_config["schema_name_mart"]
+
+    parameters = {
+        "schema_name_raw": schema_name_raw,
+        "schema_name_staging": schema_name_staging,
+        "schema_name_mart": schema_name_mart,
+    }
+
+    base_dir = os.path.join(os.path.dirname(__file__), "..", "redshift")
+    setup_file = os.path.join(base_dir, "ddl", "dev", "setup.sql.jinja")
+    raw_files = glob.glob(os.path.join(base_dir, "ddl", "raw", "*.sql.jinja"))
+
+    input_files = [setup_file] + raw_files
+    context.log.info(f"Rendering {len(input_files)} DDL templates...")
+
+    file_queries = ddl_executor._render_ddl_queries(input_files, parameters)
+
+    context.log.info("Executing DDL queries...")
+    ddl_executor.execute_ddl_queries(
+        file_queries=file_queries,
+        skip_confirmation=True,
+        parameters=parameters,
     )
-    def execute_ddl_op(
-        context: dagster.OpExecutionContext,
-        redshift: resources.RedshiftResource,
-    ) -> None:
-        """Execute DDL (Skeleton for Redshift)."""
-        query_paths = context.op_config["query_template_file_paths"]
-        context.log.info(
-            "Executing DDL for %s %s on Redshift with paths: %s",
-            schema.value,
-            region.value,
-            query_paths,
-        )
-        context.log.info("DDL Execution is skipped in this skeleton.")
-
-    return execute_ddl_op
+    context.log.info("DDL Execution completed successfully.")
 
 
 @dagster_lib.job(
     config=dagster.RunConfig(
         ops={
-            "execute_ddl_batch_global_op": {
-                "config": {"query_template_file_paths": []}
-            },
-            "execute_ddl_master_global_op": {
-                "config": {"query_template_file_paths": []}
-            },
-            "execute_ddl_batch_asia_op": {"config": {"query_template_file_paths": []}},
-            "execute_ddl_master_asia_op": {"config": {"query_template_file_paths": []}},
-        },
+            "execute_raw_layer_ddl_op": {
+                "config": {
+                    "schema_name_raw": "raw",
+                    "schema_name_staging": "staging",
+                    "schema_name_mart": "mart",
+                }
+            }
+        }
     ),
 )
 def execute_ddl_job() -> None:
     """Execute DDL Job."""
-    _create_ddl_op(environment.SchemaType.Batch, environment.RegionType.Global)()
-    _create_ddl_op(environment.SchemaType.Master, environment.RegionType.Global)()
-    _create_ddl_op(environment.SchemaType.Batch, environment.RegionType.Asia)()
-    _create_ddl_op(environment.SchemaType.Master, environment.RegionType.Asia)()
+    execute_ddl_op()
