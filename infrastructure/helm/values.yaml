@@ -218,7 +218,7 @@ runLauncher:
       resources:
         requests:
           cpu: "250m"
-          memory: "512Mi"
+          memory: "2Gi"
         limits:
           cpu: "1"
           memory: "3Gi"

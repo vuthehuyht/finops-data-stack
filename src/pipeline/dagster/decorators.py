@@ -158,11 +158,11 @@ class _DecoratorBase(abc.ABC):
                 "resources": {
                     "requests": {
                         "cpu": "100m",
-                        "memory": "800Mi",
+                        "memory": "2Gi",
                         "ephemeral-storage": "1Gi",
                     },
                     "limits": {
-                        "memory": "800Mi",
+                        "memory": "3Gi",
                         "ephemeral-storage": "1Gi",
                     },
                 },

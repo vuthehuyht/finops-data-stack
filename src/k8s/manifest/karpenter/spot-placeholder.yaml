@@ -1,0 +1,41 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: spot-placeholder-priority
+value: -1
+globalDefault: false
+description: "This priority class should be used for placeholder pods only to keep spot nodes warm."
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spot-placeholder
+  namespace: dagster
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spot-placeholder
+  template:
+    metadata:
+      labels:
+        app: spot-placeholder
+    spec:
+      priorityClassName: spot-placeholder-priority
+      nodeSelector:
+        node-group: worker
+      tolerations:
+        - key: "spotWorker"
+          operator: "Equal"
+          value: "true"
+          effect: "NoSchedule"
+      containers:
+        - name: pause
+          # Extremely lightweight Kubernetes container that does nothing but keep the Pod alive (sleep)
+          image: registry.k8s.io/pause:3.9
+          resources:
+            requests:
+              # Request a small amount of resources, just enough to trigger Karpenter 
+              # to provision a Spot node without taking up too much capacity from real jobs.
+              cpu: "100m"
+              memory: "100Mi"
