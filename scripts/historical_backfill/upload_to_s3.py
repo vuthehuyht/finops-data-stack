@@ -26,9 +26,11 @@ def process_table(table_dir: Path, bucket: str) -> None:  # noqa: C901
 
         try:
             if file_path.suffix == ".csv":
-                df = pd.read_csv(file_path)
+                df = pd.read_csv(file_path, dtype=str, on_bad_lines="skip")
             elif file_path.suffix == ".parquet":
                 df = pd.read_parquet(file_path)
+                # Convert parquet types to string for consistency
+                df = df.astype(str)
             else:
                 print(f"  [SKIP] {file_path.name} (unsupported format)")
                 continue

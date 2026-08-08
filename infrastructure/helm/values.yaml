@@ -125,7 +125,7 @@ dagster-user-deployments:
       replicaCount: 1
 
       includeConfigInLaunchedRuns:
-        enabled: true
+        enabled: false
 
       # Redshift creds injected directly from the "dagster-pg-credentials" k8s
       # Secret (kept in sync from AWS Secrets Manager by External Secrets

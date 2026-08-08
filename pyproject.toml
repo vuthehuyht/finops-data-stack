@@ -30,6 +30,7 @@ dependencies = [
     "yfinance>=1.4.1",
     "sagemaker>=3.16.0",
     "dagster-postgres>=0.29.10",
+    "dagster-webserver>=1.13.10",
 ]
 
 [dependency-groups]
