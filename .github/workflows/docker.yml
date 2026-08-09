@@ -72,18 +72,15 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Setup Terraform
-        if: github.event_name == 'push'
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.5.0"
 
       - name: Terraform Init (read remote state, no apply)
-        if: github.event_name == 'push'
         working-directory: ./infrastructure/terraform
         run: terraform init
 
       - name: Read Terraform outputs
-        if: github.event_name == 'push'
         id: tf-outputs
         working-directory: ./infrastructure/terraform
         run: |
@@ -100,7 +97,6 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Deploy Dagster to EKS
-        if: github.event_name == 'push'
         uses: ./.github/actions/deploy-dagster-to-eks
         with:
           image-tag: ${{ env.IMAGE_TAG }}
