@@ -189,31 +189,41 @@ def _compile_dbt(
         context.log.error(f"Error compiling dbt: {e}")
 
 
+def _get_partition_variables(
+    context: dagster.AssetExecutionContext,
+    dbt_config: resources.DbtConfigResource,
+) -> dict[str, Any]:
+    """Resolve partition key and calculate real-time shift."""
+    if context.has_partition_key:
+        partition_key = context.partition_key
+    elif dbt_config.variables and "partition_key" in dbt_config.variables:
+        partition_key = dbt_config.variables["partition_key"]
+    else:
+        partition_key = datetime.datetime.now().strftime("%Y-%m-%d")
+
+    try:
+        today_for_realtime = datetime.datetime.strptime(
+            partition_key, "%Y-%m-%d"
+        ) + datetime.timedelta(days=1)
+        today_for_realtime_iso = today_for_realtime.isoformat()
+    except ValueError:
+        today_for_realtime_iso = partition_key
+
+    return {
+        "partition_key": partition_key,
+        "batch_date": partition_key,
+        "dagster_job_name": context.job_name,
+        "today_for_realtime": today_for_realtime_iso,
+    }
+
+
 def _build_dbt_args(
     context: dagster.AssetExecutionContext,
     dbt: dagster_dbt.DbtCliResource,
     dbt_config: resources.DbtConfigResource,
 ) -> list[str]:
     """Build dbt arguments based on context and dbt_config."""
-    if not context.has_partition_key:
-        raise ValueError("The dbt_project_assets requires a partition key.")
-
-    partition_key = context.partition_key
-    job_name = context.job_name
-
-    # Vietnamese / Ho Chi Minh timezone shift
-    # In Vietnam, we shift by +1 day for realtime if partition key is standard date.
-    today_for_realtime = datetime.datetime.strptime(
-        partition_key, "%Y-%m-%d"
-    ) + datetime.timedelta(days=1)
-    today_for_realtime_iso = today_for_realtime.isoformat()
-
-    variables: dict[str, Any] = {
-        "partition_key": partition_key,
-        "batch_date": partition_key,
-        "dagster_job_name": job_name,
-        "today_for_realtime": today_for_realtime_iso,
-    }
+    variables: dict[str, Any] = _get_partition_variables(context, dbt_config)
 
     if dbt_config.days_offset_for_output_diff is not None:
         variables["days_offset_for_output_diff"] = (
