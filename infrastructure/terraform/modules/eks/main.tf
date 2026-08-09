@@ -143,6 +143,51 @@ resource "aws_eks_node_group" "core_system" {
   }
 }
 
+# 4.2. Worker Node Group (On-Demand baseline)
+resource "aws_eks_node_group" "worker_on_demand" {
+  cluster_name    = aws_eks_cluster.main.name
+  node_group_name = "${var.project_name}-worker-ondemand-ng"
+  node_role_arn   = aws_iam_role.eks_nodes.arn
+  subnet_ids      = var.private_app_subnet_ids
+
+  capacity_type  = "ON_DEMAND"
+  instance_types = ["t3a.medium"]
+  disk_size      = 100
+
+  # Used by K8s nodeSelector to route worker pods here before triggering Karpenter
+  labels = {
+    "node-group" = "worker"
+  }
+
+  # Matches the taint expected by worker pods so they can schedule on these nodes
+  taint {
+    key    = "spotWorker"
+    value  = "true"
+    effect = "NO_SCHEDULE"
+  }
+
+  scaling_config {
+    desired_size = 1
+    min_size     = 1
+    max_size     = 2
+  }
+
+  update_config {
+    max_unavailable = 1
+  }
+
+  depends_on = [
+    aws_iam_role_policy_attachment.eks_worker_node_policy,
+    aws_iam_role_policy_attachment.eks_cni_policy,
+    aws_iam_role_policy_attachment.eks_registry_policy
+  ]
+
+  tags = {
+    Name        = "${var.project_name}-worker-ondemand-node"
+    Environment = var.environment
+  }
+}
+
 # 5. IAM OIDC Provider cho IRSA (IAM Roles for Service Accounts)
 data "tls_certificate" "eks" {
   url = aws_eks_cluster.main.identity[0].oidc[0].issuer
@@ -235,10 +280,14 @@ resource "aws_iam_policy" "dagster_sa_permissions" {
           "sagemaker:DescribeModel",
           "sagemaker:CreateTransformJob",
           "sagemaker:DescribeTransformJob",
-          "sagemaker:StopTransformJob",
-          "iam:PassRole" # Required PassRole for SageMaker execution role
+          "sagemaker:StopTransformJob"
         ]
         Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = "iam:PassRole"
+        Resource = "arn:aws:iam::*:role/*-sagemaker-execution-role"
       }
     ]
   })
@@ -366,7 +415,34 @@ resource "aws_iam_policy" "github_actions_deploy_permissions" {
           "eks:*",
           "rds:*",
           "redshift-serverless:*",
-          "iam:*",
+          "iam:CreateRole",
+          "iam:DeleteRole",
+          "iam:AttachRolePolicy",
+          "iam:DetachRolePolicy",
+          "iam:PutRolePolicy",
+          "iam:DeleteRolePolicy",
+          "iam:GetRole",
+          "iam:GetRolePolicy",
+          "iam:PassRole",
+          "iam:List*",
+          "iam:CreatePolicy",
+          "iam:DeletePolicy",
+          "iam:CreatePolicyVersion",
+          "iam:DeletePolicyVersion",
+          "iam:GetPolicy",
+          "iam:GetPolicyVersion",
+          "iam:TagRole",
+          "iam:TagPolicy",
+          "iam:UntagRole",
+          "iam:UntagPolicy",
+          "iam:CreateOpenIDConnectProvider",
+          "iam:DeleteOpenIDConnectProvider",
+          "iam:GetOpenIDConnectProvider",
+          "iam:CreateInstanceProfile",
+          "iam:DeleteInstanceProfile",
+          "iam:GetInstanceProfile",
+          "iam:AddRoleToInstanceProfile",
+          "iam:RemoveRoleFromInstanceProfile",
           "s3:*",
           "ecr:*",
           "secretsmanager:*",

@@ -37,6 +37,10 @@ inputs:
     description: "SQS queue name Karpenter uses for Spot interruption notifications (terraform output karpenter_interruption_queue_name)"
     required: true
 
+  image-tag:
+    description: "Docker image tag. If not provided, fetches current tag from cluster."
+    required: false
+
 runs:
   using: "composite"
   steps:
@@ -104,7 +108,7 @@ runs:
           --set serviceAccount.create=false \
           --set serviceAccount.name=karpenter \
           --set replicas=1 \
-          --wait
+          --wait --timeout 10m
 
     - name: Apply Karpenter NodePool and EC2NodeClass manifests
       shell: bash
@@ -118,7 +122,7 @@ runs:
         helm upgrade --install external-secrets external-secrets/external-secrets \
           -n external-secrets \
           --set installCRDs=true \
-          --wait
+          --wait --timeout 5m
 
     - name: Apply ClusterSecretStore and ExternalSecret manifests
       shell: bash
@@ -138,6 +142,21 @@ runs:
         echo "Timed out waiting for dagster-pg-credentials Secret"
         exit 1
 
+    - name: Resolve image tag
+      id: resolve-tag
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.image-tag }}" ]; then
+          echo "tag=${{ inputs.image-tag }}" >> "$GITHUB_OUTPUT"
+        else
+          CURRENT_TAG=$(kubectl get deployment finops-user-code -n dagster -o=jsonpath='{$.spec.template.spec.containers[0].image}' 2>/dev/null | awk -F':' '{print $2}' || true)
+          if [ -z "$CURRENT_TAG" ]; then
+            echo "Failed to get current tag, falling back to latest"
+            CURRENT_TAG="latest"
+          fi
+          echo "tag=$CURRENT_TAG" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: Install/upgrade Dagster Helm chart
       shell: bash
       run: |
@@ -147,7 +166,8 @@ runs:
           -n dagster \
           -f infrastructure/helm/values.yaml \
           --set dagster-user-deployments.deployments[0].image.repository=${{ inputs.ecr-repository-url }} \
+          --set dagster-user-deployments.deployments[0].image.tag=${{ steps.resolve-tag.outputs.tag }} \
           --set postgresql.postgresqlHost=${{ inputs.rds-address }} \
           --set postgresql.postgresqlUsername=${{ inputs.rds-username }} \
           --set postgresql.postgresqlDatabase=${{ inputs.rds-dbname }} \
-          --wait
+          --wait --timeout 10m

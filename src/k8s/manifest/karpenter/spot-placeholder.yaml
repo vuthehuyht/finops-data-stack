@@ -35,7 +35,8 @@ spec:
           image: registry.k8s.io/pause:3.9
           resources:
             requests:
-              # Request a small amount of resources, just enough to trigger Karpenter 
-              # to provision a Spot node without taking up too much capacity from real jobs.
-              cpu: "100m"
-              memory: "100Mi"
+              # Request the same amount of resources as a real Dagster job (250m CPU, 1Gi Memory).
+              # This ensures that when this placeholder is preempted, exactly enough capacity
+              # is freed up for the real job to schedule immediately on the warm node.
+              cpu: "250m"
+              memory: "1Gi"
