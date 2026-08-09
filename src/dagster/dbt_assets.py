@@ -25,31 +25,6 @@ DBT_PROJECT_DIR = _PROJECT_ROOT / "src" / "transform" / "dbt"
 DBT_MANIFEST_FILE_PATH = DBT_PROJECT_DIR / "target" / "manifest.json"
 
 
-class FwCustomDagsterDbtTranslator(dagster_dbt.DagsterDbtTranslator):
-    """Custom dbt model translator mapping asset keys to uppercase."""
-
-    def get_asset_key(
-        self,
-        dbt_resource_props: Mapping[str, Any],
-    ) -> dagster.AssetKey:
-        """Get the Dagster asset key with uppercase parts."""
-        asset_key = super().get_asset_key(dbt_resource_props)
-        uppercased_path = [part.upper() for part in asset_key.path]
-        asset_key = dagster.AssetKey(uppercased_path)
-        if prefix := os.getenv("DAGSTER_ASSET_PREFIX"):
-            return asset_key.with_prefix(prefix)
-        return asset_key
-
-    def get_metadata(self, dbt_resource_props: Mapping[str, Any]) -> Mapping[str, Any]:
-        """Filter metadata and drop unnecessary column schema if needed."""
-        metadata = super().get_metadata(dbt_resource_props)
-        return metadata
-
-    def get_description(self, dbt_resource_props: Mapping[str, Any]) -> str:
-        """Filter the metadata and drop unnecessary information."""
-        return dagster_dbt.asset_utils.default_description_fn(dbt_resource_props, False)
-
-
 @functools.cache
 def get_dbt_asset_dependency(
     select: str = "fqn:*",
@@ -63,7 +38,7 @@ def get_dbt_asset_dependency(
         select=select,
         exclude=exclude,
         project=dbt_project,
-        dagster_dbt_translator=FwCustomDagsterDbtTranslator(),
+        dagster_dbt_translator=dagster_dbt.DagsterDbtTranslator(),
     )
     def _dbt_asset_dependency() -> Any:
         yield from []
@@ -441,7 +416,7 @@ def get_dbt_project_assets(
         name=name,
         manifest=DBT_MANIFEST_FILE_PATH,
         project=dbt_project,
-        dagster_dbt_translator=FwCustomDagsterDbtTranslator(
+        dagster_dbt_translator=dagster_dbt.DagsterDbtTranslator(
             settings=dagster_dbt.DagsterDbtTranslatorSettings(
                 enable_code_references=True
             )
