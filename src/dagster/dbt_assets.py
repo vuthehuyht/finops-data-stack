@@ -176,12 +176,16 @@ def _compile_dbt(
 ) -> None:
     """Compile dbt project and generate artifacts."""
     try:
+        target_path_base = pathlib.Path(
+            os.environ.get("DBT_TARGET_PATH", "/tmp/dbt-target")
+        )
         invocation = dbt.cli(
             [
                 "compile",
                 "--target-path",
                 compile_target_path,
             ],
+            target_path=target_path_base,
             context=context,
         )
         invocation.wait()
@@ -460,7 +464,12 @@ def get_dbt_project_assets(
         ] = []
 
         try:
-            dbt_cli_invocation = dbt.cli(dbt_args, context=context)
+            target_path_base = pathlib.Path(
+                os.environ.get("DBT_TARGET_PATH", "/tmp/dbt-target")
+            )
+            dbt_cli_invocation = dbt.cli(
+                dbt_args, target_path=target_path_base, context=context
+            )
             for dagster_event in dbt_cli_invocation.stream():
                 for event in _process_dbt_event(
                     dagster_event, context, dbt_config, redshift

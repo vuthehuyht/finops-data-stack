@@ -179,7 +179,6 @@ class SsmParameterResource(dagster.ConfigurableResource):
 
 dbt = DbtCliResource(
     project_dir=os.fspath(_PROJECT_ROOT / "src" / "transform" / "dbt"),
-    target_path=os.getenv("DBT_TARGET_PATH", "/tmp/dbt-target"),
 )
 s3 = S3Resource(region_name="ap-southeast-1")
 s3bucket = S3BucketResource()
