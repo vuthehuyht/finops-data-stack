@@ -35,7 +35,7 @@ class S3BucketResource(dagster.ConfigurableResource):
     """S3 bucket name for raw (Bronze) data."""
 
     raw_bucket: str = Field(
-        default_factory=lambda: os.getenv("FINOPS_RAW_BUCKET", "finops-raw-dev"),
+        default_factory=lambda: os.getenv("FINOPS_RAW_BUCKET", "finops-data-lake-raw"),
         description="S3 bucket holding Bronze layer Parquet files.",
     )
 
@@ -70,7 +70,7 @@ class SageMakerResource(dagster.ConfigurableResource):
     )
     model_artifacts_bucket: str = Field(
         default_factory=lambda: os.getenv(
-            "FINOPS_MODEL_ARTIFACTS_BUCKET", "finops-model-artifacts-dev"
+            "FINOPS_MODEL_ARTIFACTS_BUCKET", "finops-model-artifacts"
         ),
         description="S3 bucket storing versioned model.tar.gz + metadata.json.",
     )

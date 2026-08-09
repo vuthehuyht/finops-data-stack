@@ -201,4 +201,3 @@ resource "aws_security_group" "redshift" {
     Name = "${var.project_name}-redshift-sg"
   }
 }
-

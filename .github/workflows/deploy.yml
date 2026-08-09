@@ -81,6 +81,7 @@ jobs:
             echo "external_secrets_sa_role_arn=$(terraform output -raw external_secrets_sa_role_arn)"
             echo "karpenter_controller_role_arn=$(terraform output -raw karpenter_controller_role_arn)"
             echo "karpenter_interruption_queue_name=$(terraform output -raw karpenter_interruption_queue_name)"
+            echo "redshift_iam_role_arn=$(terraform output -raw redshift_iam_role_arn)"
           } >> "$GITHUB_OUTPUT"
 
       - name: Deploy Dagster to EKS
@@ -96,6 +97,7 @@ jobs:
           external-secrets-sa-role-arn: ${{ steps.tf-outputs.outputs.external_secrets_sa_role_arn }}
           karpenter-controller-role-arn: ${{ steps.tf-outputs.outputs.karpenter_controller_role_arn }}
           karpenter-interruption-queue-name: ${{ steps.tf-outputs.outputs.karpenter_interruption_queue_name }}
+          redshift-iam-role-arn: ${{ steps.tf-outputs.outputs.redshift_iam_role_arn }}
 
   deploy-infra:
     needs: detect-changes
@@ -143,6 +145,7 @@ jobs:
             echo "external_secrets_sa_role_arn=$(terraform output -raw external_secrets_sa_role_arn)"
             echo "karpenter_controller_role_arn=$(terraform output -raw karpenter_controller_role_arn)"
             echo "karpenter_interruption_queue_name=$(terraform output -raw karpenter_interruption_queue_name)"
+            echo "redshift_iam_role_arn=$(terraform output -raw redshift_iam_role_arn)"
           } >> "$GITHUB_OUTPUT"
 
       - name: Deploy Dagster to EKS
@@ -158,3 +161,4 @@ jobs:
           external-secrets-sa-role-arn: ${{ steps.tf-outputs.outputs.external_secrets_sa_role_arn }}
           karpenter-controller-role-arn: ${{ steps.tf-outputs.outputs.karpenter_controller_role_arn }}
           karpenter-interruption-queue-name: ${{ steps.tf-outputs.outputs.karpenter_interruption_queue_name }}
+          redshift-iam-role-arn: ${{ steps.tf-outputs.outputs.redshift_iam_role_arn }}

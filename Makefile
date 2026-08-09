@@ -170,9 +170,12 @@ deploy_eks:
 	RDS_HOST=$$(terraform -chdir=infrastructure/terraform output -raw rds_address) && \
 	RDS_USER=$$(terraform -chdir=infrastructure/terraform output -raw rds_username) && \
 	RDS_DB=$$(terraform -chdir=infrastructure/terraform output -raw rds_dbname) && \
+	REDSHIFT_ROLE=$$(terraform -chdir=infrastructure/terraform output -raw redshift_iam_role_arn) && \
 	helm upgrade --install dagster dagster/dagster -f infrastructure/helm/values.yaml -n dagster --create-namespace \
 		--set dagster-user-deployments.deployments\[0\].image.repository=$(ECR_REPO) \
 		--set dagster-user-deployments.deployments\[0\].image.tag=$(IMAGE_TAG) \
+		--set dagster-user-deployments.deployments\[0\].env\[7\].value=$$REDSHIFT_ROLE \
+		--set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env\[6\].value=$$REDSHIFT_ROLE \
 		--set postgresql.postgresqlHost=$$RDS_HOST \
 		--set postgresql.postgresqlUsername=$$RDS_USER \
 		--set postgresql.postgresqlDatabase=$$RDS_DB

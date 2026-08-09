@@ -166,6 +166,8 @@ dagster-user-deployments:
             secretKeyRef:
               name: dagster-pg-credentials
               key: fireant_password
+        - name: REDSHIFT_IAM_ROLE_ARN
+          value: ""
 
       # Always-on gRPC server serving definitions — runs on Core, same as
       # webserver/daemon (see nodeSelector note there).
@@ -276,6 +278,8 @@ runLauncher:
                 secretKeyRef:
                   name: dagster-pg-credentials
                   key: fireant_password
+            - name: REDSHIFT_IAM_ROLE_ARN
+              value: ""
 
 ####################################################################################################
 # PostgreSQL — external RDS instance (aws_db_instance.dagster_meta), not chart-managed.

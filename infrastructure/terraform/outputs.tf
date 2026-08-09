@@ -104,3 +104,8 @@ output "karpenter_interruption_queue_name" {
   value       = module.eks.karpenter_interruption_queue_name
   description = "The SQS queue name Karpenter uses for Spot interruption/rebalance notifications"
 }
+
+output "redshift_iam_role_arn" {
+  value       = module.redshift.redshift_s3_role_arn
+  description = "The ARN of the IAM role assumed by Redshift to access S3"
+}

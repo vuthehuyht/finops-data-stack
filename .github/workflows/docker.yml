@@ -45,11 +45,7 @@ jobs:
 
       - name: Generate image tag
         run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "IMAGE_TAG=pr-${{ github.event.pull_request.number }}-$(date -u +%Y%m%d%H%M)" >> "$GITHUB_ENV"
-          else
-            echo "IMAGE_TAG=$(date -u +%Y%m%d-%H%M)" >> "$GITHUB_ENV"
-          fi
+          echo "IMAGE_TAG=$(date -u +%Y%m%d-%H%M)" >> "$GITHUB_ENV"
 
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
@@ -94,6 +90,7 @@ jobs:
             echo "external_secrets_sa_role_arn=$(terraform output -raw external_secrets_sa_role_arn)"
             echo "karpenter_controller_role_arn=$(terraform output -raw karpenter_controller_role_arn)"
             echo "karpenter_interruption_queue_name=$(terraform output -raw karpenter_interruption_queue_name)"
+            echo "redshift_iam_role_arn=$(terraform output -raw redshift_iam_role_arn)"
           } >> "$GITHUB_OUTPUT"
 
       - name: Deploy Dagster to EKS
@@ -110,3 +107,4 @@ jobs:
           external-secrets-sa-role-arn: ${{ steps.tf-outputs.outputs.external_secrets_sa_role_arn }}
           karpenter-controller-role-arn: ${{ steps.tf-outputs.outputs.karpenter_controller_role_arn }}
           karpenter-interruption-queue-name: ${{ steps.tf-outputs.outputs.karpenter_interruption_queue_name }}
+          redshift-iam-role-arn: ${{ steps.tf-outputs.outputs.redshift_iam_role_arn }}

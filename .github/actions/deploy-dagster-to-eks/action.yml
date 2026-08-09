@@ -41,6 +41,10 @@ inputs:
     description: "Docker image tag. If not provided, fetches current tag from cluster."
     required: false
 
+  redshift-iam-role-arn:
+    description: "IAM Role ARN for Redshift to access S3"
+    required: true
+
 runs:
   using: "composite"
   steps:
@@ -167,6 +171,8 @@ runs:
           -f infrastructure/helm/values.yaml \
           --set dagster-user-deployments.deployments[0].image.repository=${{ inputs.ecr-repository-url }} \
           --set dagster-user-deployments.deployments[0].image.tag=${{ steps.resolve-tag.outputs.tag }} \
+          --set dagster-user-deployments.deployments[0].env[7].value=${{ inputs.redshift-iam-role-arn }} \
+          --set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env[6].value=${{ inputs.redshift-iam-role-arn }} \
           --set postgresql.postgresqlHost=${{ inputs.rds-address }} \
           --set postgresql.postgresqlUsername=${{ inputs.rds-username }} \
           --set postgresql.postgresqlDatabase=${{ inputs.rds-dbname }} \

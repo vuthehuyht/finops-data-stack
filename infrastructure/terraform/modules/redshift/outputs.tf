@@ -24,3 +24,8 @@ output "admin_password" {
   sensitive   = true
   description = "The database admin password (sensitive)"
 }
+
+output "redshift_s3_role_arn" {
+  value       = aws_iam_role.redshift_s3.arn
+  description = "The ARN of the IAM role assumed by Redshift to access S3"
+}
