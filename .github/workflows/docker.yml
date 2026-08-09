@@ -91,6 +91,8 @@ jobs:
             echo "karpenter_controller_role_arn=$(terraform output -raw karpenter_controller_role_arn)"
             echo "karpenter_interruption_queue_name=$(terraform output -raw karpenter_interruption_queue_name)"
             echo "redshift_iam_role_arn=$(terraform output -raw redshift_iam_role_arn)"
+            echo "raw_bucket_id=$(terraform output -raw raw_bucket_id)"
+            echo "model_artifacts_bucket_id=$(terraform output -raw model_artifacts_bucket_id)"
           } >> "$GITHUB_OUTPUT"
 
       - name: Deploy Dagster to EKS
@@ -108,3 +110,5 @@ jobs:
           karpenter-controller-role-arn: ${{ steps.tf-outputs.outputs.karpenter_controller_role_arn }}
           karpenter-interruption-queue-name: ${{ steps.tf-outputs.outputs.karpenter_interruption_queue_name }}
           redshift-iam-role-arn: ${{ steps.tf-outputs.outputs.redshift_iam_role_arn }}
+          finops-raw-bucket: ${{ steps.tf-outputs.outputs.raw_bucket_id }}
+          finops-model-artifacts-bucket: ${{ steps.tf-outputs.outputs.model_artifacts_bucket_id }}

@@ -168,6 +168,10 @@ dagster-user-deployments:
               key: fireant_password
         - name: REDSHIFT_IAM_ROLE_ARN
           value: ""
+        - name: FINOPS_RAW_BUCKET
+          value: ""
+        - name: FINOPS_MODEL_ARTIFACTS_BUCKET
+          value: ""
 
       # Always-on gRPC server serving definitions — runs on Core, same as
       # webserver/daemon (see nodeSelector note there).
@@ -279,6 +283,10 @@ runLauncher:
                   name: dagster-pg-credentials
                   key: fireant_password
             - name: REDSHIFT_IAM_ROLE_ARN
+              value: ""
+            - name: FINOPS_RAW_BUCKET
+              value: ""
+            - name: FINOPS_MODEL_ARTIFACTS_BUCKET
               value: ""
 
 ####################################################################################################
