@@ -149,7 +149,7 @@ def _create_sensor_for_jobs(  # noqa: C901
         ):
             context.advance_cursor({key: asset_event})
 
-            # Lấy Partition Key từ Bronze
+            # Extract Partition Key from Bronze
             partition_key = materialization.partition
             if not partition_key:
                 conata_key = materialization.metadata.get("conata_partition_key")
@@ -167,14 +167,14 @@ def _create_sensor_for_jobs(  # noqa: C901
             partition_key,
             materialized_assets,
         ) in partition_to_materialized_assets.items():
-            # Xác định các jobs cần trigger
-            # (Bronze->STG là 1-to-1 nên không cần check upstream chéo)
+            # Identify jobs to trigger
+            # (Bronze->STG is 1-to-1, no need to cross-check upstreams)
             possible_jobs: set[JobDefinition | UnresolvedAssetJobDefinition] = set()
             for asset in materialized_assets:
                 if asset in upstream_to_jobs:
                     possible_jobs.update(upstream_to_jobs[asset])
 
-            # 4. Yield RunRequest cho từng job
+            # 4. Yield RunRequest for each job
             for job in possible_jobs:
                 yield RunRequest(
                     job_name=job.name,
@@ -360,10 +360,10 @@ def _create_sensor_for_mart_jobs(  # noqa: C901
         ):
             context.advance_cursor({key: asset_event})
 
-            # Lấy Native Partition từ Dagster
+            # Extract Native Partition from Dagster
             partition_key = materialization.partition
             if not partition_key:
-                # Fallback cho data cũ chưa có native partition
+                # Fallback for older data missing native partition
                 conata_key = materialization.metadata.get("conata_partition_key")
                 dbt_vars = materialization.metadata.get("variables")
                 if conata_key is not None:
