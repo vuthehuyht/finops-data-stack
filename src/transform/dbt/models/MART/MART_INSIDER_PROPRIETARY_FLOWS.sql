@@ -1,6 +1,8 @@
 {{
   config(
-    materialized='table',
+    materialized='incremental',
+    incremental_strategy='merge',
+    merge_exclude_columns=['DATACORE_CREATE_DATETIME', 'DATACORE_CREATE_PROGRAM', 'DATACORE_CREATE_BY'],
     unique_key=['TICKER', 'TRADING_DATE']
   )
 }}
@@ -14,6 +16,7 @@ WITH FOREIGN_FLOW_BASE AS (
   SELECT
     TICKER,
     TRADING_DATE,
+    BATCH_DATE,
     BUY_VOL,
     SELL_VOL,
     BUY_VAL,
@@ -34,6 +37,9 @@ WITH FOREIGN_FLOW_BASE AS (
       ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
     ) AS NET_FOREIGN_VAL_1M
   FROM {{ ref('STG_FOREIGN_TRADING') }}
+  {% if is_incremental() %}
+  WHERE BATCH_DATE <= {{ current_batch_date() }}
+  {% endif %}
 ),
 
 FOREIGN_FLOW AS (
@@ -49,6 +55,7 @@ PROPRIETARY_FLOW AS (
   SELECT
     TICKER,
     TRADING_DATE,
+    BATCH_DATE,
     NET_VAL AS PROP_NET_VAL,
     -- 5-day rolling sum of proprietary net value
     SUM(NET_VAL) OVER (
@@ -56,6 +63,9 @@ PROPRIETARY_FLOW AS (
       ROWS BETWEEN 4 PRECEDING AND CURRENT ROW
     ) AS PROP_NET_VAL_5D
   FROM {{ ref('STG_PROPRIETARY_TRADING') }}
+  {% if is_incremental() %}
+  WHERE BATCH_DATE <= {{ current_batch_date() }}
+  {% endif %}
 ),
 
 -- Correlation between prop and foreign net value over 10 days
@@ -63,6 +73,7 @@ PROP_FOREIGN_JOINED AS (
   SELECT
     P.TICKER,
     P.TRADING_DATE,
+    COALESCE(P.BATCH_DATE, F.BATCH_DATE) AS BATCH_DATE,
     P.PROP_NET_VAL,
     F.NET_VAL AS FOREIGN_NET_VAL
   FROM PROPRIETARY_FLOW AS P
@@ -76,6 +87,7 @@ PROP_FOREIGN_STATS AS (
   SELECT
     TICKER,
     TRADING_DATE,
+    BATCH_DATE,
     PROP_NET_VAL::DOUBLE PRECISION AS X,
     FOREIGN_NET_VAL::DOUBLE PRECISION AS Y,
     COUNT(1) OVER (
@@ -109,6 +121,7 @@ PROP_FOREIGN_CORR AS (
   SELECT
     TICKER,
     TRADING_DATE,
+    BATCH_DATE,
     CASE
       WHEN N <= 1 THEN NULL
       WHEN (N * SUM_XX - SUM_X * SUM_X) * (N * SUM_YY - SUM_Y * SUM_Y) <= 0 THEN NULL

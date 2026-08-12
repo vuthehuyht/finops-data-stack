@@ -1,6 +1,8 @@
 {{
   config(
-    materialized='table',
+    materialized='incremental',
+    incremental_strategy='merge',
+    merge_exclude_columns=['DATACORE_CREATE_DATETIME', 'DATACORE_CREATE_PROGRAM', 'DATACORE_CREATE_BY'],
     unique_key=['TICKER', 'TRADING_DATE']
   )
 }}
@@ -9,6 +11,7 @@ WITH STOCK_PRICES AS (
   SELECT
     TICKER,
     TRADING_DATE,
+    BATCH_DATE,
     CLOSE,
     ADJUSTED_CLOSE,
     -- Lag prices for momentum & moving average calculations
@@ -19,12 +22,16 @@ WITH STOCK_PRICES AS (
     LAG(ADJUSTED_CLOSE, 90) OVER (PARTITION BY TICKER ORDER BY TRADING_DATE) AS CLOSE_90D_AGO,
     LAG(ADJUSTED_CLOSE, 200) OVER (PARTITION BY TICKER ORDER BY TRADING_DATE) AS CLOSE_200D_AGO
   FROM {{ ref('STG_STOCK_PRICE_EOD') }}
+  {% if is_incremental() %}
+  WHERE BATCH_DATE <= {{ current_batch_date() }}
+  {% endif %}
 ),
 
 DAILY_RETURNS AS (
   SELECT
     TICKER,
     TRADING_DATE,
+    BATCH_DATE,
     CLOSE,
     ADJUSTED_CLOSE,
     CLOSE_20D_AGO,
@@ -43,6 +50,7 @@ STOCK_METRICS AS (
   SELECT
     TICKER,
     TRADING_DATE,
+    BATCH_DATE,
     CLOSE,
     ADJUSTED_CLOSE,
     -- Price momentum
@@ -77,15 +85,20 @@ STOCK_METRICS AS (
 VNINDEX_DAILY AS (
   SELECT
     TRADING_DATE,
+    BATCH_DATE,
     CLOSE,
     LAG(CLOSE, 1) OVER (ORDER BY TRADING_DATE) AS PREV_CLOSE
   FROM {{ ref('STG_INDEX_PRICE_EOD') }}
   WHERE INDEX_NAME = 'VNINDEX'
+  {% if is_incremental() %}
+    AND BATCH_DATE <= {{ current_batch_date() }}
+  {% endif %}
 ),
 
 VNINDEX_RETURNS AS (
   SELECT
     TRADING_DATE,
+    BATCH_DATE,
     CASE WHEN PREV_CLOSE > 0 THEN (CLOSE / PREV_CLOSE) - 1 END AS VNINDEX_DAILY_RETURN
   FROM VNINDEX_DAILY
 ),
@@ -93,6 +106,7 @@ VNINDEX_RETURNS AS (
 VNINDEX_1M AS (
   SELECT
     TRADING_DATE,
+    BATCH_DATE,
     -- Average daily VNINDEX return over 20 trading days
     AVG(VNINDEX_DAILY_RETURN) OVER (
       ORDER BY TRADING_DATE

@@ -1,7 +1,9 @@
 {{
   config(
-    materialized='table',
-    unique_key=['TICKER', 'DATE']
+    materialized='incremental',
+    incremental_strategy='merge',
+    merge_exclude_columns=['DATACORE_CREATE_DATETIME', 'DATACORE_CREATE_PROGRAM', 'DATACORE_CREATE_BY'],
+    unique_key=['TICKER', 'TRADING_DATE']
   )
 }}
 

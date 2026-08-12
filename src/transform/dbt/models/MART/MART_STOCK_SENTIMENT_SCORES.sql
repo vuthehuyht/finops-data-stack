@@ -1,6 +1,8 @@
 {{
   config(
-    materialized='table',
+    materialized='incremental',
+    incremental_strategy='merge',
+    merge_exclude_columns=['DATACORE_CREATE_DATETIME', 'DATACORE_CREATE_PROGRAM', 'DATACORE_CREATE_BY'],
     unique_key=['TICKER', 'DATE']
   )
 }}
@@ -17,6 +19,9 @@ WITH NEWS_DAILY AS (
     -- Placeholder: sentiment score would come from NLP enrichment in STG layer
     NULL::NUMERIC(18, 4) AS AVG_SENTIMENT_SCORE
   FROM {{ ref('STG_NEWS_ARTICLES') }}
+  {% if is_incremental() %}
+  WHERE BATCH_DATE <= {{ current_batch_date() }}
+  {% endif %}
   GROUP BY 1, 2
 ),
 
@@ -51,6 +56,9 @@ ANALYST_LATEST AS (
     NULL::INTEGER AS ANALYST_BUY_COUNT,
     NULL::NUMERIC(18, 4) AS AVG_ANALYST_TARGET_PRICE
   FROM {{ ref('STG_ANALYST_REPORTS') }}
+  {% if is_incremental() %}
+  WHERE BATCH_DATE <= {{ current_batch_date() }}
+  {% endif %}
   GROUP BY 1, 2
 ),
 
@@ -66,6 +74,9 @@ CORPORATE_EVENTS_DAILY AS (
       ELSE 0
     END) AS DIVIDEND_EVENT_COUNT
   FROM {{ ref('STG_CORPORATE_EVENTS') }}
+  {% if is_incremental() %}
+  WHERE BATCH_DATE <= {{ current_batch_date() }}
+  {% endif %}
   GROUP BY 1, 2
 ),
 
