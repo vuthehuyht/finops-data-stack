@@ -16,7 +16,7 @@ permissions:
 jobs:
   terraform-ci:
     name: Terraform Lint & Validate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       # Step 1: Checkout code from the repository
