@@ -76,33 +76,6 @@ def fetch_row_count(
     return count_redshift
 
 
-def fetch_update_count_from_entity_status_table(
-    table_name: str,
-    redshift: resources.RedshiftResource,
-    context: dagster.AssetExecutionContext,
-) -> int:
-    """Fetch materialization count from the ENTITY_STATUS table."""
-    count_redshift = 0
-    try:
-        with redshift.get_connection() as conn:
-            with conn.cursor() as cursor:
-                # Assuming ENTITY_STATUS resides in operation schema
-                query = """
-                SELECT count
-                FROM operation.entity_status
-                WHERE entity_name = %s;
-                """
-                cursor.execute(query, (table_name,))
-                result = cursor.fetchone()
-                if result:
-                    count_redshift = int(result[0])
-                else:
-                    context.log.info(f"No count found for entity {table_name}")
-    except Exception as e:
-        context.log.error(f"Error retrieving operation.entity_status: {e}")
-    return count_redshift
-
-
 def should_materialize(expected_count: int, current_count: int) -> bool:
     """Check if asset should be materialized based on count and current records."""
     return expected_count == 1 or (
@@ -344,13 +317,10 @@ def _process_output_event(
         output_name=dagster_event.output_name,
     )
 
-    table_name = metadata.get("dagster/table_name", asset_key.path[-1])
     expected_updates_per_day = (
         get_expected_update_count_before_materialize(metadata) if metadata else 1
     )
-    update_count = fetch_update_count_from_entity_status_table(
-        table_name, redshift, context
-    )
+    update_count = 0
 
     if should_materialize(expected_updates_per_day, update_count):
         context.log.info(

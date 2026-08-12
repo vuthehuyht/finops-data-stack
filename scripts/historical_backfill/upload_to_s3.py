@@ -82,7 +82,13 @@ def main():
     parser.add_argument(
         "--workers", type=int, default=10, help="Number of concurrent threads"
     )
+    parser.add_argument(
+        "--profile", default=None, help="AWS Profile to use for authentication"
+    )
     args = parser.parse_args()
+
+    if args.profile:
+        boto3.setup_default_session(profile_name=args.profile)
 
     base_path = Path(args.input_dir)
 

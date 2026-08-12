@@ -758,6 +758,12 @@ resource "aws_iam_policy" "karpenter_controller_permissions" {
         }
       },
       {
+        Sid      = "AllowInstanceProfileReadActions"
+        Effect   = "Allow"
+        Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:instance-profile/*"
+        Action   = ["iam:GetInstanceProfile", "iam:ListInstanceProfiles"]
+      },
+      {
         Sid      = "AllowScopedInstanceProfileCreationActions"
         Effect   = "Allow"
         Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:instance-profile/*"

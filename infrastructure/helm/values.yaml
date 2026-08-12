@@ -352,7 +352,7 @@ dagsterDaemon:
       queuedRunCoordinator:
         # Matches max_size = 3 of the Worker Spot node group — avoids run
         # pods pending due to insufficient nodes.
-        maxConcurrentRuns: 3
+        maxConcurrentRuns: 10
         tagConcurrencyLimits: []
         dequeueUseThreads: true
         dequeueNumWorkers: 4
