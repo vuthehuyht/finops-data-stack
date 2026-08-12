@@ -1,5 +1,12 @@
 provider "aws" {
-  region = var.aws_region
+  region  = var.aws_region
+  profile = var.aws_profile
+}
+
+variable "aws_profile" {
+  type        = string
+  default     = "default"
+  description = "AWS CLI profile to use"
 }
 
 variable "aws_region" {
@@ -14,9 +21,11 @@ variable "project_name" {
   description = "Project name prefix for resources"
 }
 
+data "aws_caller_identity" "current" {}
+
 # S3 Bucket to store Terraform State
 resource "aws_s3_bucket" "tf_state" {
-  bucket        = "${var.project_name}-tfstate-s3"
+  bucket        = "${var.project_name}-tfstate-s3-${data.aws_caller_identity.current.account_id}"
   force_destroy = true
 
   tags = {

@@ -2,6 +2,13 @@
 
 .PHONY: help setup dev lint format test clean dev_local dev_local_up dev_local_down up down lint-sql format-sql ci ci_up ci_down infra infra_plan infra_up infra_down bootstrap build_push_image deploy_eks
 
+# AWS Profile configuration
+PROFILE ?= default
+ifdef profile
+  PROFILE = $(profile)
+endif
+export AWS_PROFILE = $(PROFILE)
+
 # Variables for Docker and ECR
 AWS_REGION ?= ap-southeast-1
 ECR_REPO ?= $(shell terraform -chdir=infrastructure/terraform output -raw ecr_repository_url)
@@ -104,22 +111,23 @@ ci:
 # Preview changes to the main infrastructure stack (EKS, SageMaker, IAM, ...)
 infra_plan:
 	@echo "Planning main infrastructure stack..."
-	terraform -chdir=infrastructure/terraform init
-	terraform -chdir=infrastructure/terraform plan
+	terraform -chdir=infrastructure/terraform init -backend-config="profile=$(PROFILE)"
+	terraform -chdir=infrastructure/terraform plan -var="aws_profile=$(PROFILE)"
 
 # Apply the main infrastructure stack. No -auto-approve: this provisions
 # real shared AWS resources (EKS, SageMaker, IAM), so Terraform's own
 # interactive confirmation prompt is kept as a safety check.
 infra_up:
 	@echo "Applying main infrastructure stack..."
-	terraform -chdir=infrastructure/terraform init
-	terraform -chdir=infrastructure/terraform apply
+	terraform -chdir=infrastructure/terraform init -backend-config="profile=$(PROFILE)"
+	terraform -chdir=infrastructure/terraform apply -var="aws_profile=$(PROFILE)"
 
 # Destroy the main infrastructure stack. No -auto-approve, same reason as
 # infra_up -- destroying this stack is hard to reverse.
 infra_down:
 	@echo "Destroying main infrastructure stack..."
-	terraform -chdir=infrastructure/terraform destroy
+	terraform -chdir=infrastructure/terraform init -backend-config="profile=$(PROFILE)"
+	terraform -chdir=infrastructure/terraform destroy -var="aws_profile=$(PROFILE)"
 
 # Allow command syntax: make infra plan / make infra up / make infra down
 infra:
@@ -133,8 +141,8 @@ infra:
 # `terraform -chdir=infrastructure/terraform/bootstrap destroy` if you really mean to.
 bootstrap:
 	@echo "Bootstrapping Terraform remote state backend (S3 + DynamoDB)..."
-	terraform -chdir=infrastructure/terraform/bootstrap init
-	terraform -chdir=infrastructure/terraform/bootstrap apply
+	terraform -chdir=infrastructure/terraform/bootstrap init -backend-config="profile=$(PROFILE)"
+	terraform -chdir=infrastructure/terraform/bootstrap apply -var="aws_profile=$(PROFILE)"
 
 # Dummy target to prevent make from complaining about 'up', 'down', or 'plan' arguments
 up down plan:
