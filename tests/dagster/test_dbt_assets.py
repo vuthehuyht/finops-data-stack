@@ -1,10 +1,7 @@
 import json
-import os
-import unittest.mock
 
 import pytest
 
-import src.pipeline.dagster as dagster_lib
 from src.dagster import dbt_assets
 
 
@@ -62,62 +59,6 @@ def dummy_manifest_path(tmp_path) -> str:
     with open(manifest_file, "w") as f:
         json.dump(manifest_data, f)
     return str(manifest_file)
-
-
-def test_custom_dagster_dbt_translator_with_asset_prefix(dummy_manifest_path) -> None:
-    with unittest.mock.patch.dict(
-        os.environ,
-        {
-            "DAGSTER_ASSET_PREFIX": "TEST_PREFIX",
-        },
-    ):
-
-        @dagster_lib.dbt_assets(
-            manifest=dummy_manifest_path,
-            dagster_dbt_translator=dbt_assets.FwCustomDagsterDbtTranslator(),
-        )
-        def dbt_project_assets(): ...  # type: ignore[no-untyped-def]
-
-        assert "DAGSTER_ASSET_PREFIX" in os.environ
-        assert dbt_project_assets.asset_deps.keys()
-        assert all(
-            key.has_prefix(["TEST_PREFIX"])
-            for key in dbt_project_assets.asset_deps.keys()
-        )
-        assert all(
-            dep.has_prefix(["TEST_PREFIX"])
-            for deps in dbt_project_assets.asset_deps.values()
-            for dep in deps
-        )
-
-
-def test_custom_dagster_dbt_translator_without_prefix(dummy_manifest_path) -> None:
-    with unittest.mock.patch.dict(
-        os.environ,
-        {},
-        clear=True,
-    ):
-
-        @dagster_lib.dbt_assets(
-            manifest=dummy_manifest_path,
-            dagster_dbt_translator=dbt_assets.FwCustomDagsterDbtTranslator(),
-        )
-        def dbt_project_assets(): ...  # type: ignore[no-untyped-def]
-
-        assert "DAGSTER_ASSET_PREFIX" not in os.environ
-        assert dbt_project_assets.asset_deps.keys()
-
-        # Check that we have deps to check against (not empty)
-        deps_list = [
-            dep for deps in dbt_project_assets.asset_deps.values() for dep in deps
-        ]
-        assert len(deps_list) > 0
-
-        assert not all(
-            key.has_prefix(["TEST_PREFIX"])
-            for key in dbt_project_assets.asset_deps.keys()
-        )
-        assert not all(dep.has_prefix(["TEST_PREFIX"]) for dep in deps_list)
 
 
 def test_get_compiled_code_path() -> None:

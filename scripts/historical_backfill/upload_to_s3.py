@@ -48,8 +48,13 @@ def process_table(table_dir: Path, bucket: str) -> None:  # noqa: C901
     # Concatenate all dataframes
     final_df = pd.concat(dfs, ignore_index=True)
 
+    from datetime import datetime
+
+    current_date = datetime.now().strftime("%Y-%m-%d")
     unix_timestamp = int(time.time())
-    s3_key = f"raw/{table_name}/batch_date=init/{unix_timestamp}/data_init.parquet"
+    s3_key = (
+        f"raw/{table_name}/batch_date={current_date}/{unix_timestamp}/data_init.parquet"
+    )
 
     s3_client = boto3.client("s3")
 

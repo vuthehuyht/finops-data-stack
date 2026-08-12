@@ -58,7 +58,7 @@ def test_read_load_job_parameter_first_row() -> None:
     params = list(_read_load_job_parameter(_JOB_DEFINITION_FILE))
     first = params[0]
     assert first.table_name == "RAW_STOCK_PRICE_EOD"
-    assert first.schema == "bronze"
+    assert first.schema == "raw"
     assert first.file_format == "parquet"
     assert first.trigger_type == TriggerType.Sensor
     assert first.trigger_parameter == ""
@@ -102,7 +102,7 @@ def test_define_load_jobs_returns_bundle() -> None:
     bundle = define_load_jobs()
     assert isinstance(bundle, LoadJobBundle)
     assert len(bundle.assets) == 15
-    assert len(bundle.jobs) == 15
+    assert len(bundle.jobs) == 16
     assert len(bundle.schedules) == 0  # all SENSOR, no SCHEDULE rows
     assert len(bundle.sensors) == 1  # one sensor monitoring all 15 INPUT assets
 

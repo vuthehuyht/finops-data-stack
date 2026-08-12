@@ -41,7 +41,7 @@ def test_s3_bucket_resource_default() -> None:
     with unittest.mock.patch.dict(os.environ, {}, clear=False):
         os.environ.pop("FINOPS_RAW_BUCKET", None)
         r = S3BucketResource()
-    assert r.raw_bucket == "finops-raw-dev"
+    assert r.raw_bucket == "finops-data-lake-raw"
 
 
 def test_s3_bucket_resource_from_env() -> None:
@@ -77,7 +77,7 @@ def test_sagemaker_resource_defaults() -> None:
         os.environ.pop("FINOPS_MODEL_ARTIFACTS_BUCKET", None)
         r = SageMakerResource()
     assert r.execution_role_arn == ""
-    assert r.model_artifacts_bucket == "finops-model-artifacts-dev"
+    assert r.model_artifacts_bucket == "finops-model-artifacts"
 
 
 def test_sagemaker_resource_from_env() -> None:

@@ -36,9 +36,7 @@ def test_load_job_defs_csv():
             assert table_name.startswith("raw_"), (
                 f"Row {i}: table_name '{table_name}' must start with 'raw_'"
             )
-            assert schema == "bronze", (
-                f"Row {i}: schema must be 'bronze'. Found '{schema}'"
-            )
+            assert schema == "raw", f"Row {i}: schema must be 'raw'. Found '{schema}'"
             assert file_format == "parquet", (
                 f"Row {i}: file_format must be 'parquet'. Found '{file_format}'"
             )

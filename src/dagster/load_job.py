@@ -155,8 +155,7 @@ def _make_load_schedule(
                 ops={
                     asset_py_id: RawDataAssetConfig(
                         s3_url=(
-                            f"s3://{raw_bucket}/data_storage"
-                            f"/{table_name.lower()}/{batch_date}/"
+                            f"s3://{raw_bucket}/raw/{table_name.upper()}/batch_date={batch_date}/"
                         ),
                         batch_date=batch_date,
                     )
@@ -278,7 +277,17 @@ def define_load_jobs() -> LoadJobBundle:
             _create_load_sensor(sensor_keys, sensor_jobs, input_to_job, input_to_asset)
         )
 
-    @dagster.config_mapping(config_schema={"batch_date": str})
+    import datetime
+
+    @dagster.config_mapping(
+        config_schema={
+            "batch_date": dagster.Field(
+                str,
+                default_value=datetime.datetime.now().strftime("%Y-%m-%d"),
+                is_required=False,
+            )
+        }
+    )
     def load_all_config_mapping(val: dict) -> dict:
         batch_date = val["batch_date"]
         raw_bucket = os.getenv("FINOPS_RAW_BUCKET", "finops-raw-dev")
@@ -290,7 +299,7 @@ def define_load_jobs() -> LoadJobBundle:
                     f"s3://{raw_bucket}/raw/{param.table_name.upper()}/batch_date=init/"
                 )
             else:
-                s3_url = f"s3://{raw_bucket}/data_storage/{param.table_name.lower()}/{batch_date}/"
+                s3_url = f"s3://{raw_bucket}/raw/{param.table_name.upper()}/batch_date={batch_date}/"
 
             ops[asset_py_id] = {
                 "config": {
