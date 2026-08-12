@@ -135,12 +135,13 @@ def _create_sensor_for_jobs(  # noqa: C901
     ) -> Iterator[RunRequest | SkipReason]:
         # 1. Invert mapping: Upstream -> set of Jobs
         upstream_to_jobs: dict[
-            AssetKey, set[JobDefinition | UnresolvedAssetJobDefinition]
-        ] = defaultdict(set)
+            AssetKey, list[JobDefinition | UnresolvedAssetJobDefinition]
+        ] = defaultdict(list)
         for asset_key, upstream_key in asset_to_upstream.items():
             for job in sensor_jobs:
                 if asset_key.to_python_identifier() in job.name:
-                    upstream_to_jobs[upstream_key].add(job)
+                    if job not in upstream_to_jobs[upstream_key]:
+                        upstream_to_jobs[upstream_key].append(job)
 
         # 2. Group new materializations by partition
         partition_to_materialized_assets: dict[str, set[AssetKey]] = defaultdict(set)
@@ -169,10 +170,12 @@ def _create_sensor_for_jobs(  # noqa: C901
         ) in partition_to_materialized_assets.items():
             # Identify jobs to trigger
             # (Bronze->STG is 1-to-1, no need to cross-check upstreams)
-            possible_jobs: set[JobDefinition | UnresolvedAssetJobDefinition] = set()
+            possible_jobs: list[JobDefinition | UnresolvedAssetJobDefinition] = []
             for asset in materialized_assets:
                 if asset in upstream_to_jobs:
-                    possible_jobs.update(upstream_to_jobs[asset])
+                    for job in upstream_to_jobs[asset]:
+                        if job not in possible_jobs:
+                            possible_jobs.append(job)
 
             # 4. Yield RunRequest for each job
             for job in possible_jobs:
@@ -345,13 +348,14 @@ def _create_sensor_for_mart_jobs(  # noqa: C901
     ) -> Iterator[RunRequest | SkipReason]:
         # 1. Invert mapping: Upstream -> set of Jobs
         upstream_to_jobs: dict[
-            AssetKey, set[JobDefinition | UnresolvedAssetJobDefinition]
-        ] = defaultdict(set)
+            AssetKey, list[JobDefinition | UnresolvedAssetJobDefinition]
+        ] = defaultdict(list)
         for asset_key, upstream_keys in asset_to_upstream.items():
             for job in sensor_jobs:
                 if asset_key.to_python_identifier() in job.name:
                     for up_key in upstream_keys:
-                        upstream_to_jobs[up_key].add(job)
+                        if job not in upstream_to_jobs[up_key]:
+                            upstream_to_jobs[up_key].append(job)
 
         # 2. Group new materializations by partition
         partition_to_materialized_assets: dict[str, set[AssetKey]] = defaultdict(set)
@@ -380,10 +384,12 @@ def _create_sensor_for_mart_jobs(  # noqa: C901
             materialized_assets,
         ) in partition_to_materialized_assets.items():
             # Determine which jobs COULD be triggered
-            possible_jobs: set[JobDefinition | UnresolvedAssetJobDefinition] = set()
+            possible_jobs: list[JobDefinition | UnresolvedAssetJobDefinition] = []
             for asset in materialized_assets:
                 if asset in upstream_to_jobs:
-                    possible_jobs.update(upstream_to_jobs[asset])
+                    for job in upstream_to_jobs[asset]:
+                        if job not in possible_jobs:
+                            possible_jobs.append(job)
 
             # Memoization for upstream partition checks
             materialization_status = dict.fromkeys(materialized_assets, True)
