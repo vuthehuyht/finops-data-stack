@@ -125,6 +125,10 @@ infra_up:
 # Destroy the main infrastructure stack. No -auto-approve, same reason as
 # infra_up -- destroying this stack is hard to reverse.
 infra_down:
+	@echo "Cleaning up Karpenter nodes before destroy..."
+	-aws eks update-kubeconfig --region $(AWS_REGION) --name finops-eks-cluster
+	-kubectl delete nodepool --all --timeout=60s
+	-kubectl delete nodeclaim --all --timeout=60s
 	@echo "Destroying main infrastructure stack..."
 	terraform -chdir=infrastructure/terraform init -backend-config="profile=$(PROFILE)"
 	terraform -chdir=infrastructure/terraform destroy -var="aws_profile=$(PROFILE)"
