@@ -7,8 +7,11 @@ resource "random_string" "redshift_username" {
 }
 
 resource "random_password" "redshift_admin" {
-  length  = 16
-  special = false
+  length      = 16
+  special     = false
+  min_numeric = 1
+  min_upper   = 1
+  min_lower   = 1
 }
 
 # 1. IAM Role for Redshift Serverless to access S3 (Spectrum)

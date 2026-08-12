@@ -290,7 +290,7 @@ def _make_mart_schedule(
     return _schedule
 
 
-def _create_sensor_for_mart_jobs(
+def _create_sensor_for_mart_jobs(  # noqa: C901
     sensor_name: str,
     all_upstream_keys: list[AssetKey],
     sensor_jobs: list[JobDefinition | UnresolvedAssetJobDefinition],
@@ -305,7 +305,7 @@ def _create_sensor_for_mart_jobs(
         jobs=sensor_jobs,
         minimum_interval_seconds=60,
     )
-    def _sensor(
+    def _sensor(  # noqa: C901
         context: MultiAssetSensorEvaluationContext,
     ) -> Iterator[RunRequest | SkipReason]:
         # Map upstream Silver key to corresponding Mart jobs
@@ -327,10 +327,48 @@ def _create_sensor_for_mart_jobs(
 
             if key in job_by_upstream:
                 for job in job_by_upstream[key]:
+                    # Find all upstream keys for this job
+                    job_upstream_keys = [
+                        up_key
+                        for up_key, jobs in job_by_upstream.items()
+                        if job in jobs
+                    ]
+
+                    # Check if all upstream_keys have been materialized
+                    all_ready = True
+                    for up_key in job_upstream_keys:
+                        if up_key == key:
+                            continue
+
+                        records = context.instance.get_event_records(
+                            dagster.EventRecordsFilter(
+                                event_type=dagster.DagsterEventType.ASSET_MATERIALIZATION,
+                                asset_key=up_key,
+                            ),
+                            limit=20,
+                        )
+
+                        found = False
+                        for record in records:
+                            mat = record.event_log_entry.dagster_event.asset_materialization  # noqa: E501
+                            if mat:
+                                c_key = mat.metadata.get("conata_partition_key")
+                                if c_key and str(c_key.value) == partition_key:
+                                    found = True
+                                    break
+                        if not found:
+                            all_ready = False
+                            break
+
+                    if not all_ready:
+                        context.log.info(
+                            f"Job {job.name} skipped: "
+                            f"waiting for upstreams for partition {partition_key}"
+                        )
+                        continue
+
                     run_key = (
-                        f"{key.to_python_identifier()}_{partition_key}"
-                        if partition_key
-                        else key.to_python_identifier()
+                        f"{job.name}_{partition_key}" if partition_key else job.name
                     )
                     dbt_vars = {"partition_key": partition_key} if partition_key else {}
                     yield RunRequest(

@@ -25,31 +25,6 @@ DBT_PROJECT_DIR = _PROJECT_ROOT / "src" / "transform" / "dbt"
 DBT_MANIFEST_FILE_PATH = DBT_PROJECT_DIR / "target" / "manifest.json"
 
 
-class FwCustomDagsterDbtTranslator(dagster_dbt.DagsterDbtTranslator):
-    """Custom dbt model translator mapping asset keys to uppercase."""
-
-    def get_asset_key(
-        self,
-        dbt_resource_props: Mapping[str, Any],
-    ) -> dagster.AssetKey:
-        """Get the Dagster asset key with uppercase parts."""
-        asset_key = super().get_asset_key(dbt_resource_props)
-        uppercased_path = [part.upper() for part in asset_key.path]
-        asset_key = dagster.AssetKey(uppercased_path)
-        if prefix := os.getenv("DAGSTER_ASSET_PREFIX"):
-            return asset_key.with_prefix(prefix)
-        return asset_key
-
-    def get_metadata(self, dbt_resource_props: Mapping[str, Any]) -> Mapping[str, Any]:
-        """Filter metadata and drop unnecessary column schema if needed."""
-        metadata = super().get_metadata(dbt_resource_props)
-        return metadata
-
-    def get_description(self, dbt_resource_props: Mapping[str, Any]) -> str:
-        """Filter the metadata and drop unnecessary information."""
-        return dagster_dbt.asset_utils.default_description_fn(dbt_resource_props, False)
-
-
 @functools.cache
 def get_dbt_asset_dependency(
     select: str = "fqn:*",
@@ -63,7 +38,7 @@ def get_dbt_asset_dependency(
         select=select,
         exclude=exclude,
         project=dbt_project,
-        dagster_dbt_translator=FwCustomDagsterDbtTranslator(),
+        dagster_dbt_translator=dagster_dbt.DagsterDbtTranslator(),
     )
     def _dbt_asset_dependency() -> Any:
         yield from []
@@ -98,33 +73,6 @@ def fetch_row_count(
                     count_redshift = int(result[0])
     except Exception as e:
         logger.error(f"Error retrieving row count for {schema}.{table}: {e}")
-    return count_redshift
-
-
-def fetch_update_count_from_entity_status_table(
-    table_name: str,
-    redshift: resources.RedshiftResource,
-    context: dagster.AssetExecutionContext,
-) -> int:
-    """Fetch materialization count from the ENTITY_STATUS table."""
-    count_redshift = 0
-    try:
-        with redshift.get_connection() as conn:
-            with conn.cursor() as cursor:
-                # Assuming ENTITY_STATUS resides in operation schema
-                query = """
-                SELECT count
-                FROM operation.entity_status
-                WHERE entity_name = %s;
-                """
-                cursor.execute(query, (table_name,))
-                result = cursor.fetchone()
-                if result:
-                    count_redshift = int(result[0])
-                else:
-                    context.log.info(f"No count found for entity {table_name}")
-    except Exception as e:
-        context.log.error(f"Error retrieving operation.entity_status: {e}")
     return count_redshift
 
 
@@ -176,17 +124,49 @@ def _compile_dbt(
 ) -> None:
     """Compile dbt project and generate artifacts."""
     try:
+        target_path_base = pathlib.Path(
+            os.environ.get("DBT_TARGET_PATH", "/tmp/dbt-target")
+        )
         invocation = dbt.cli(
             [
                 "compile",
                 "--target-path",
                 compile_target_path,
             ],
+            target_path=target_path_base,
             context=context,
         )
         invocation.wait()
     except Exception as e:
         context.log.error(f"Error compiling dbt: {e}")
+
+
+def _get_partition_variables(
+    context: dagster.AssetExecutionContext,
+    dbt_config: resources.DbtConfigResource,
+) -> dict[str, Any]:
+    """Resolve partition key and calculate real-time shift."""
+    if context.has_partition_key:
+        partition_key = context.partition_key
+    elif dbt_config.variables and "partition_key" in dbt_config.variables:
+        partition_key = dbt_config.variables["partition_key"]
+    else:
+        partition_key = datetime.datetime.now().strftime("%Y-%m-%d")
+
+    try:
+        today_for_realtime = datetime.datetime.strptime(
+            partition_key, "%Y-%m-%d"
+        ) + datetime.timedelta(days=1)
+        today_for_realtime_iso = today_for_realtime.isoformat()
+    except ValueError:
+        today_for_realtime_iso = partition_key
+
+    return {
+        "partition_key": partition_key,
+        "batch_date": partition_key,
+        "dagster_job_name": context.job_name,
+        "today_for_realtime": today_for_realtime_iso,
+    }
 
 
 def _build_dbt_args(
@@ -195,25 +175,7 @@ def _build_dbt_args(
     dbt_config: resources.DbtConfigResource,
 ) -> list[str]:
     """Build dbt arguments based on context and dbt_config."""
-    if not context.has_partition_key:
-        raise ValueError("The dbt_project_assets requires a partition key.")
-
-    partition_key = context.partition_key
-    job_name = context.job_name
-
-    # Vietnamese / Ho Chi Minh timezone shift
-    # In Vietnam, we shift by +1 day for realtime if partition key is standard date.
-    today_for_realtime = datetime.datetime.strptime(
-        partition_key, "%Y-%m-%d"
-    ) + datetime.timedelta(days=1)
-    today_for_realtime_iso = today_for_realtime.isoformat()
-
-    variables: dict[str, Any] = {
-        "partition_key": partition_key,
-        "batch_date": partition_key,
-        "dagster_job_name": job_name,
-        "today_for_realtime": today_for_realtime_iso,
-    }
+    variables: dict[str, Any] = _get_partition_variables(context, dbt_config)
 
     if dbt_config.days_offset_for_output_diff is not None:
         variables["days_offset_for_output_diff"] = (
@@ -355,13 +317,10 @@ def _process_output_event(
         output_name=dagster_event.output_name,
     )
 
-    table_name = metadata.get("dagster/table_name", asset_key.path[-1])
     expected_updates_per_day = (
         get_expected_update_count_before_materialize(metadata) if metadata else 1
     )
-    update_count = fetch_update_count_from_entity_status_table(
-        table_name, redshift, context
-    )
+    update_count = 0
 
     if should_materialize(expected_updates_per_day, update_count):
         context.log.info(
@@ -427,7 +386,7 @@ def get_dbt_project_assets(
         name=name,
         manifest=DBT_MANIFEST_FILE_PATH,
         project=dbt_project,
-        dagster_dbt_translator=FwCustomDagsterDbtTranslator(
+        dagster_dbt_translator=dagster_dbt.DagsterDbtTranslator(
             settings=dagster_dbt.DagsterDbtTranslatorSettings(
                 enable_code_references=True
             )
@@ -450,7 +409,12 @@ def get_dbt_project_assets(
         ] = []
 
         try:
-            dbt_cli_invocation = dbt.cli(dbt_args, context=context)
+            target_path_base = pathlib.Path(
+                os.environ.get("DBT_TARGET_PATH", "/tmp/dbt-target")
+            )
+            dbt_cli_invocation = dbt.cli(
+                dbt_args, target_path=target_path_base, context=context
+            )
             for dagster_event in dbt_cli_invocation.stream():
                 for event in _process_dbt_event(
                     dagster_event, context, dbt_config, redshift

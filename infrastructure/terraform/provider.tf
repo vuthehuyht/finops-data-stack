@@ -13,7 +13,7 @@ terraform {
 
   # Fill in the specific bucket name received from the bootstrap output before init
   backend "s3" {
-    bucket         = "finops-tfstate-s3"
+    bucket         = "finops-tfstate-s3-669126231138"
     key            = "state/terraform.tfstate"
     region         = "ap-southeast-1"
     dynamodb_table = "finops-tfstate-locks"
@@ -22,7 +22,8 @@ terraform {
 }
 
 provider "aws" {
-  region = var.aws_region
+  region  = var.aws_region
+  profile = var.aws_profile
 
   default_tags {
     tags = {

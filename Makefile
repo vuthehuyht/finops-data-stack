@@ -1,6 +1,19 @@
 # Makefile to setup and run dev_local environment for FinOps Data Stack
 
-.PHONY: help setup dev lint format test clean dev_local dev_local_up dev_local_down up down lint-sql format-sql ci ci_up ci_down infra infra_plan infra_up infra_down bootstrap
+.PHONY: help setup dev lint format test clean dev_local dev_local_up dev_local_down up down lint-sql format-sql ci ci_up ci_down infra infra_plan infra_up infra_down bootstrap build_push_image deploy_eks
+
+# AWS Profile configuration
+PROFILE ?= default
+ifdef profile
+  PROFILE = $(profile)
+endif
+export AWS_PROFILE = $(PROFILE)
+
+# Variables for Docker and ECR
+AWS_REGION ?= ap-southeast-1
+ECR_REPO ?= $(shell terraform -chdir=infrastructure/terraform output -raw ecr_repository_url)
+ECR_HOST ?= $(firstword $(subst /, ,$(ECR_REPO)))
+IMAGE_TAG ?= latest
 
 # Default target when running `make`
 help:
@@ -18,6 +31,8 @@ help:
 	@echo "  make lint           - Check code style and formatting issues with ruff"
 	@echo "  make format         - Automatically format and fix lint issues with ruff"
 	@echo "  make test           - Run all unit tests with pytest"
+	@echo "  make build_push_image - Build Docker image and push to AWS ECR"
+	@echo "  make deploy_eks     - Deploy the FinOps Data Stack to EKS via Helm"
 	@echo "  make clean          - Clean up temporary files, logs, and caches"
 
 # Initialize dev_local environment
@@ -96,22 +111,27 @@ ci:
 # Preview changes to the main infrastructure stack (EKS, SageMaker, IAM, ...)
 infra_plan:
 	@echo "Planning main infrastructure stack..."
-	terraform -chdir=infrastructure/terraform init
-	terraform -chdir=infrastructure/terraform plan
+	terraform -chdir=infrastructure/terraform init -backend-config="profile=$(PROFILE)"
+	terraform -chdir=infrastructure/terraform plan -var="aws_profile=$(PROFILE)"
 
 # Apply the main infrastructure stack. No -auto-approve: this provisions
 # real shared AWS resources (EKS, SageMaker, IAM), so Terraform's own
 # interactive confirmation prompt is kept as a safety check.
 infra_up:
 	@echo "Applying main infrastructure stack..."
-	terraform -chdir=infrastructure/terraform init
-	terraform -chdir=infrastructure/terraform apply
+	terraform -chdir=infrastructure/terraform init -backend-config="profile=$(PROFILE)"
+	terraform -chdir=infrastructure/terraform apply -var="aws_profile=$(PROFILE)"
 
 # Destroy the main infrastructure stack. No -auto-approve, same reason as
 # infra_up -- destroying this stack is hard to reverse.
 infra_down:
+	@echo "Cleaning up Karpenter nodes before destroy..."
+	-aws eks update-kubeconfig --region $(AWS_REGION) --name finops-eks-cluster
+	-kubectl delete nodepool --all --timeout=60s
+	-kubectl delete nodeclaim --all --timeout=60s
 	@echo "Destroying main infrastructure stack..."
-	terraform -chdir=infrastructure/terraform destroy
+	terraform -chdir=infrastructure/terraform init -backend-config="profile=$(PROFILE)"
+	terraform -chdir=infrastructure/terraform destroy -var="aws_profile=$(PROFILE)"
 
 # Allow command syntax: make infra plan / make infra up / make infra down
 infra:
@@ -125,8 +145,8 @@ infra:
 # `terraform -chdir=infrastructure/terraform/bootstrap destroy` if you really mean to.
 bootstrap:
 	@echo "Bootstrapping Terraform remote state backend (S3 + DynamoDB)..."
-	terraform -chdir=infrastructure/terraform/bootstrap init
-	terraform -chdir=infrastructure/terraform/bootstrap apply
+	terraform -chdir=infrastructure/terraform/bootstrap init -backend-config="profile=$(PROFILE)"
+	terraform -chdir=infrastructure/terraform/bootstrap apply -var="aws_profile=$(PROFILE)"
 
 # Dummy target to prevent make from complaining about 'up', 'down', or 'plan' arguments
 up down plan:
@@ -135,3 +155,45 @@ up down plan:
 # Clean cache and temporary files (Cross-platform support)
 clean:
 	@uv run python scripts/clean.py
+
+# Build and push Docker image to ECR
+build_push_image:
+	@echo "Authenticating Docker with ECR..."
+	aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(ECR_HOST)
+	@echo "Building Docker image..."
+	docker build -t finops-dagster-app:$(IMAGE_TAG) -f src/docker/Dockerfile .
+	@echo "Tagging Docker image..."
+	docker tag finops-dagster-app:$(IMAGE_TAG) $(ECR_REPO):$(IMAGE_TAG)
+	@echo "Pushing Docker image to ECR..."
+	docker push $(ECR_REPO):$(IMAGE_TAG)
+
+# Deploy to EKS using Helm
+deploy_eks:
+	@echo "Updating kubeconfig for EKS cluster..."
+	aws eks update-kubeconfig --region $(AWS_REGION) --name finops-eks-cluster
+	@echo "Ensuring namespaces exist..."
+	kubectl create namespace dagster --dry-run=client -o yaml | kubectl apply -f -
+	@echo "Applying External Secrets manifests..."
+	kubectl apply -f src/k8s/manifest/external-secrets/
+	@echo "Adding Dagster Helm repository..."
+	helm repo add dagster https://dagster-io.github.io/helm
+	helm repo update
+	@echo "Deploying Dagster to EKS with Helm..."
+	RDS_HOST=$$(terraform -chdir=infrastructure/terraform output -raw rds_address) && \
+	RDS_USER=$$(terraform -chdir=infrastructure/terraform output -raw rds_username) && \
+	RDS_DB=$$(terraform -chdir=infrastructure/terraform output -raw rds_dbname) && \
+	REDSHIFT_ROLE=$$(terraform -chdir=infrastructure/terraform output -raw redshift_iam_role_arn) && \
+	RAW_BUCKET=$$(terraform -chdir=infrastructure/terraform output -raw raw_bucket_id) && \
+	MODEL_BUCKET=$$(terraform -chdir=infrastructure/terraform output -raw model_artifacts_bucket_id) && \
+	helm upgrade --install dagster dagster/dagster -f infrastructure/helm/values.yaml -n dagster --create-namespace \
+		--set dagster-user-deployments.deployments\[0\].image.repository=$(ECR_REPO) \
+		--set dagster-user-deployments.deployments\[0\].image.tag=$(IMAGE_TAG) \
+		--set dagster-user-deployments.deployments\[0\].env\[7\].value=$$REDSHIFT_ROLE \
+		--set dagster-user-deployments.deployments\[0\].env\[8\].value=$$RAW_BUCKET \
+		--set dagster-user-deployments.deployments\[0\].env\[9\].value=$$MODEL_BUCKET \
+		--set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env\[6\].value=$$REDSHIFT_ROLE \
+		--set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env\[7\].value=$$RAW_BUCKET \
+		--set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env\[8\].value=$$MODEL_BUCKET \
+		--set postgresql.postgresqlHost=$$RDS_HOST \
+		--set postgresql.postgresqlUsername=$$RDS_USER \
+		--set postgresql.postgresqlDatabase=$$RDS_DB

@@ -125,7 +125,7 @@ dagster-user-deployments:
       replicaCount: 1
 
       includeConfigInLaunchedRuns:
-        enabled: true
+        enabled: false
 
       # Redshift creds injected directly from the "dagster-pg-credentials" k8s
       # Secret (kept in sync from AWS Secrets Manager by External Secrets
@@ -166,6 +166,12 @@ dagster-user-deployments:
             secretKeyRef:
               name: dagster-pg-credentials
               key: fireant_password
+        - name: REDSHIFT_IAM_ROLE_ARN
+          value: ""
+        - name: FINOPS_RAW_BUCKET
+          value: ""
+        - name: FINOPS_MODEL_ARTIFACTS_BUCKET
+          value: ""
 
       # Always-on gRPC server serving definitions — runs on Core, same as
       # webserver/daemon (see nodeSelector note there).
@@ -176,8 +182,8 @@ dagster-user-deployments:
           cpu: "250m"
           memory: "512Mi"
         limits:
-          cpu: "500m"
-          memory: "1Gi"
+          cpu: "1"
+          memory: "3Gi"
 
       readinessProbe:
         enabled: true
@@ -218,10 +224,10 @@ runLauncher:
       resources:
         requests:
           cpu: "250m"
-          memory: "512Mi"
+          memory: "1Gi"
         limits:
           cpu: "1"
-          memory: "1Gi"
+          memory: "3Gi"
 
       failPodOnRunFailure: false
 
@@ -276,6 +282,12 @@ runLauncher:
                 secretKeyRef:
                   name: dagster-pg-credentials
                   key: fireant_password
+            - name: REDSHIFT_IAM_ROLE_ARN
+              value: ""
+            - name: FINOPS_RAW_BUCKET
+              value: ""
+            - name: FINOPS_MODEL_ARTIFACTS_BUCKET
+              value: ""
 
 ####################################################################################################
 # PostgreSQL — external RDS instance (aws_db_instance.dagster_meta), not chart-managed.
@@ -340,7 +352,7 @@ dagsterDaemon:
       queuedRunCoordinator:
         # Matches max_size = 3 of the Worker Spot node group — avoids run
         # pods pending due to insufficient nodes.
-        maxConcurrentRuns: 3
+        maxConcurrentRuns: 10
         tagConcurrencyLimits: []
         dequeueUseThreads: true
         dequeueNumWorkers: 4

@@ -152,4 +152,3 @@ resource "aws_security_group_rule" "redshift_allow_eks_cluster_sg" {
   source_security_group_id = module.eks.cluster_security_group_id
   description              = "Allow Redshift from EKS-managed node group instances (auto-created cluster SG)"
 }
-

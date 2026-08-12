@@ -66,13 +66,12 @@ def test_load_s3_to_redshift_success() -> None:
     # Get executed SQL statements
     calls = [call[0][0] for call in mock_cursor.execute.call_args_list]
 
-    assert "BEGIN;" in calls
     assert any("CREATE TEMPORARY TABLE temp_my_table" in q for q in calls)
     assert any("COPY temp_my_table" in q for q in calls)
     assert any(
-        "INSERT INTO my_schema.my_table SELECT * FROM temp_my_table" in q for q in calls
+        'INSERT INTO "my_schema"."my_table" SELECT * FROM temp_my_table' in q
+        for q in calls
     )
-    assert "COMMIT;" in calls
 
 
 def test_load_s3_to_redshift_failure() -> None:
@@ -82,7 +81,6 @@ def test_load_s3_to_redshift_failure() -> None:
 
     # Mock failure on COPY command
     mock_cursor.execute.side_effect = [
-        None,  # BEGIN;
         None,  # CREATE TEMPORARY TABLE...
         ValueError("COPY statement failed"),  # COPY
     ]
@@ -98,8 +96,7 @@ def test_load_s3_to_redshift_failure() -> None:
         )
 
     calls = [call[0][0] for call in mock_cursor.execute.call_args_list]
-    assert "BEGIN;" in calls
-    assert "ROLLBACK;" in calls
+    assert any("CREATE TEMPORARY TABLE temp_my_table" in q for q in calls)
 
 
 def test_load_s3_to_redshift_invalid_identifiers() -> None:

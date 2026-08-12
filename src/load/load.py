@@ -92,41 +92,26 @@ def load_s3_to_redshift(
         temp_table,
     )
 
-    try:
-        # Start a transaction
-        execute_query(cursor, "BEGIN;")
+    # Quote the target table to prevent reserved keyword conflicts (e.g. 'raw')
+    target_table_quoted = f'"{target_table.replace(".", '"."')}"'
 
-        # 1. Create a temporary staging table mimicking the target table structure
-        create_temp_query = (
-            f"CREATE TEMPORARY TABLE {temp_table} (LIKE {target_table});"
-        )
-        execute_query(cursor, create_temp_query)
+    # 1. Create a temporary staging table mimicking the target table structure
+    create_temp_query = (
+        f"CREATE TEMPORARY TABLE {temp_table} (LIKE {target_table_quoted});"
+    )
+    execute_query(cursor, create_temp_query)
 
-        # 2. Execute COPY command into the staging table
-        copy_query = _build_copy_query(
-            temp_table=temp_table,
-            s3_url=s3_url,
-            file_format=file_format,
-            iam_role_arn=iam_role_arn,
-        )
-        execute_query(cursor, copy_query)
+    # 2. Execute COPY command into the staging table
+    copy_query = _build_copy_query(
+        temp_table=temp_table,
+        s3_url=s3_url,
+        file_format=file_format,
+        iam_role_arn=iam_role_arn,
+    )
+    execute_query(cursor, copy_query)
 
-        # 3. Append all data from the temporary table to the target table
-        insert_query = f"INSERT INTO {target_table} SELECT * FROM {temp_table};"
-        execute_query(cursor, insert_query)
+    # 3. Append all data from the temporary table to the target table
+    insert_query = f"INSERT INTO {target_table_quoted} SELECT * FROM {temp_table};"
+    execute_query(cursor, insert_query)
 
-        # Commit transaction
-        execute_query(cursor, "COMMIT;")
-        logger.info("Successfully loaded data into table: %s", target_table)
-
-    except Exception as e:
-        logger.error(
-            "Error loading data into table: %s, rolling back transaction. Error: %s",
-            target_table,
-            e,
-        )
-        try:
-            execute_query(cursor, "ROLLBACK;")
-        except Exception as rollback_err:
-            logger.error("Failed to rollback transaction: %s", rollback_err)
-        raise e
+    logger.info("Successfully loaded data into table: %s", target_table)

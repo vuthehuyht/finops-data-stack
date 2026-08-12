@@ -113,6 +113,7 @@ resource "aws_eks_node_group" "core_system" {
 
   capacity_type  = "ON_DEMAND"
   instance_types = ["t3a.medium"] # Optimization: use cheaper AMD instance type
+  disk_size      = 100
 
   # Used by K8s nodeSelector (infrastructure/helm/values.yaml) to pin the
   # always-on webserver/daemon/user-code pods to this node group.
@@ -234,10 +235,14 @@ resource "aws_iam_policy" "dagster_sa_permissions" {
           "sagemaker:DescribeModel",
           "sagemaker:CreateTransformJob",
           "sagemaker:DescribeTransformJob",
-          "sagemaker:StopTransformJob",
-          "iam:PassRole" # Required PassRole for SageMaker execution role
+          "sagemaker:StopTransformJob"
         ]
         Resource = "*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = "iam:PassRole"
+        Resource = "arn:aws:iam::*:role/*-sagemaker-execution-role"
       }
     ]
   })
@@ -332,7 +337,9 @@ resource "aws_iam_role" "github_actions_deploy" {
         Condition = {
           StringEquals = {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
-            "token.actions.githubusercontent.com:sub" = "repo:vuthehuyht/finops-data-stack:ref:refs/heads/main"
+          }
+          StringLike = {
+            "token.actions.githubusercontent.com:sub" = "repo:vuthehuyht/finops-data-stack:*"
           }
         }
       }
@@ -363,7 +370,34 @@ resource "aws_iam_policy" "github_actions_deploy_permissions" {
           "eks:*",
           "rds:*",
           "redshift-serverless:*",
-          "iam:*",
+          "iam:CreateRole",
+          "iam:DeleteRole",
+          "iam:AttachRolePolicy",
+          "iam:DetachRolePolicy",
+          "iam:PutRolePolicy",
+          "iam:DeleteRolePolicy",
+          "iam:GetRole",
+          "iam:GetRolePolicy",
+          "iam:PassRole",
+          "iam:List*",
+          "iam:CreatePolicy",
+          "iam:DeletePolicy",
+          "iam:CreatePolicyVersion",
+          "iam:DeletePolicyVersion",
+          "iam:GetPolicy",
+          "iam:GetPolicyVersion",
+          "iam:TagRole",
+          "iam:TagPolicy",
+          "iam:UntagRole",
+          "iam:UntagPolicy",
+          "iam:CreateOpenIDConnectProvider",
+          "iam:DeleteOpenIDConnectProvider",
+          "iam:GetOpenIDConnectProvider",
+          "iam:CreateInstanceProfile",
+          "iam:DeleteInstanceProfile",
+          "iam:GetInstanceProfile",
+          "iam:AddRoleToInstanceProfile",
+          "iam:RemoveRoleFromInstanceProfile",
           "s3:*",
           "ecr:*",
           "secretsmanager:*",
@@ -722,6 +756,12 @@ resource "aws_iam_policy" "karpenter_controller_permissions" {
             "aws:ResourceTag/karpenter.sh/nodepool" = "*"
           }
         }
+      },
+      {
+        Sid      = "AllowInstanceProfileReadActions"
+        Effect   = "Allow"
+        Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:instance-profile/*"
+        Action   = ["iam:GetInstanceProfile", "iam:ListInstanceProfiles"]
       },
       {
         Sid      = "AllowScopedInstanceProfileCreationActions"
