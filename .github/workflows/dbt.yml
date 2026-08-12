@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   check-dbt-paths:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     outputs:
       dbt_related: ${{ steps.filter.outputs.targets }}
     steps:
@@ -40,7 +40,7 @@ jobs:
   check-dbt:
     needs: check-dbt-paths
     if: github.event_name != 'pull_request' || needs.check-dbt-paths.outputs.dbt_related == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 60
     permissions:
       contents: read

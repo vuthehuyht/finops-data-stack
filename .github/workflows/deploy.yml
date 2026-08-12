@@ -19,7 +19,7 @@ jobs:
   # path prefixes -- dorny/paths-filter diffs the actual push range and
   # supports glob patterns, so it is used here instead for both jobs' gates.
   detect-changes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     permissions:
       contents: read
     outputs:
@@ -42,7 +42,7 @@ jobs:
   deploy-app:
     needs: detect-changes
     if: needs.detect-changes.outputs.helm == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -106,7 +106,7 @@ jobs:
   deploy-infra:
     needs: detect-changes
     if: needs.detect-changes.outputs.terraform == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 30
     permissions:
       contents: read

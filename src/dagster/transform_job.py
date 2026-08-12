@@ -323,7 +323,13 @@ def _create_sensor_for_mart_jobs(  # noqa: C901
         ):
             context.advance_cursor({key: asset_event})
             conata_key = materialization.metadata.get("conata_partition_key")
-            partition_key = str(conata_key.value) if conata_key is not None else None
+            dbt_vars = materialization.metadata.get("variables")
+            if conata_key is not None:
+                partition_key = str(conata_key.value)
+            elif dbt_vars is not None and isinstance(dbt_vars.value, dict):
+                partition_key = dbt_vars.value.get("partition_key")
+            else:
+                partition_key = None
 
             if key in job_by_upstream:
                 for job in job_by_upstream[key]:
@@ -353,7 +359,21 @@ def _create_sensor_for_mart_jobs(  # noqa: C901
                             mat = record.event_log_entry.dagster_event.asset_materialization  # noqa: E501
                             if mat:
                                 c_key = mat.metadata.get("conata_partition_key")
-                                if c_key and str(c_key.value) == partition_key:
+                                d_vars = mat.metadata.get("variables")
+                                rec_partition_key = None
+                                if c_key is not None:
+                                    rec_partition_key = str(c_key.value)
+                                elif d_vars is not None and isinstance(
+                                    d_vars.value, dict
+                                ):
+                                    rec_partition_key = d_vars.value.get(
+                                        "partition_key"
+                                    )
+
+                                if (
+                                    rec_partition_key
+                                    and rec_partition_key == partition_key
+                                ):
                                     found = True
                                     break
                         if not found:
