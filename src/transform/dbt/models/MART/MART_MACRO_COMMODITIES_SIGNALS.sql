@@ -1,6 +1,8 @@
 {{
   config(
-    materialized='table',
+    materialized='incremental',
+    incremental_strategy='merge',
+    merge_exclude_columns=['DATACORE_CREATE_DATETIME', 'DATACORE_CREATE_PROGRAM', 'DATACORE_CREATE_BY'],
     unique_key='DATE'
   )
 }}
@@ -17,6 +19,9 @@ WITH INTEREST_RATES_PIVOT AS (
     MAX(CASE WHEN RATE_TYPE = '^TNX' THEN RATE_VALUE END) AS TREASURY_10Y,
     MAX(CASE WHEN RATE_TYPE = '^FVX' THEN RATE_VALUE END) AS TREASURY_5Y
   FROM {{ ref('STG_INTEREST_RATES') }}
+  {% if is_incremental() %}
+  WHERE BATCH_DATE <= {{ current_batch_date() }}
+  {% endif %}
   GROUP BY 1
 ),
 
@@ -27,6 +32,9 @@ USDVND AS (
     LAG(EXCHANGE_RATE, 1) OVER (ORDER BY DATE) AS PREV_RATE
   FROM {{ ref('STG_EXCHANGE_RATES') }}
   WHERE PAIR = 'USDT/VND'
+  {% if is_incremental() %}
+    AND BATCH_DATE <= {{ current_batch_date() }}
+  {% endif %}
 ),
 
 EXCHANGE_RATE_VOL AS (
@@ -51,6 +59,9 @@ MACRO_PIVOT AS (
     MAX(CASE WHEN INDICATOR_NAME = 'CPI' THEN VALUE END) AS CPI_VALUE,
     MAX(CASE WHEN INDICATOR_NAME = 'INTEREST_RATE' THEN VALUE END) AS POLICY_RATE
   FROM {{ ref('STG_MACRO_INDICATORS') }}
+  {% if is_incremental() %}
+  WHERE BATCH_DATE <= {{ current_batch_date() }}
+  {% endif %}
   GROUP BY 1
 ),
 
@@ -61,6 +72,9 @@ BRENT_CRUDE AS (
     LAG(PRICE, 30) OVER (ORDER BY DATE) AS BRENT_PRICE_30D_AGO
   FROM {{ ref('STG_COMMODITIES_PRICE') }}
   WHERE COMMODITY_NAME = 'Brent Crude'
+  {% if is_incremental() %}
+    AND BATCH_DATE <= {{ current_batch_date() }}
+  {% endif %}
 ),
 
 COMMODITIES_PIVOT AS (
@@ -81,12 +95,18 @@ COMMODITIES_PIVOT AS (
         AND COMMODITY_NAME LIKE '%Dirty%' THEN PRICE
     END) AS BALTIC_DIRTY_TANKER_INDEX
   FROM {{ ref('STG_COMMODITIES_PRICE') }}
+  {% if is_incremental() %}
+  WHERE BATCH_DATE <= {{ current_batch_date() }}
+  {% endif %}
   GROUP BY 1
 ),
 
 -- Use brent crude date spine as the anchor (most complete daily commodity series)
 DATE_SPINE AS (
   SELECT DISTINCT DATE FROM {{ ref('STG_COMMODITIES_PRICE') }}
+  {% if is_incremental() %}
+  WHERE BATCH_DATE <= {{ current_batch_date() }}
+  {% endif %}
 )
 
 SELECT

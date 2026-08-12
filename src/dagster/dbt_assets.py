@@ -394,6 +394,9 @@ def get_dbt_project_assets(
         k8s_config=get_k8s_config(3),
         select=select,
         exclude=exclude,
+        partitions_def=dagster.DailyPartitionsDefinition(
+            start_date="2024-01-01", timezone="Asia/Ho_Chi_Minh"
+        ),
     )
     def dbt_project_assets(
         context: dagster.AssetExecutionContext,

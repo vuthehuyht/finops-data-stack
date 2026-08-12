@@ -4,6 +4,7 @@ import csv
 import enum
 import functools
 import os
+from collections import defaultdict
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 
@@ -102,7 +103,10 @@ def _make_transform_schedule(
             run_config=RunConfig(
                 resources={
                     "dbt_config": DbtConfigResource(
-                        variables={"partition_key": partition_key}
+                        variables={
+                            "partition_key": partition_key,
+                            "batch_date": partition_key,
+                        }
                     )
                 }
             )
@@ -111,7 +115,7 @@ def _make_transform_schedule(
     return _schedule
 
 
-def _create_sensor_for_jobs(
+def _create_sensor_for_jobs(  # noqa: C901
     sensor_name: str,
     all_upstream_keys: list[AssetKey],
     sensor_jobs: list[JobDefinition | UnresolvedAssetJobDefinition],
@@ -126,37 +130,68 @@ def _create_sensor_for_jobs(
         jobs=sensor_jobs,
         minimum_interval_seconds=60,
     )
-    def _sensor(
+    def _sensor(  # noqa: C901
         context: MultiAssetSensorEvaluationContext,
     ) -> Iterator[RunRequest | SkipReason]:
-        job_by_upstream: dict[
-            AssetKey, JobDefinition | UnresolvedAssetJobDefinition
-        ] = {}
+        # 1. Invert mapping: Upstream -> set of Jobs
+        upstream_to_jobs: dict[
+            AssetKey, list[JobDefinition | UnresolvedAssetJobDefinition]
+        ] = defaultdict(list)
         for asset_key, upstream_key in asset_to_upstream.items():
             for job in sensor_jobs:
                 if asset_key.to_python_identifier() in job.name:
-                    job_by_upstream[upstream_key] = job
-                    break
+                    if job not in upstream_to_jobs[upstream_key]:
+                        upstream_to_jobs[upstream_key].append(job)
 
+        # 2. Group new materializations by partition
+        partition_to_materialized_assets: dict[str, set[AssetKey]] = defaultdict(set)
         for key, asset_event, materialization in dagster_lib.fetch_materializations(
             context, fetch_limit_for_each_asset=_FETCH_LIMIT
         ):
             context.advance_cursor({key: asset_event})
-            conata_key = materialization.metadata.get("conata_partition_key")
-            partition_key = str(conata_key.value) if conata_key is not None else None
-            if key in job_by_upstream:
-                job = job_by_upstream[key]
-                run_key = (
-                    f"{key.to_python_identifier()}_{partition_key}"
-                    if partition_key
-                    else key.to_python_identifier()
-                )
-                dbt_vars = {"partition_key": partition_key} if partition_key else {}
+
+            # Extract Partition Key from Bronze
+            partition_key = materialization.partition
+            if not partition_key:
+                conata_key = materialization.metadata.get("conata_partition_key")
+                dbt_vars = materialization.metadata.get("variables")
+                if conata_key is not None:
+                    partition_key = str(conata_key.value)
+                elif dbt_vars is not None and isinstance(dbt_vars.value, dict):
+                    partition_key = dbt_vars.value.get("partition_key")
+
+            if partition_key:
+                partition_to_materialized_assets[partition_key].add(key)
+
+        # 3. Process each partition independently
+        for (
+            partition_key,
+            materialized_assets,
+        ) in partition_to_materialized_assets.items():
+            # Identify jobs to trigger
+            # (Bronze->STG is 1-to-1, no need to cross-check upstreams)
+            possible_jobs: list[JobDefinition | UnresolvedAssetJobDefinition] = []
+            for asset in materialized_assets:
+                if asset in upstream_to_jobs:
+                    for job in upstream_to_jobs[asset]:
+                        if job not in possible_jobs:
+                            possible_jobs.append(job)
+
+            # 4. Yield RunRequest for each job
+            for job in possible_jobs:
                 yield RunRequest(
                     job_name=job.name,
-                    run_key=run_key,
+                    run_key=f"{job.name}_{partition_key}",
+                    partition_key=partition_key,
                     run_config=RunConfig(
-                        resources={"dbt_config": DbtConfigResource(variables=dbt_vars)}
+                        resources={
+                            "dbt_config": DbtConfigResource(
+                                variables={
+                                    "partition_key": partition_key,
+                                    "batch_date": partition_key,
+                                }
+                            )
+                        }
                     ),
                 )
 
@@ -281,7 +316,10 @@ def _make_mart_schedule(
             run_config=RunConfig(
                 resources={
                     "dbt_config": DbtConfigResource(
-                        variables={"partition_key": partition_key}
+                        variables={
+                            "partition_key": partition_key,
+                            "batch_date": partition_key,
+                        }
                     )
                 }
             )
@@ -305,101 +343,100 @@ def _create_sensor_for_mart_jobs(  # noqa: C901
         jobs=sensor_jobs,
         minimum_interval_seconds=60,
     )
-    def _sensor(  # noqa: C901
+    def _sensor(  # noqa: C901  # noqa: C901
         context: MultiAssetSensorEvaluationContext,
     ) -> Iterator[RunRequest | SkipReason]:
-        # Map upstream Silver key to corresponding Mart jobs
-        job_by_upstream: dict[
+        # 1. Invert mapping: Upstream -> set of Jobs
+        upstream_to_jobs: dict[
             AssetKey, list[JobDefinition | UnresolvedAssetJobDefinition]
-        ] = {}
+        ] = defaultdict(list)
         for asset_key, upstream_keys in asset_to_upstream.items():
             for job in sensor_jobs:
                 if asset_key.to_python_identifier() in job.name:
                     for up_key in upstream_keys:
-                        job_by_upstream.setdefault(up_key, []).append(job)
+                        if job not in upstream_to_jobs[up_key]:
+                            upstream_to_jobs[up_key].append(job)
 
+        # 2. Group new materializations by partition
+        partition_to_materialized_assets: dict[str, set[AssetKey]] = defaultdict(set)
         for key, asset_event, materialization in dagster_lib.fetch_materializations(
             context, fetch_limit_for_each_asset=_FETCH_LIMIT
         ):
             context.advance_cursor({key: asset_event})
-            conata_key = materialization.metadata.get("conata_partition_key")
-            dbt_vars = materialization.metadata.get("variables")
-            if conata_key is not None:
-                partition_key = str(conata_key.value)
-            elif dbt_vars is not None and isinstance(dbt_vars.value, dict):
-                partition_key = dbt_vars.value.get("partition_key")
-            else:
-                partition_key = None
 
-            if key in job_by_upstream:
-                for job in job_by_upstream[key]:
-                    # Find all upstream keys for this job
-                    job_upstream_keys = [
-                        up_key
-                        for up_key, jobs in job_by_upstream.items()
-                        if job in jobs
-                    ]
+            # Extract Native Partition from Dagster
+            partition_key = materialization.partition
+            if not partition_key:
+                # Fallback for older data missing native partition
+                conata_key = materialization.metadata.get("conata_partition_key")
+                dbt_vars = materialization.metadata.get("variables")
+                if conata_key is not None:
+                    partition_key = str(conata_key.value)
+                elif dbt_vars is not None and isinstance(dbt_vars.value, dict):
+                    partition_key = dbt_vars.value.get("partition_key")
 
-                    # Check if all upstream_keys have been materialized
-                    all_ready = True
-                    for up_key in job_upstream_keys:
-                        if up_key == key:
-                            continue
+            if partition_key:
+                partition_to_materialized_assets[partition_key].add(key)
 
-                        records = context.instance.get_event_records(
-                            dagster.EventRecordsFilter(
-                                event_type=dagster.DagsterEventType.ASSET_MATERIALIZATION,
-                                asset_key=up_key,
-                            ),
-                            limit=20,
+        # 3. Process each partition independently
+        for (
+            partition_key,
+            materialized_assets,
+        ) in partition_to_materialized_assets.items():
+            # Determine which jobs COULD be triggered
+            possible_jobs: list[JobDefinition | UnresolvedAssetJobDefinition] = []
+            for asset in materialized_assets:
+                if asset in upstream_to_jobs:
+                    for job in upstream_to_jobs[asset]:
+                        if job not in possible_jobs:
+                            possible_jobs.append(job)
+
+            # Memoization for upstream partition checks
+            materialization_status = dict.fromkeys(materialized_assets, True)
+
+            # 4. Check dependencies for possible jobs
+            for job in possible_jobs:
+                # Find all required upstream keys for this job
+                # from asset_to_upstream mapping
+                required_upstreams = set()
+                for asset_key, up_keys in asset_to_upstream.items():
+                    if asset_key.to_python_identifier() in job.name:
+                        required_upstreams.update(up_keys)
+
+                all_ready = True
+                for up_key in required_upstreams:
+                    if up_key not in materialization_status:
+                        materialization_status[up_key] = (
+                            context.all_partitions_materialized(up_key, [partition_key])
                         )
 
-                        found = False
-                        for record in records:
-                            mat = record.event_log_entry.dagster_event.asset_materialization  # noqa: E501
-                            if mat:
-                                c_key = mat.metadata.get("conata_partition_key")
-                                d_vars = mat.metadata.get("variables")
-                                rec_partition_key = None
-                                if c_key is not None:
-                                    rec_partition_key = str(c_key.value)
-                                elif d_vars is not None and isinstance(
-                                    d_vars.value, dict
-                                ):
-                                    rec_partition_key = d_vars.value.get(
-                                        "partition_key"
-                                    )
+                    if not materialization_status[up_key]:
+                        all_ready = False
+                        break
 
-                                if (
-                                    rec_partition_key
-                                    and rec_partition_key == partition_key
-                                ):
-                                    found = True
-                                    break
-                        if not found:
-                            all_ready = False
-                            break
-
-                    if not all_ready:
-                        context.log.info(
-                            f"Job {job.name} skipped: "
-                            f"waiting for upstreams for partition {partition_key}"
-                        )
-                        continue
-
-                    run_key = (
-                        f"{job.name}_{partition_key}" if partition_key else job.name
+                if not all_ready:
+                    context.log.info(
+                        f"Job {job.name} skipped: "
+                        f"waiting for upstreams for partition {partition_key}"
                     )
-                    dbt_vars = {"partition_key": partition_key} if partition_key else {}
-                    yield RunRequest(
-                        job_name=job.name,
-                        run_key=run_key,
-                        run_config=RunConfig(
-                            resources={
-                                "dbt_config": DbtConfigResource(variables=dbt_vars)
-                            }
-                        ),
-                    )
+                    continue
+
+                # 5. Yield RunRequest if all upstreams are materialized
+                yield RunRequest(
+                    job_name=job.name,
+                    run_key=f"{job.name}_{partition_key}",
+                    partition_key=partition_key,
+                    run_config=RunConfig(
+                        resources={
+                            "dbt_config": DbtConfigResource(
+                                variables={
+                                    "partition_key": partition_key,
+                                    "batch_date": partition_key,
+                                }
+                            )
+                        }
+                    ),
+                )
 
     return _sensor
 

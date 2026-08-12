@@ -143,7 +143,7 @@ def ml_daily_forecast(  # noqa: C901
     if model_version is None:
         raise ValueError(f"SSM parameter {_ACTIVE_VERSION_PARAM} is not set.")
 
-    # 1. Đảm bảo model đã được đăng ký trên SageMaker
+    # 1. Ensure the model is registered on SageMaker
     model_data_s3_uri = (
         f"s3://{sagemaker.model_artifacts_bucket}/"
         f"{model_version_prefix(model_version)}model.tar.gz"
@@ -200,12 +200,12 @@ def ml_daily_forecast(  # noqa: C901
         if not valid_tickers:
             raise ValueError("No tickers had valid features to forecast.")
 
-        # 3. Upload file JSONL lên S3
+        # 3. Upload JSONL file to S3
         input_key = f"ml-inference-input/{validated_date}/input.jsonl"
         s3_client = s3.get_client()
         s3_client.upload_file(local_input_path, s3bucket.raw_bucket, input_key)
 
-        # 4. Chạy Batch Transform Job
+        # 4. Run Batch Transform Job
         input_s3_uri = f"s3://{s3bucket.raw_bucket}/{input_key}"
         output_prefix = f"ml-inference-output/{validated_date}/"
         output_s3_uri = f"s3://{s3bucket.raw_bucket}/{output_prefix}"
@@ -222,12 +222,12 @@ def ml_daily_forecast(  # noqa: C901
         except Exception as exc:
             raise RuntimeError(f"Failed to run Batch Transform Job: {exc}") from exc
 
-        # 5. Tải kết quả đầu ra về local
+        # 5. Download output results to local
         output_key = f"{output_prefix}input.jsonl.out"
         local_output_path = os.path.join(tmpdir, "output.jsonl.out")
         s3_client.download_file(s3bucket.raw_bucket, output_key, local_output_path)
 
-        # 6. Đọc kết quả — output.jsonl.out is now self-contained
+        # 6. Read results — output.jsonl.out is now self-contained
         # ({"ticker": ..., "predicted_return": ...} per line), no position
         # matching against valid_tickers needed.
         with open(local_output_path, encoding="utf-8") as f_out:
