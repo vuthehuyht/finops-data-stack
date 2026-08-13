@@ -10,7 +10,7 @@ models:
           arguments:
             combination_of_columns:
               - TICKER
-              - DATE
+              - TRADING_DATE
     config:
       meta:
         dagster:
