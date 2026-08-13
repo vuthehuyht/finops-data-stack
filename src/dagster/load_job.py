@@ -65,7 +65,10 @@ class LoadJobBundle:
 
 
 def _get_asset_key(table_name: str) -> dagster.AssetKey:
-    return dagster_lib.asset_key(["RAW", table_name])
+    clean_name = (
+        table_name.replace("RAW_", "") if table_name.startswith("RAW_") else table_name
+    )
+    return dagster_lib.asset_key(["RAW", clean_name])
 
 
 def _read_load_job_parameter(csv_file: str) -> Iterator[LoadJobParameter]:
@@ -293,7 +296,7 @@ def define_load_jobs() -> LoadJobBundle:
         ops = {}
         for param in parameters:
             asset_py_id = param.asset_key.to_python_identifier()
-            table_dir = param.table_name.replace("raw_", "")
+            table_dir = param.table_name.lower().replace("raw_", "")
             s3_url = f"s3://{raw_bucket}/raw/{table_dir}/batch_date={batch_date}/"
 
             ops[asset_py_id] = {
