@@ -395,7 +395,7 @@ def get_dbt_project_assets(
         select=select,
         exclude=exclude,
         partitions_def=dagster.DailyPartitionsDefinition(
-            start_date="2024-01-01", timezone="Asia/Ho_Chi_Minh"
+            start_date="2024-01-01", timezone="Asia/Ho_Chi_Minh", end_offset=1
         ),
     )
     def dbt_project_assets(
