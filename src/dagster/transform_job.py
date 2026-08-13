@@ -194,8 +194,7 @@ def _create_sensor_for_jobs(  # noqa: C901
                         }
                     ),
                 }
-                if partition_key != "init":
-                    kwargs["partition_key"] = partition_key
+                kwargs["partition_key"] = partition_key
                 yield RunRequest(**kwargs)
 
     return _sensor
@@ -439,8 +438,7 @@ def _create_sensor_for_mart_jobs(  # noqa: C901
                         }
                     ),
                 }
-                if partition_key != "init":
-                    kwargs["partition_key"] = partition_key
+                kwargs["partition_key"] = partition_key
                 yield RunRequest(**kwargs)
 
     return _sensor
