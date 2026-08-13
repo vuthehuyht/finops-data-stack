@@ -153,19 +153,10 @@ def _get_partition_variables(
     else:
         partition_key = datetime.datetime.now().strftime("%Y-%m-%d")
 
-    try:
-        today_for_realtime = datetime.datetime.strptime(
-            partition_key, "%Y-%m-%d"
-        ) + datetime.timedelta(days=1)
-        today_for_realtime_iso = today_for_realtime.isoformat()
-    except ValueError:
-        today_for_realtime_iso = partition_key
-
     return {
         "partition_key": partition_key,
         "batch_date": partition_key,
         "dagster_job_name": context.job_name,
-        "today_for_realtime": today_for_realtime_iso,
     }
 
 
@@ -177,10 +168,6 @@ def _build_dbt_args(
     """Build dbt arguments based on context and dbt_config."""
     variables: dict[str, Any] = _get_partition_variables(context, dbt_config)
 
-    if dbt_config.days_offset_for_output_diff is not None:
-        variables["days_offset_for_output_diff"] = (
-            dbt_config.days_offset_for_output_diff
-        )
     if dbt_config.variables:
         variables.update(dbt_config.variables)
 
@@ -323,15 +310,7 @@ def _process_output_event(
     update_count = 0
 
     if should_materialize(expected_updates_per_day, update_count):
-        context.log.info(
-            f"should_materialize({expected_updates_per_day}, {update_count}) == True"
-        )
         yield dagster_event
-    else:
-        context.log.info(
-            f"Skipped because should_materialize({expected_updates_per_day},"
-            f" {update_count}) == False"
-        )
 
 
 def _process_dbt_event(

@@ -1,6 +1,7 @@
 """Dagster jobs for loading raw data from S3 into Redshift Bronze layer."""
 
 import csv
+import datetime
 import enum
 import functools
 import os
@@ -276,8 +277,6 @@ def define_load_jobs() -> LoadJobBundle:
         bundle.sensors.append(
             _create_load_sensor(sensor_keys, sensor_jobs, input_to_job, input_to_asset)
         )
-
-    import datetime
 
     @dagster.config_mapping(
         config_schema={
