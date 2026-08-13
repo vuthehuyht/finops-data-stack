@@ -114,4 +114,7 @@ def load_s3_to_redshift(
     insert_query = f"INSERT INTO {target_table_quoted} SELECT * FROM {temp_table};"
     execute_query(cursor, insert_query)
 
-    logger.info("Successfully loaded data into table: %s", target_table)
+    rows_inserted = cursor.rowcount
+    logger.info(
+        "Successfully loaded %s rows into table: %s", rows_inserted, target_table
+    )

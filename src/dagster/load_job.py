@@ -293,12 +293,8 @@ def define_load_jobs() -> LoadJobBundle:
         ops = {}
         for param in parameters:
             asset_py_id = param.asset_key.to_python_identifier()
-            if batch_date == "init":
-                s3_url = (
-                    f"s3://{raw_bucket}/raw/{param.table_name.upper()}/batch_date=init/"
-                )
-            else:
-                s3_url = f"s3://{raw_bucket}/raw/{param.table_name.upper()}/batch_date={batch_date}/"
+            table_dir = param.table_name.replace("raw_", "")
+            s3_url = f"s3://{raw_bucket}/raw/{table_dir}/batch_date={batch_date}/"
 
             ops[asset_py_id] = {
                 "config": {
