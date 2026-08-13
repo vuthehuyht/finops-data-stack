@@ -4,6 +4,7 @@ import csv
 import enum
 import functools
 import os
+import time
 from collections import defaultdict
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -179,11 +180,10 @@ def _create_sensor_for_jobs(  # noqa: C901
 
             # 4. Yield RunRequest for each job
             for job in possible_jobs:
-                yield RunRequest(
-                    job_name=job.name,
-                    run_key=f"{job.name}_{partition_key}",
-                    partition_key=partition_key,
-                    run_config=RunConfig(
+                kwargs = {
+                    "job_name": job.name,
+                    "run_key": f"{job.name}_{partition_key}_{int(time.time())}",
+                    "run_config": RunConfig(
                         resources={
                             "dbt_config": DbtConfigResource(
                                 variables={
@@ -193,7 +193,10 @@ def _create_sensor_for_jobs(  # noqa: C901
                             )
                         }
                     ),
-                )
+                }
+                if partition_key != "init":
+                    kwargs["partition_key"] = partition_key
+                yield RunRequest(**kwargs)
 
     return _sensor
 
@@ -422,11 +425,10 @@ def _create_sensor_for_mart_jobs(  # noqa: C901
                     continue
 
                 # 5. Yield RunRequest if all upstreams are materialized
-                yield RunRequest(
-                    job_name=job.name,
-                    run_key=f"{job.name}_{partition_key}",
-                    partition_key=partition_key,
-                    run_config=RunConfig(
+                kwargs = {
+                    "job_name": job.name,
+                    "run_key": f"{job.name}_{partition_key}_{int(time.time())}",
+                    "run_config": RunConfig(
                         resources={
                             "dbt_config": DbtConfigResource(
                                 variables={
@@ -436,7 +438,10 @@ def _create_sensor_for_mart_jobs(  # noqa: C901
                             )
                         }
                     ),
-                )
+                }
+                if partition_key != "init":
+                    kwargs["partition_key"] = partition_key
+                yield RunRequest(**kwargs)
 
     return _sensor
 
