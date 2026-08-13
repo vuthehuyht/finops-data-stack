@@ -52,7 +52,18 @@ def test_build_copy_query() -> None:
 def test_load_s3_to_redshift_success() -> None:
     """Test successful load process (full SQL query sequence check)."""
     mock_cursor = unittest.mock.Mock()
-    mock_cursor.query = b""
+    # First call to execute is for fetching columns
+    mock_cursor.fetchall.return_value = [
+        ("TICKER",),
+        ("BATCH_DATE",),
+        ("_CONATA_SOURCE",),
+    ]
+    mock_cursor.execute.side_effect = [
+        None,  # SELECT column_name FROM information_schema.columns
+        None,  # CREATE TEMPORARY TABLE...
+        None,  # COPY
+        None,  # INSERT
+    ]
 
     load.load_s3_to_redshift(
         cursor=mock_cursor,
@@ -69,7 +80,8 @@ def test_load_s3_to_redshift_success() -> None:
     assert any("CREATE TEMPORARY TABLE temp_my_table" in q for q in calls)
     assert any("COPY temp_my_table" in q for q in calls)
     assert any(
-        'INSERT INTO "my_schema"."my_table" SELECT * FROM temp_my_table' in q
+        'INSERT INTO "my_schema"."my_table" SELECT "TICKER", "BATCH_DATE", '
+        "'s3://bucket/path' AS _CONATA_SOURCE FROM" in q
         for q in calls
     )
 
@@ -79,8 +91,16 @@ def test_load_s3_to_redshift_failure() -> None:
     mock_cursor = unittest.mock.Mock()
     mock_cursor.query = b""
 
+    # First call to execute is for fetching columns
+    mock_cursor.fetchall.return_value = [
+        ("TICKER",),
+        ("BATCH_DATE",),
+        ("_CONATA_SOURCE",),
+    ]
+
     # Mock failure on COPY command
     mock_cursor.execute.side_effect = [
+        None,  # SELECT columns
         None,  # CREATE TEMPORARY TABLE...
         ValueError("COPY statement failed"),  # COPY
     ]

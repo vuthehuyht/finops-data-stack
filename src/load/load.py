@@ -64,6 +64,7 @@ def load_s3_to_redshift(
     schema: str,
     file_format: str,
     iam_role_arn: str,
+    batch_date: str | None = None,
 ) -> None:
     """Load data from S3 to Redshift target table using a temporary staging table.
 
@@ -74,6 +75,7 @@ def load_s3_to_redshift(
         schema: Target schema name.
         file_format: File format ('parquet', 'json', 'csv').
         iam_role_arn: IAM Role ARN associated with Redshift cluster to access S3.
+        batch_date: Optional batch date for metadata injection.
     """
     if not _is_valid_identifier(table_name):
         raise ValueError(f"Invalid table name: {table_name}")
@@ -93,7 +95,26 @@ def load_s3_to_redshift(
     )
 
     # Quote the target table to prevent reserved keyword conflicts (e.g. 'raw')
-    target_table_quoted = f'"{target_table.replace(".", '"."')}"'
+    target_table_quoted = f'"{schema}"."{table_name}"'
+
+    # Get column names to handle schema evolution / missing columns
+    get_cols_query = f"""
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = '{schema}'
+        AND table_name = '{table_name.lower()}'
+        ORDER BY ordinal_position;
+    """
+    execute_query(cursor, get_cols_query)
+    all_columns = [row[0].upper() for row in cursor.fetchall()]
+
+    if not all_columns:
+        raise ValueError(f"No columns found for {target_table}. Ensure table exists.")
+
+    base_columns = [
+        c for c in all_columns if not c.startswith("_CONATA_") and c != "BATCH_DATE"
+    ]
+    base_cols_str = ", ".join(f'"{c}"' for c in base_columns)
 
     # 1. Create a temporary staging table mimicking the target table structure
     create_temp_query = (
@@ -101,17 +122,41 @@ def load_s3_to_redshift(
     )
     execute_query(cursor, create_temp_query)
 
-    # 2. Execute COPY command into the staging table
+    # 2. Execute COPY command into the staging table, specifying only the base columns.
+    # This prevents "Unmatched number of columns" if source file lacks metadata cols.
+    temp_table_with_cols = f"{temp_table} ({base_cols_str})"
     copy_query = _build_copy_query(
-        temp_table=temp_table,
+        temp_table=temp_table_with_cols,
         s3_url=s3_url,
         file_format=file_format,
         iam_role_arn=iam_role_arn,
     )
     execute_query(cursor, copy_query)
 
-    # 3. Append all data from the temporary table to the target table
-    insert_query = f"INSERT INTO {target_table_quoted} SELECT * FROM {temp_table};"
+    # 3. Append data from the temporary table to the target table, injecting metadata
+    select_items = []
+    for col in all_columns:
+        if col == "BATCH_DATE":
+            val = f"'{batch_date}'" if batch_date else "NULL"
+            select_items.append(f"{val} AS BATCH_DATE")
+        elif col == "_CONATA_SOURCE":
+            select_items.append(f"'{s3_url}' AS _CONATA_SOURCE")
+        elif col == "_CONATA_SOURCE_ROW_NUMBER":
+            select_items.append(
+                "ROW_NUMBER() OVER(ORDER BY 1) AS _CONATA_SOURCE_ROW_NUMBER"
+            )
+        elif col == "_CONATA_PARTITION_KEY":
+            val = f"'{batch_date}'" if batch_date else "NULL"
+            select_items.append(f"{val} AS _CONATA_PARTITION_KEY")
+        elif col == "_CONATA_LOADED_AT":
+            select_items.append("SYSDATE AS _CONATA_LOADED_AT")
+        else:
+            select_items.append(f'"{col}"')
+
+    select_clause = ", ".join(select_items)
+    insert_query = (
+        f"INSERT INTO {target_table_quoted} SELECT {select_clause} FROM {temp_table};"
+    )
     execute_query(cursor, insert_query)
 
     rows_inserted = cursor.rowcount

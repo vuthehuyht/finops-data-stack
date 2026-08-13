@@ -119,6 +119,7 @@ def _create_raw_data_asset(parameter: LoadJobParameter) -> dagster.AssetsDefinit
                     schema=parameter.schema,
                     file_format=parameter.file_format,
                     iam_role_arn=load_config.iam_role_arn,
+                    batch_date=config.batch_date,
                 )
             conn.commit()
         return dagster.Output(

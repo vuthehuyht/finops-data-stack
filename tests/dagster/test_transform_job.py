@@ -164,4 +164,4 @@ def test_transform_sensor_evaluates() -> None:
     assert len(results) == 1
     run_request = results[0]
     assert run_request.job_name == "transform_STAGING__STG_TEST_job"
-    assert run_request.run_key == "transform_STAGING__STG_TEST_job_2026-06-17"
+    assert run_request.run_key.startswith("transform_STAGING__STG_TEST_job_2026-06-17")

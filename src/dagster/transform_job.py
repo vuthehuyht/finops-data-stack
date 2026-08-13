@@ -408,9 +408,28 @@ def _create_sensor_for_mart_jobs(  # noqa: C901
                 all_ready = True
                 for up_key in required_upstreams:
                     if up_key not in materialization_status:
-                        materialization_status[up_key] = (
-                            context.all_partitions_materialized(up_key, [partition_key])
+                        is_ready = False
+                        # Check if the latest materialization matches the partition_key
+                        latest_event = (
+                            context.instance.get_latest_materialization_event(up_key)
                         )
+                        if latest_event and latest_event.asset_materialization:
+                            mat = latest_event.asset_materialization
+                            up_partition_key = mat.partition
+                            if not up_partition_key:
+                                conata_key = mat.metadata.get("conata_partition_key")
+                                dbt_vars = mat.metadata.get("variables")
+                                if conata_key is not None:
+                                    up_partition_key = str(conata_key.value)
+                                elif dbt_vars is not None and isinstance(
+                                    dbt_vars.value, dict
+                                ):
+                                    up_partition_key = dbt_vars.value.get(
+                                        "partition_key"
+                                    )
+                            if up_partition_key == partition_key:
+                                is_ready = True
+                        materialization_status[up_key] = is_ready
 
                     if not materialization_status[up_key]:
                         all_ready = False
