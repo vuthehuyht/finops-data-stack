@@ -4,6 +4,7 @@ import csv
 import enum
 import functools
 import os
+import time
 from collections import defaultdict
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -79,7 +80,7 @@ def read_transform_job_parameter(csv_file: str) -> Iterator[TransformJobParamete
 def _get_upstream_bronze_key(silver_table_name: str) -> AssetKey:
     """Derive the RAW asset key from a Silver staging model name."""
     entity = silver_table_name.removeprefix("stg_")
-    return dagster_lib.asset_key(["RAW", f"raw_{entity}".upper()])
+    return dagster_lib.asset_key(["RAW", f"{entity}".upper()])
 
 
 def _make_transform_schedule(
@@ -179,11 +180,10 @@ def _create_sensor_for_jobs(  # noqa: C901
 
             # 4. Yield RunRequest for each job
             for job in possible_jobs:
-                yield RunRequest(
-                    job_name=job.name,
-                    run_key=f"{job.name}_{partition_key}",
-                    partition_key=partition_key,
-                    run_config=RunConfig(
+                kwargs = {
+                    "job_name": job.name,
+                    "run_key": f"{job.name}_{partition_key}_{int(time.time())}",
+                    "run_config": RunConfig(
                         resources={
                             "dbt_config": DbtConfigResource(
                                 variables={
@@ -193,7 +193,9 @@ def _create_sensor_for_jobs(  # noqa: C901
                             )
                         }
                     ),
-                )
+                }
+                kwargs["partition_key"] = partition_key
+                yield RunRequest(**kwargs)
 
     return _sensor
 
@@ -406,9 +408,28 @@ def _create_sensor_for_mart_jobs(  # noqa: C901
                 all_ready = True
                 for up_key in required_upstreams:
                     if up_key not in materialization_status:
-                        materialization_status[up_key] = (
-                            context.all_partitions_materialized(up_key, [partition_key])
+                        is_ready = False
+                        # Check if the latest materialization matches the partition_key
+                        latest_event = (
+                            context.instance.get_latest_materialization_event(up_key)
                         )
+                        if latest_event and latest_event.asset_materialization:
+                            mat = latest_event.asset_materialization
+                            up_partition_key = mat.partition
+                            if not up_partition_key:
+                                conata_key = mat.metadata.get("conata_partition_key")
+                                dbt_vars = mat.metadata.get("variables")
+                                if conata_key is not None:
+                                    up_partition_key = str(conata_key.value)
+                                elif dbt_vars is not None and isinstance(
+                                    dbt_vars.value, dict
+                                ):
+                                    up_partition_key = dbt_vars.value.get(
+                                        "partition_key"
+                                    )
+                            if up_partition_key == partition_key:
+                                is_ready = True
+                        materialization_status[up_key] = is_ready
 
                     if not materialization_status[up_key]:
                         all_ready = False
@@ -422,11 +443,10 @@ def _create_sensor_for_mart_jobs(  # noqa: C901
                     continue
 
                 # 5. Yield RunRequest if all upstreams are materialized
-                yield RunRequest(
-                    job_name=job.name,
-                    run_key=f"{job.name}_{partition_key}",
-                    partition_key=partition_key,
-                    run_config=RunConfig(
+                kwargs = {
+                    "job_name": job.name,
+                    "run_key": f"{job.name}_{partition_key}_{int(time.time())}",
+                    "run_config": RunConfig(
                         resources={
                             "dbt_config": DbtConfigResource(
                                 variables={
@@ -436,7 +456,9 @@ def _create_sensor_for_mart_jobs(  # noqa: C901
                             )
                         }
                     ),
-                )
+                }
+                kwargs["partition_key"] = partition_key
+                yield RunRequest(**kwargs)
 
     return _sensor
 

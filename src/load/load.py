@@ -1,16 +1,52 @@
 """Logic to load data from S3 to AWS Redshift."""
 
-import logging
+import io
 import re
 import time
 from typing import Any
+from urllib.parse import urlparse
+
+import boto3
+import pyarrow.parquet as pq
+from dagster import get_dagster_logger
 
 from src.common.redshift_util import execute_query
 
-logger = logging.getLogger(__name__)
+logger = get_dagster_logger()
 
 # Regex to validate database identifiers (Redshift)
 _RE_VALID_REDSHIFT_IDENTIFIER = re.compile(r"^[a-zA-Z_][a-zA-Z_0-9$]*$")
+
+
+def _validate_parquet_schema_count(
+    s3_url: str, expected_count: int, table_name: str, base_columns: list[str]
+) -> None:
+    """Validate that the parquet file on S3 has the expected number of columns."""
+    parsed_url = urlparse(s3_url)
+    bucket = parsed_url.netloc
+    prefix = parsed_url.path.lstrip("/")
+
+    s3 = boto3.client("s3")
+    response = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
+    parquet_keys = [
+        obj["Key"]
+        for obj in response.get("Contents", [])
+        if obj["Key"].endswith(".parquet")
+    ]
+
+    if not parquet_keys:
+        raise ValueError(f"No parquet files found in {s3_url}")
+
+    obj_response = s3.get_object(Bucket=bucket, Key=parquet_keys[0])
+    parquet_file = pq.ParquetFile(io.BytesIO(obj_response["Body"].read()))
+    parquet_cols = parquet_file.schema.names
+
+    if len(parquet_cols) != expected_count:
+        raise ValueError(
+            f"Schema mismatch for {table_name}: Parquet file has {len(parquet_cols)} "
+            f"columns ({parquet_cols}), but Redshift expects {expected_count} columns "
+            f"({base_columns})."
+        )
 
 
 def _is_valid_identifier(identifier: str) -> bool:
@@ -57,14 +93,15 @@ def _build_copy_query(
     """
 
 
-def load_s3_to_redshift(
+def load_s3_to_redshift(  # noqa: C901
     cursor: Any,
     s3_url: str,
     table_name: str,
     schema: str,
     file_format: str,
     iam_role_arn: str,
-) -> None:
+    batch_date: str | None = None,
+) -> int:
     """Load data from S3 to Redshift target table using a temporary staging table.
 
     Args:
@@ -74,6 +111,7 @@ def load_s3_to_redshift(
         schema: Target schema name.
         file_format: File format ('parquet', 'json', 'csv').
         iam_role_arn: IAM Role ARN associated with Redshift cluster to access S3.
+        batch_date: Optional batch date for metadata injection.
     """
     if not _is_valid_identifier(table_name):
         raise ValueError(f"Invalid table name: {table_name}")
@@ -93,7 +131,26 @@ def load_s3_to_redshift(
     )
 
     # Quote the target table to prevent reserved keyword conflicts (e.g. 'raw')
-    target_table_quoted = f'"{target_table.replace(".", '"."')}"'
+    target_table_quoted = f'"{schema}"."{table_name}"'
+
+    # Get column names to handle schema evolution / missing columns
+    get_cols_query = f"""
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = '{schema}'
+        AND table_name = '{table_name.lower()}'
+        ORDER BY ordinal_position;
+    """
+    execute_query(cursor, get_cols_query)
+    all_columns = [row[0].upper() for row in cursor.fetchall()]
+
+    if not all_columns:
+        raise ValueError(f"No columns found for {target_table}. Ensure table exists.")
+
+    base_columns = [
+        c for c in all_columns if not c.startswith("_CONATA_") and c != "BATCH_DATE"
+    ]
+    base_cols_str = ", ".join(f'"{c}"' for c in base_columns)
 
     # 1. Create a temporary staging table mimicking the target table structure
     create_temp_query = (
@@ -101,17 +158,53 @@ def load_s3_to_redshift(
     )
     execute_query(cursor, create_temp_query)
 
-    # 2. Execute COPY command into the staging table
+    # 2. Add validation to ensure source data column count matches target base columns
+    if file_format.lower() == "parquet":
+        _validate_parquet_schema_count(
+            s3_url, len(base_columns), table_name, base_columns
+        )
+        temp_table_with_cols = temp_table
+    else:
+        temp_table_with_cols = f"{temp_table} ({base_cols_str})"
+
     copy_query = _build_copy_query(
-        temp_table=temp_table,
+        temp_table=temp_table_with_cols,
         s3_url=s3_url,
         file_format=file_format,
         iam_role_arn=iam_role_arn,
     )
     execute_query(cursor, copy_query)
 
-    # 3. Append all data from the temporary table to the target table
-    insert_query = f"INSERT INTO {target_table_quoted} SELECT * FROM {temp_table};"
+    # 3. Append data from the temporary table to the target table, injecting metadata
+    select_items = []
+    for col in all_columns:
+        if col == "BATCH_DATE":
+            val = f"'{batch_date}'" if batch_date else "NULL"
+            select_items.append(f"{val} AS BATCH_DATE")
+        elif col == "_CONATA_SOURCE":
+            select_items.append(f"'{s3_url}' AS _CONATA_SOURCE")
+        elif col == "_CONATA_SOURCE_ROW_NUMBER":
+            select_items.append(
+                "ROW_NUMBER() OVER(ORDER BY 1) AS _CONATA_SOURCE_ROW_NUMBER"
+            )
+        elif col == "_CONATA_PARTITION_KEY":
+            val = f"'{batch_date}'" if batch_date else "NULL"
+            select_items.append(f"{val} AS _CONATA_PARTITION_KEY")
+        elif col == "_CONATA_LOADED_AT":
+            select_items.append("SYSDATE AS _CONATA_LOADED_AT")
+        else:
+            select_items.append(f'"{col}"')
+
+    select_clause = ", ".join(select_items)
+
+    # Xoá toàn bộ dữ liệu cũ trong bảng để tránh duplicate khi load lại toàn bộ dữ liệu
+    truncate_query = f"TRUNCATE TABLE {target_table_quoted};"
+    execute_query(cursor, truncate_query)
+
+    insert_query = (
+        f"INSERT INTO {target_table_quoted} SELECT {select_clause} FROM {temp_table};"
+    )
     execute_query(cursor, insert_query)
 
-    logger.info("Successfully loaded data into table: %s", target_table)
+    rows_inserted = cursor.rowcount
+    return rows_inserted

@@ -1,6 +1,7 @@
 """Improved decorators for dagster entity."""
 
 import abc
+import json
 import os
 import random
 from collections.abc import Callable, Iterable, Mapping, Sequence, Set
@@ -73,8 +74,6 @@ class _DecoratorBase(abc.ABC):
         self.kwargs = kwargs
 
     def _prepare_tags(self, fn_name: str, op: bool, tags_key: str) -> None:
-        import json
-
         tags = self.kwargs.setdefault(tags_key, {})
         tags[USER_DEFINED_K8S_CONFIG_KEY] = json.dumps(self._k8s_config(fn_name, op))
         if not op:

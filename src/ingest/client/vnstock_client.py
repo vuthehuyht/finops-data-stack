@@ -1,13 +1,12 @@
 """VnStock client wrapper based on vnstock v4 library."""
 
-import logging
-
 import pandas as pd
+from dagster import get_dagster_logger
 from vnstock import Vnstock
 
 from src.ingest.client.base_client import BaseClient
 
-logger = logging.getLogger(__name__)
+logger = get_dagster_logger()
 
 
 class VnStockClient(BaseClient):

@@ -1,3 +1,5 @@
+data "aws_caller_identity" "current" {}
+
 # 1. Bucket Raw (Bronze Data Lake)
 resource "aws_s3_bucket" "raw" {
   bucket        = "${var.project_name}-data-lake-raw"
@@ -74,7 +76,7 @@ resource "aws_s3_bucket_public_access_block" "processed_public_block" {
 
 # 3. Bucket Model Artifacts (ML Models)
 resource "aws_s3_bucket" "model_artifacts" {
-  bucket        = "${var.project_name}-model-artifacts"
+  bucket        = "${var.project_name}-model-artifacts-${data.aws_caller_identity.current.account_id}"
   force_destroy = true
 
   tags = {

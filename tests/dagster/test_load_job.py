@@ -38,7 +38,7 @@ def test_get_asset_key() -> None:
     from src.dagster.load_job import _get_asset_key
 
     key = _get_asset_key("RAW_STOCK_PRICE_EOD")
-    assert key.path == ["RAW", "RAW_STOCK_PRICE_EOD"]
+    assert key.path == ["RAW", "STOCK_PRICE_EOD"]
 
 
 def test_read_load_job_parameter_count() -> None:
@@ -62,7 +62,7 @@ def test_read_load_job_parameter_first_row() -> None:
     assert first.file_format == "parquet"
     assert first.trigger_type == TriggerType.Sensor
     assert first.trigger_parameter == ""
-    assert first.asset_key == dagster.AssetKey(["RAW", "RAW_STOCK_PRICE_EOD"])
+    assert first.asset_key == dagster.AssetKey(["RAW", "STOCK_PRICE_EOD"])
 
 
 def test_read_load_job_parameter_all_sensor() -> None:
@@ -112,9 +112,9 @@ def test_define_load_jobs_asset_keys() -> None:
 
     bundle = define_load_jobs()
     keys = {a.key for a in bundle.assets}
-    assert dagster.AssetKey(["RAW", "RAW_STOCK_PRICE_EOD"]) in keys
-    assert dagster.AssetKey(["RAW", "RAW_BALANCE_SHEET"]) in keys
-    assert dagster.AssetKey(["RAW", "RAW_ANALYST_REPORTS"]) in keys
+    assert dagster.AssetKey(["RAW", "STOCK_PRICE_EOD"]) in keys
+    assert dagster.AssetKey(["RAW", "BALANCE_SHEET"]) in keys
+    assert dagster.AssetKey(["RAW", "ANALYST_REPORTS"]) in keys
 
 
 def test_define_load_jobs_sensor_names() -> None:

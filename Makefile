@@ -111,7 +111,7 @@ ci:
 # Preview changes to the main infrastructure stack (EKS, SageMaker, IAM, ...)
 infra_plan:
 	@echo "Planning main infrastructure stack..."
-	terraform -chdir=infrastructure/terraform init -backend-config="profile=$(PROFILE)"
+	terraform -chdir=infrastructure/terraform init -reconfigure -backend-config="profile=$(PROFILE)"
 	terraform -chdir=infrastructure/terraform plan -var="aws_profile=$(PROFILE)"
 
 # Apply the main infrastructure stack. No -auto-approve: this provisions
@@ -119,7 +119,7 @@ infra_plan:
 # interactive confirmation prompt is kept as a safety check.
 infra_up:
 	@echo "Applying main infrastructure stack..."
-	terraform -chdir=infrastructure/terraform init -backend-config="profile=$(PROFILE)"
+	terraform -chdir=infrastructure/terraform init -reconfigure -backend-config="profile=$(PROFILE)"
 	terraform -chdir=infrastructure/terraform apply -var="aws_profile=$(PROFILE)"
 
 # Destroy the main infrastructure stack. No -auto-approve, same reason as
@@ -130,7 +130,7 @@ infra_down:
 	-kubectl delete nodepool --all --timeout=60s
 	-kubectl delete nodeclaim --all --timeout=60s
 	@echo "Destroying main infrastructure stack..."
-	terraform -chdir=infrastructure/terraform init -backend-config="profile=$(PROFILE)"
+	terraform -chdir=infrastructure/terraform init -reconfigure -backend-config="profile=$(PROFILE)"
 	terraform -chdir=infrastructure/terraform destroy -var="aws_profile=$(PROFILE)"
 
 # Allow command syntax: make infra plan / make infra up / make infra down

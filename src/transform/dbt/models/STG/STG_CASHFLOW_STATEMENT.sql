@@ -11,14 +11,10 @@ SELECT
   TICKER::VARCHAR(256) AS TICKER,
   PERIOD::VARCHAR(256) AS PERIOD,
   YEAR::INTEGER AS YEAR,
-  CFO::NUMERIC(18, 4) AS CFO,
-  CFI::NUMERIC(18, 4) AS CFI,
-  CFF::NUMERIC(18, 4) AS CFF,
-  NET_CASH_FLOW::NUMERIC(18, 4) AS NET_CASH_FLOW,
-  CAPEX::NUMERIC(18, 4) AS CAPEX,
+  NULLIF(NULLIF(LOWER(CFO), 'nan'), '')::NUMERIC(38, 4) AS CFO,
+  NULLIF(NULLIF(LOWER(CFI), 'nan'), '')::NUMERIC(38, 4) AS CFI,
+  NULLIF(NULLIF(LOWER(CFF), 'nan'), '')::NUMERIC(38, 4) AS CFF,
+  NULLIF(NULLIF(LOWER(NET_CASH_FLOW), 'nan'), '')::NUMERIC(38, 4) AS NET_CASH_FLOW,
+  NULLIF(NULLIF(LOWER(CAPEX), 'nan'), '')::NUMERIC(38, 4) AS CAPEX,
   {{ datacore_common_metadata() }}
-FROM {{ source('RAW', 'RAW_CASHFLOW_STATEMENT') }}
-{% if is_incremental() %}
-  -- Filter by partition key for incremental run
-  WHERE _CONATA_PARTITION_KEY = '{{ var("partition_key") }}'
-{% endif %}
+FROM {{ latest_source(source("RAW", "RAW_CASHFLOW_STATEMENT"), ['TICKER','PERIOD','YEAR']) }}

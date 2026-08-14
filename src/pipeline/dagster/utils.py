@@ -37,9 +37,11 @@ def fetch_materializations(
     for key, has_asset_event in context.latest_materialization_records_by_key().items():
         if has_asset_event:
             # fetch all materialization, not only the latest one
-            for asset_event in context.materialization_records_for_key(
-                key,
-                fetch_limit_for_each_asset,
+            for asset_event in reversed(
+                context.materialization_records_for_key(
+                    key,
+                    fetch_limit_for_each_asset,
+                )
             ):
                 materialization = asset_event.asset_materialization
                 if materialization is not None:

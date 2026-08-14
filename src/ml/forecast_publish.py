@@ -5,13 +5,14 @@ the follow-up INSERT carries literal trading_date/model_version/audit
 columns that aren't present in the raw Batch Transform output file.
 """
 
-import logging
 import time
 from typing import Any
 
+from dagster import get_dagster_logger
+
 from src.common.redshift_util import execute_query
 
-logger = logging.getLogger(__name__)
+logger = get_dagster_logger()
 
 _TARGET_TABLE = "MART.FCT_ML_FORECAST_RESULTS"
 _PROGRAM_NAME = "publish_forecast_results"

@@ -50,7 +50,7 @@ def test_trigger_type_values() -> None:
 
 def test_get_upstream_bronze_key() -> None:
     key = _get_upstream_bronze_key("stg_stock_price_eod")
-    assert key.path == ["RAW", "RAW_STOCK_PRICE_EOD"]
+    assert key.path == ["RAW", "STOCK_PRICE_EOD"]
 
 
 def test_get_upstream_bronze_key_all_models() -> None:
@@ -58,7 +58,7 @@ def test_get_upstream_bronze_key_all_models() -> None:
     for p in params:
         key = _get_upstream_bronze_key(p.table_name)
         assert key.path[0] == "RAW"
-        assert key.path[1].startswith("RAW_")
+        assert not key.path[1].startswith("RAW_")
 
 
 def test_read_transform_job_parameter_count() -> None:
@@ -164,4 +164,4 @@ def test_transform_sensor_evaluates() -> None:
     assert len(results) == 1
     run_request = results[0]
     assert run_request.job_name == "transform_STAGING__STG_TEST_job"
-    assert run_request.run_key == "transform_STAGING__STG_TEST_job_2026-06-17"
+    assert run_request.run_key.startswith("transform_STAGING__STG_TEST_job_2026-06-17")

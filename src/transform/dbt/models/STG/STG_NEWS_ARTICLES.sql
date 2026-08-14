@@ -17,8 +17,4 @@ SELECT
   SOURCE::VARCHAR(256) AS SOURCE,
   URL::VARCHAR(256) AS URL,
   {{ datacore_common_metadata() }}
-FROM {{ source('RAW', 'RAW_NEWS_ARTICLES') }}
-{% if is_incremental() %}
-  -- Filter by partition key for incremental run
-  WHERE _CONATA_PARTITION_KEY = '{{ var("partition_key") }}'
-{% endif %}
+FROM {{ latest_source(source("RAW", "RAW_NEWS_ARTICLES"), ['ARTICLE_ID']) }}

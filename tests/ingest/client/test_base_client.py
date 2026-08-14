@@ -37,7 +37,7 @@ def test_base_client_retry_exhausted() -> None:
     with pytest.raises(ValueError, match="Fatal Error"):
         client.call_api_with_retry(mock_func)
 
-    assert mock_func.call_count == 3
+    assert mock_func.call_count == 6
 
 
 def test_base_client_rate_limiting() -> None:

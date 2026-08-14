@@ -10,14 +10,10 @@
 SELECT
   INDEX_NAME::VARCHAR(256) AS INDEX_NAME,
   TRADING_DATE::DATE AS TRADING_DATE,
-  "OPEN"::NUMERIC(18, 4) AS "OPEN",
-  HIGH::NUMERIC(18, 4) AS HIGH,
-  LOW::NUMERIC(18, 4) AS LOW,
-  CLOSE::NUMERIC(18, 4) AS CLOSE,
-  VOLUME::NUMERIC(18, 4) AS VOLUME,
+  "OPEN"::NUMERIC(38, 4) AS "OPEN",
+  NULLIF(NULLIF(LOWER(HIGH), 'nan'), '')::NUMERIC(38, 4) AS HIGH,
+  NULLIF(NULLIF(LOWER(LOW), 'nan'), '')::NUMERIC(38, 4) AS LOW,
+  NULLIF(NULLIF(LOWER(CLOSE), 'nan'), '')::NUMERIC(38, 4) AS CLOSE,
+  NULLIF(NULLIF(LOWER(VOLUME), 'nan'), '')::NUMERIC(38, 4) AS VOLUME,
   {{ datacore_common_metadata() }}
-FROM {{ source('RAW', 'RAW_INDEX_PRICE_EOD') }}
-{% if is_incremental() %}
-  -- Filter by partition key for incremental run
-  WHERE _CONATA_PARTITION_KEY = '{{ var("partition_key") }}'
-{% endif %}
+FROM {{ latest_source(source("RAW", "RAW_INDEX_PRICE_EOD"), ['INDEX_NAME','TRADING_DATE']) }}

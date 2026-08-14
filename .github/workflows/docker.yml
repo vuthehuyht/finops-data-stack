@@ -96,7 +96,6 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Deploy Dagster to EKS
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: ./.github/actions/deploy-dagster-to-eks
         with:
           image-tag: ${{ env.IMAGE_TAG }}

@@ -7,10 +7,11 @@ import sys
 from typing import ClassVar
 
 import jinja2
+from dagster import get_dagster_logger
 
 from src.common.redshift_util import get_redshift_connection
 
-logger = logging.getLogger(__name__)
+logger = get_dagster_logger()
 
 
 def _render_query(query_template: str, parameters: dict[str, str]) -> str:

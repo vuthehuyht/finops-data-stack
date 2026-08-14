@@ -1,6 +1,7 @@
 """Dagster jobs for loading raw data from S3 into Redshift Bronze layer."""
 
 import csv
+import datetime
 import enum
 import functools
 import os
@@ -64,7 +65,10 @@ class LoadJobBundle:
 
 
 def _get_asset_key(table_name: str) -> dagster.AssetKey:
-    return dagster_lib.asset_key(["RAW", table_name])
+    clean_name = (
+        table_name.replace("RAW_", "") if table_name.startswith("RAW_") else table_name
+    )
+    return dagster_lib.asset_key(["RAW", clean_name])
 
 
 def _read_load_job_parameter(csv_file: str) -> Iterator[LoadJobParameter]:
@@ -108,13 +112,19 @@ def _create_raw_data_asset(parameter: LoadJobParameter) -> dagster.AssetsDefinit
         )
         with redshift.get_connection() as conn:
             with conn.cursor() as cursor:
-                load_s3_to_redshift(
+                rows_inserted = load_s3_to_redshift(
                     cursor=cursor,
                     s3_url=config.s3_url,
                     table_name=parameter.table_name,
                     schema=parameter.schema,
                     file_format=parameter.file_format,
                     iam_role_arn=load_config.iam_role_arn,
+                    batch_date=config.batch_date,
+                )
+                context.log.info(
+                    "Successfully loaded %s rows into table: %s",
+                    rows_inserted,
+                    parameter.table_name,
                 )
             conn.commit()
         return dagster.Output(
@@ -277,8 +287,6 @@ def define_load_jobs() -> LoadJobBundle:
             _create_load_sensor(sensor_keys, sensor_jobs, input_to_job, input_to_asset)
         )
 
-    import datetime
-
     @dagster.config_mapping(
         config_schema={
             "batch_date": dagster.Field(
@@ -294,12 +302,8 @@ def define_load_jobs() -> LoadJobBundle:
         ops = {}
         for param in parameters:
             asset_py_id = param.asset_key.to_python_identifier()
-            if batch_date == "init":
-                s3_url = (
-                    f"s3://{raw_bucket}/raw/{param.table_name.upper()}/batch_date=init/"
-                )
-            else:
-                s3_url = f"s3://{raw_bucket}/raw/{param.table_name.upper()}/batch_date={batch_date}/"
+            table_dir = param.table_name.lower().replace("raw_", "")
+            s3_url = f"s3://{raw_bucket}/raw/{table_dir}/batch_date={batch_date}/"
 
             ops[asset_py_id] = {
                 "config": {

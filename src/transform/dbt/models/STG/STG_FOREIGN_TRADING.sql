@@ -10,14 +10,10 @@
 SELECT
   TICKER::VARCHAR(256) AS TICKER,
   TRADING_DATE::DATE AS TRADING_DATE,
-  BUY_VOL::NUMERIC(18, 4) AS BUY_VOL,
-  SELL_VOL::NUMERIC(18, 4) AS SELL_VOL,
-  BUY_VAL::NUMERIC(18, 4) AS BUY_VAL,
-  SELL_VAL::NUMERIC(18, 4) AS SELL_VAL,
-  NET_VAL::NUMERIC(18, 4) AS NET_VAL,
+  NULLIF(NULLIF(LOWER(BUY_VOL), 'nan'), '')::NUMERIC(38, 4) AS BUY_VOL,
+  NULLIF(NULLIF(LOWER(SELL_VOL), 'nan'), '')::NUMERIC(38, 4) AS SELL_VOL,
+  NULLIF(NULLIF(LOWER(BUY_VAL), 'nan'), '')::NUMERIC(38, 4) AS BUY_VAL,
+  NULLIF(NULLIF(LOWER(SELL_VAL), 'nan'), '')::NUMERIC(38, 4) AS SELL_VAL,
+  NULLIF(NULLIF(LOWER(NET_VAL), 'nan'), '')::NUMERIC(38, 4) AS NET_VAL,
   {{ datacore_common_metadata() }}
-FROM {{ source('RAW', 'RAW_FOREIGN_TRADING') }}
-{% if is_incremental() %}
-  -- Filter by partition key for incremental run
-  WHERE _CONATA_PARTITION_KEY = '{{ var("partition_key") }}'
-{% endif %}
+FROM {{ latest_source(source("RAW", "RAW_FOREIGN_TRADING"), ['TICKER','TRADING_DATE']) }}
