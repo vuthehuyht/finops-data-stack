@@ -18,6 +18,16 @@ _COLUMN_MAP = {
     "news_source_link": "url",
     "public_date": "publish_time",
 }
+_SCHEMA_COLS = [
+    "article_id",
+    "ticker",
+    "publish_time",
+    "title",
+    "summary",
+    "content",
+    "source",
+    "url",
+]
 
 
 def run(
@@ -45,6 +55,10 @@ def run(
         df = df.rename(columns=_COLUMN_MAP)
         if "ticker" not in df.columns or df["ticker"].isna().all():
             df["ticker"] = symbol
+
+        # Keep only schema columns — drop extra columns returned by the API
+        keep = [c for c in _SCHEMA_COLS if c in df.columns]
+        df = df[keep]
         if "publish_time" not in df.columns:
             gap_logger.log(
                 TABLE_NAME,

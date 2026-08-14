@@ -40,14 +40,17 @@ def run(
         # sellForeignQuantity, sellForeignValue
         rows = []
         for q in quotes:
+            buy_val = q.get("buyForeignValue", 0)
+            sell_val = q.get("sellForeignValue", 0)
             rows.append(
                 {
                     "ticker": symbol,
                     "trading_date": q.get("date", "")[:10],
-                    "buyForeignQuantity": q.get("buyForeignQuantity", 0),
-                    "buyForeignValue": q.get("buyForeignValue", 0),
-                    "sellForeignQuantity": q.get("sellForeignQuantity", 0),
-                    "sellForeignValue": q.get("sellForeignValue", 0),
+                    "buy_vol": q.get("buyForeignQuantity", 0),
+                    "sell_vol": q.get("sellForeignQuantity", 0),
+                    "buy_val": buy_val,
+                    "sell_val": sell_val,
+                    "net_val": buy_val - sell_val,
                 }
             )
 

@@ -16,9 +16,17 @@ _RENAME_MAP = {
     "organ_name": "company_name",
     "sector": "industry",
     "com_group_code": "exchange",
+    "issue_share": "outstanding_share",
     "company_profile": "description",
 }
-_KEEP_COLS = ["ticker", "company_name", "industry", "exchange", "description"]
+_KEEP_COLS = [
+    "ticker",
+    "company_name",
+    "industry",
+    "exchange",
+    "outstanding_share",
+    "description",
+]
 
 
 def run(

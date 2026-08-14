@@ -17,6 +17,14 @@ _RENAME_MAP = {
     "exright_date": "ex_right_date",
     "event_title_vi": "event_details",
 }
+_SCHEMA_COLS = [
+    "event_id",
+    "ticker",
+    "event_type",
+    "ex_right_date",
+    "record_date",
+    "event_details",
+]
 
 
 def run(
@@ -48,6 +56,10 @@ def run(
             df["ticker"] = symbol
         else:
             df["ticker"] = df["ticker"].fillna(symbol)
+
+        # Keep only schema columns — drop extra columns returned by the API
+        keep = [c for c in _SCHEMA_COLS if c in df.columns]
+        df = df[keep]
 
         if "ex_right_date" not in df.columns:
             gap_logger.log(
