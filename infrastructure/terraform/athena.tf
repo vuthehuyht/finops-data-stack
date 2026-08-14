@@ -1,9 +1,9 @@
 # 1. Deploy AWS Lambda Connector cho Redshift thông qua Serverless Application Repository
 resource "aws_serverlessapplicationrepository_cloudformation_stack" "athena_redshift_connector" {
-  name             = "${var.project_name}-${var.environment}-athena-redshift"
-  application_id   = "arn:aws:serverlessrepo:us-east-1:292517598671:applications/AthenaRedshiftConnector"
-  
-  capabilities     = ["CAPABILITY_IAM", "CAPABILITY_RESOURCE_POLICY", "CAPABILITY_AUTO_EXPAND"]
+  name           = "${var.project_name}-${var.environment}-athena-redshift"
+  application_id = "arn:aws:serverlessrepo:us-east-1:292517598671:applications/AthenaRedshiftConnector"
+
+  capabilities = ["CAPABILITY_IAM", "CAPABILITY_RESOURCE_POLICY", "CAPABILITY_AUTO_EXPAND"]
 
   parameters = {
     SpillBucket             = module.s3.model_artifacts_bucket_id
@@ -20,7 +20,7 @@ resource "aws_athena_data_catalog" "redshift_catalog" {
   name        = "redshift_catalog"
   description = "Athena to Redshift Serverless Connector"
   type        = "LAMBDA"
-  
+
   parameters = {
     "function" = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-${var.environment}-redshift-connector"
   }
@@ -40,7 +40,7 @@ resource "aws_secretsmanager_secret" "athena_redshift" {
 }
 
 resource "aws_secretsmanager_secret_version" "athena_redshift_val" {
-  secret_id     = aws_secretsmanager_secret.athena_redshift.id
+  secret_id = aws_secretsmanager_secret.athena_redshift.id
   secret_string = jsonencode({
     username = module.redshift.admin_username
     password = module.redshift.admin_password
