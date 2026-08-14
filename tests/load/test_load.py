@@ -49,8 +49,20 @@ def test_build_copy_query() -> None:
         load._build_copy_query("temp_t", "s3://bucket/path", "unknown", "arn")
 
 
-def test_load_s3_to_redshift_success() -> None:
+@unittest.mock.patch("pyarrow.parquet.ParquetFile")
+@unittest.mock.patch("boto3.client")
+def test_load_s3_to_redshift_success(
+    mock_boto_client: unittest.mock.Mock, mock_parquet_file: unittest.mock.Mock
+) -> None:
     """Test successful load process (full SQL query sequence check)."""
+    mock_s3 = unittest.mock.Mock()
+    mock_boto_client.return_value = mock_s3
+    mock_s3.list_objects_v2.return_value = {"Contents": [{"Key": "test.parquet"}]}
+    mock_s3.get_object.return_value = {"Body": unittest.mock.Mock(read=lambda: b"")}
+
+    mock_pq_instance = unittest.mock.Mock()
+    mock_pq_instance.schema.names = ["TICKER"]
+    mock_parquet_file.return_value = mock_pq_instance
     mock_cursor = unittest.mock.Mock()
     # First call to execute is for fetching columns
     mock_cursor.fetchall.return_value = [
@@ -87,8 +99,20 @@ def test_load_s3_to_redshift_success() -> None:
     )
 
 
-def test_load_s3_to_redshift_failure() -> None:
+@unittest.mock.patch("pyarrow.parquet.ParquetFile")
+@unittest.mock.patch("boto3.client")
+def test_load_s3_to_redshift_failure(
+    mock_boto_client: unittest.mock.Mock, mock_parquet_file: unittest.mock.Mock
+) -> None:
     """Test rollback behaviour when the COPY or CREATE table command fails."""
+    mock_s3 = unittest.mock.Mock()
+    mock_boto_client.return_value = mock_s3
+    mock_s3.list_objects_v2.return_value = {"Contents": [{"Key": "test.parquet"}]}
+    mock_s3.get_object.return_value = {"Body": unittest.mock.Mock(read=lambda: b"")}
+
+    mock_pq_instance = unittest.mock.Mock()
+    mock_pq_instance.schema.names = ["TICKER"]
+    mock_parquet_file.return_value = mock_pq_instance
     mock_cursor = unittest.mock.Mock()
     mock_cursor.query = b""
 

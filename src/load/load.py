@@ -1,9 +1,13 @@
 """Logic to load data from S3 to AWS Redshift."""
 
+import io
 import re
 import time
 from typing import Any
+from urllib.parse import urlparse
 
+import boto3
+import pyarrow.parquet as pq
 from dagster import get_dagster_logger
 
 from src.common.redshift_util import execute_query
@@ -12,6 +16,37 @@ logger = get_dagster_logger()
 
 # Regex to validate database identifiers (Redshift)
 _RE_VALID_REDSHIFT_IDENTIFIER = re.compile(r"^[a-zA-Z_][a-zA-Z_0-9$]*$")
+
+
+def _validate_parquet_schema_count(
+    s3_url: str, expected_count: int, table_name: str, base_columns: list[str]
+) -> None:
+    """Validate that the parquet file on S3 has the expected number of columns."""
+    parsed_url = urlparse(s3_url)
+    bucket = parsed_url.netloc
+    prefix = parsed_url.path.lstrip("/")
+
+    s3 = boto3.client("s3")
+    response = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
+    parquet_keys = [
+        obj["Key"]
+        for obj in response.get("Contents", [])
+        if obj["Key"].endswith(".parquet")
+    ]
+
+    if not parquet_keys:
+        raise ValueError(f"No parquet files found in {s3_url}")
+
+    obj_response = s3.get_object(Bucket=bucket, Key=parquet_keys[0])
+    parquet_file = pq.ParquetFile(io.BytesIO(obj_response["Body"].read()))
+    parquet_cols = parquet_file.schema.names
+
+    if len(parquet_cols) != expected_count:
+        raise ValueError(
+            f"Schema mismatch for {table_name}: Parquet file has {len(parquet_cols)} "
+            f"columns ({parquet_cols}), but Redshift expects {expected_count} columns "
+            f"({base_columns})."
+        )
 
 
 def _is_valid_identifier(identifier: str) -> bool:
@@ -58,7 +93,7 @@ def _build_copy_query(
     """
 
 
-def load_s3_to_redshift(
+def load_s3_to_redshift(  # noqa: C901
     cursor: Any,
     s3_url: str,
     table_name: str,
@@ -123,9 +158,15 @@ def load_s3_to_redshift(
     )
     execute_query(cursor, create_temp_query)
 
-    # 2. Execute COPY command into the staging table, specifying only the base columns.
-    # This prevents "Unmatched number of columns" if source file lacks metadata cols.
-    temp_table_with_cols = f"{temp_table} ({base_cols_str})"
+    # 2. Add validation to ensure source data column count matches target base columns
+    if file_format.lower() == "parquet":
+        _validate_parquet_schema_count(
+            s3_url, len(base_columns), table_name, base_columns
+        )
+        temp_table_with_cols = temp_table
+    else:
+        temp_table_with_cols = f"{temp_table} ({base_cols_str})"
+
     copy_query = _build_copy_query(
         temp_table=temp_table_with_cols,
         s3_url=s3_url,
