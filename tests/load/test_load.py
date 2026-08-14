@@ -62,6 +62,7 @@ def test_load_s3_to_redshift_success() -> None:
         None,  # SELECT column_name FROM information_schema.columns
         None,  # CREATE TEMPORARY TABLE...
         None,  # COPY
+        None,  # TRUNCATE
         None,  # INSERT
     ]
 
@@ -80,7 +81,7 @@ def test_load_s3_to_redshift_success() -> None:
     assert any("CREATE TEMPORARY TABLE temp_my_table" in q for q in calls)
     assert any("COPY temp_my_table" in q for q in calls)
     assert any(
-        'INSERT INTO "my_schema"."my_table" SELECT "TICKER", "BATCH_DATE", '
+        'INSERT INTO "my_schema"."my_table" SELECT "TICKER", NULL AS BATCH_DATE, '
         "'s3://bucket/path' AS _CONATA_SOURCE FROM" in q
         for q in calls
     )
