@@ -136,6 +136,10 @@ dagster-user-deployments:
       env:
         - name: AWS_REGION
           value: "ap-southeast-1"
+        - name: KUBERNETES_CLUSTER_NAME
+          value: "finops-eks-cluster"
+        - name: DAGSTER_S3_IO_BUCKET
+          value: "finops-data-lake-raw"
         - name: REDSHIFT_HOST
           valueFrom:
             secretKeyRef:
@@ -252,6 +256,10 @@ runLauncher:
         # k8s Secret's lowercase keys to the uppercase names the app reads).
         containerConfig:
           env:
+            - name: KUBERNETES_CLUSTER_NAME
+              value: "finops-eks-cluster"
+            - name: DAGSTER_S3_IO_BUCKET
+              value: "finops-data-lake-raw"
             - name: REDSHIFT_HOST
               valueFrom:
                 secretKeyRef:
