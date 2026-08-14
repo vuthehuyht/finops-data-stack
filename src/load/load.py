@@ -1,13 +1,14 @@
 """Logic to load data from S3 to AWS Redshift."""
 
-import logging
 import re
 import time
 from typing import Any
 
+from dagster import get_dagster_logger
+
 from src.common.redshift_util import execute_query
 
-logger = logging.getLogger(__name__)
+logger = get_dagster_logger()
 
 # Regex to validate database identifiers (Redshift)
 _RE_VALID_REDSHIFT_IDENTIFIER = re.compile(r"^[a-zA-Z_][a-zA-Z_0-9$]*$")
@@ -65,7 +66,7 @@ def load_s3_to_redshift(
     file_format: str,
     iam_role_arn: str,
     batch_date: str | None = None,
-) -> None:
+) -> int:
     """Load data from S3 to Redshift target table using a temporary staging table.
 
     Args:
@@ -154,12 +155,15 @@ def load_s3_to_redshift(
             select_items.append(f'"{col}"')
 
     select_clause = ", ".join(select_items)
+
+    # Xoá toàn bộ dữ liệu cũ trong bảng để tránh duplicate khi load lại toàn bộ dữ liệu
+    truncate_query = f"TRUNCATE TABLE {target_table_quoted};"
+    execute_query(cursor, truncate_query)
+
     insert_query = (
         f"INSERT INTO {target_table_quoted} SELECT {select_clause} FROM {temp_table};"
     )
     execute_query(cursor, insert_query)
 
     rows_inserted = cursor.rowcount
-    logger.info(
-        "Successfully loaded %s rows into table: %s", rows_inserted, target_table
-    )
+    return rows_inserted
