@@ -1,13 +1,13 @@
 """Base API client logic with retry and rate limiting capabilities."""
 
-import logging
 import time
 from collections.abc import Callable
 from typing import ParamSpec, TypeVar
 
+from dagster import get_dagster_logger
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-logger = logging.getLogger(__name__)
+logger = get_dagster_logger()
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -35,8 +35,8 @@ class BaseClient:
         self._last_request_time = time.time()
 
     @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=2, max=10),
+        stop=stop_after_attempt(6),
+        wait=wait_exponential(multiplier=2, min=5, max=60),
         reraise=True,
     )
     def call_api_with_retry(

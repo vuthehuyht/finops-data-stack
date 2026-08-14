@@ -21,8 +21,4 @@ SELECT
   END AS RECORD_DATE,
   EVENT_DETAILS::VARCHAR(256) AS EVENT_DETAILS,
   {{ datacore_common_metadata() }}
-FROM {{ source('RAW', 'RAW_CORPORATE_EVENTS') }}
-{% if is_incremental() %}
-  -- Filter by partition key for incremental run
-  WHERE _CONATA_PARTITION_KEY = '{{ var("partition_key") }}'
-{% endif %}
+FROM {{ latest_source(source("RAW", "RAW_CORPORATE_EVENTS"), ['EVENT_ID']) }}

@@ -1,14 +1,14 @@
 """Ingestion pipeline for RAW_PROPRIETARY_TRADING."""
 
-import logging
 import os
 
 import pandas as pd
+from dagster import get_dagster_logger
 
 from src.ingest.client.fireant_client import FireAntClient
 from src.ingest.pipeline.base import DEFAULT_TICKER_SYMBOLS, BaseIngestPipeline
 
-logger = logging.getLogger(__name__)
+logger = get_dagster_logger()
 
 
 class ProprietaryTradingPipeline(BaseIngestPipeline):

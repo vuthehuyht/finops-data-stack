@@ -1,13 +1,13 @@
 """Utility module for connection and querying with AWS Redshift Serverless."""
 
-import logging
 import os
 import time
 from typing import Any
 
 import psycopg2
+from dagster import get_dagster_logger
 
-logger = logging.getLogger(__name__)
+logger = get_dagster_logger()
 
 
 def get_redshift_connection() -> Any:

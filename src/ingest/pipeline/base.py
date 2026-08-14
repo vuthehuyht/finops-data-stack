@@ -15,7 +15,9 @@ from src.common.s3_util import upload_to_s3
 if TYPE_CHECKING:
     from mypy_boto3_s3.client import S3Client
 
-logger = logging.getLogger(__name__)
+from dagster import get_dagster_logger
+
+logger = get_dagster_logger()
 
 
 # Fallback list of VN30 symbols to ensure basic data ingestion runs

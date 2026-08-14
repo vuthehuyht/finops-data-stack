@@ -17,8 +17,4 @@ SELECT
   NET_CASH_FLOW::NUMERIC(18, 4) AS NET_CASH_FLOW,
   CAPEX::NUMERIC(18, 4) AS CAPEX,
   {{ datacore_common_metadata() }}
-FROM {{ source('RAW', 'RAW_CASHFLOW_STATEMENT') }}
-{% if is_incremental() %}
-  -- Filter by partition key for incremental run
-  WHERE _CONATA_PARTITION_KEY = '{{ var("partition_key") }}'
-{% endif %}
+FROM {{ latest_source(source("RAW", "RAW_CASHFLOW_STATEMENT"), ['TICKER','PERIOD','YEAR']) }}

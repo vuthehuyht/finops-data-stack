@@ -16,8 +16,4 @@ SELECT
   SELL_VAL::NUMERIC(18, 4) AS SELL_VAL,
   NET_VAL::NUMERIC(18, 4) AS NET_VAL,
   {{ datacore_common_metadata() }}
-FROM {{ source('RAW', 'RAW_FOREIGN_TRADING') }}
-{% if is_incremental() %}
-  -- Filter by partition key for incremental run
-  WHERE _CONATA_PARTITION_KEY = '{{ var("partition_key") }}'
-{% endif %}
+FROM {{ latest_source(source("RAW", "RAW_FOREIGN_TRADING"), ['TICKER','TRADING_DATE']) }}

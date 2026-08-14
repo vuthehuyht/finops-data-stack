@@ -112,7 +112,7 @@ def _create_raw_data_asset(parameter: LoadJobParameter) -> dagster.AssetsDefinit
         )
         with redshift.get_connection() as conn:
             with conn.cursor() as cursor:
-                load_s3_to_redshift(
+                rows_inserted = load_s3_to_redshift(
                     cursor=cursor,
                     s3_url=config.s3_url,
                     table_name=parameter.table_name,
@@ -120,6 +120,11 @@ def _create_raw_data_asset(parameter: LoadJobParameter) -> dagster.AssetsDefinit
                     file_format=parameter.file_format,
                     iam_role_arn=load_config.iam_role_arn,
                     batch_date=config.batch_date,
+                )
+                context.log.info(
+                    "Successfully loaded %s rows into table: %s",
+                    rows_inserted,
+                    parameter.table_name,
                 )
             conn.commit()
         return dagster.Output(

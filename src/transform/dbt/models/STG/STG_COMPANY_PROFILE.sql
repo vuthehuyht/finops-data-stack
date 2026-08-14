@@ -15,8 +15,4 @@ SELECT
   OUTSTANDING_SHARE::NUMERIC(18, 4) AS OUTSTANDING_SHARE,
   DESCRIPTION::VARCHAR(65535) AS DESCRIPTION,
   {{ datacore_common_metadata() }}
-FROM {{ source('RAW', 'RAW_COMPANY_PROFILE') }}
-{% if is_incremental() %}
-  -- Filter by partition key for incremental run
-  WHERE _CONATA_PARTITION_KEY = '{{ var("partition_key") }}'
-{% endif %}
+FROM {{ latest_source(source("RAW", "RAW_COMPANY_PROFILE"), ['TICKER']) }}

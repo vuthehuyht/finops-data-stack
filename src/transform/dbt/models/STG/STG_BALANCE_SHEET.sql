@@ -20,8 +20,4 @@ SELECT
   LONG_TERM_DEBT::NUMERIC(18, 4) AS LONG_TERM_DEBT,
   EQUITY::NUMERIC(18, 4) AS EQUITY,
   {{ datacore_common_metadata() }}
-FROM {{ source('RAW', 'RAW_BALANCE_SHEET') }}
-{% if is_incremental() %}
-  -- Filter by partition key for incremental run
-  WHERE _CONATA_PARTITION_KEY = '{{ var("partition_key") }}'
-{% endif %}
+FROM {{ latest_source(source("RAW", "RAW_BALANCE_SHEET"), ['TICKER','PERIOD','YEAR']) }}

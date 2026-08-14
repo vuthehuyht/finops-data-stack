@@ -13,8 +13,4 @@ SELECT
   VALUE::NUMERIC(18, 4) AS VALUE,
   UNIT::VARCHAR(256) AS UNIT,
   {{ datacore_common_metadata() }}
-FROM {{ source('RAW', 'RAW_MACRO_INDICATORS') }}
-{% if is_incremental() %}
-  -- Filter by partition key for incremental run
-  WHERE _CONATA_PARTITION_KEY = '{{ var("partition_key") }}'
-{% endif %}
+FROM {{ latest_source(source("RAW", "RAW_MACRO_INDICATORS"), ['INDICATOR_NAME','REPORT_DATE']) }}

@@ -16,8 +16,4 @@ SELECT
   DESCRIPTION::VARCHAR(8000) AS DESCRIPTION,
   FILE_NAME::VARCHAR(256) AS FILE_NAME,
   {{ datacore_common_metadata() }}
-FROM {{ source('RAW', 'RAW_ANALYST_REPORTS') }}
-{% if is_incremental() %}
-  -- Filter by partition key for incremental run
-  WHERE _CONATA_PARTITION_KEY = '{{ var("partition_key") }}'
-{% endif %}
+FROM {{ latest_source(source("RAW", "RAW_ANALYST_REPORTS"), ['REPORT_ID']) }}

@@ -18,8 +18,4 @@ SELECT
   VALUE::NUMERIC(18, 4) AS VALUE,
   ADJUSTED_CLOSE::NUMERIC(18, 4) AS ADJUSTED_CLOSE,
   {{ datacore_common_metadata() }}
-FROM {{ source('RAW', 'RAW_STOCK_PRICE_EOD') }}
-{% if is_incremental() %}
-  -- Filter by partition key for incremental run
-  WHERE _CONATA_PARTITION_KEY = '{{ var("partition_key") }}'
-{% endif %}
+FROM {{ latest_source(source("RAW", "RAW_STOCK_PRICE_EOD"), ['TICKER','TRADING_DATE']) }}
