@@ -20,7 +20,7 @@ WITH NEWS_DAILY AS (
     NULL::NUMERIC(38, 4) AS AVG_SENTIMENT_SCORE
   FROM {{ ref('STG_NEWS_ARTICLES') }}
   {% if is_incremental() %}
-  WHERE BATCH_DATE <= {{ current_batch_date() }}
+    WHERE BATCH_DATE <= {{ current_batch_date() }}
   {% endif %}
   GROUP BY 1, 2
 ),
@@ -57,7 +57,7 @@ ANALYST_LATEST AS (
     NULL::NUMERIC(38, 4) AS AVG_ANALYST_TARGET_PRICE
   FROM {{ ref('STG_ANALYST_REPORTS') }}
   {% if is_incremental() %}
-  WHERE BATCH_DATE <= {{ current_batch_date() }}
+    WHERE BATCH_DATE <= {{ current_batch_date() }}
   {% endif %}
   GROUP BY 1, 2
 ),
@@ -75,7 +75,7 @@ CORPORATE_EVENTS_DAILY AS (
     END) AS DIVIDEND_EVENT_COUNT
   FROM {{ ref('STG_CORPORATE_EVENTS') }}
   {% if is_incremental() %}
-  WHERE BATCH_DATE <= {{ current_batch_date() }}
+    WHERE BATCH_DATE <= {{ current_batch_date() }}
   {% endif %}
   GROUP BY 1, 2
 ),
