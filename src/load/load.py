@@ -76,7 +76,7 @@ def _build_copy_query(
 
     fmt = file_format.lower()
     if fmt == "parquet":
-        format_clause = "FORMAT AS PARQUET"
+        format_clause = "FORMAT AS PARQUET SERIALIZETOJSON"
     elif fmt == "json":
         format_clause = "FORMAT AS JSON 'auto'\nTIMEFORMAT 'auto'"
     elif fmt == "csv":
