@@ -121,7 +121,6 @@ class BaseIngestPipeline(abc.ABC):
         1. Uppercase all column names from source.
         2. Retain only columns declared in `schema_columns` (uppercased).
         3. Fill any missing declared columns with None and warn.
-        4. Inject _CONATA_* metadata columns at the end.
 
         Args:
             df: Raw DataFrame retrieved from fetch().

@@ -39,7 +39,7 @@ def _validate_parquet_schema_count(
 
     obj_response = s3.get_object(Bucket=bucket, Key=parquet_keys[0])
     parquet_file = pq.ParquetFile(io.BytesIO(obj_response["Body"].read()))
-    parquet_cols = parquet_file.schema.names
+    parquet_cols = [c.lower() for c in parquet_file.schema.names]
 
     missing_cols = set(base_columns) - set(parquet_cols)
 
@@ -62,6 +62,7 @@ def _build_copy_query(
     s3_url: str,
     file_format: str,
     iam_role_arn: str,
+    has_super_column: bool = False,
 ) -> str:
     """Dynamically construct a Redshift COPY query based on the file format.
 
@@ -70,6 +71,7 @@ def _build_copy_query(
         s3_url: S3 prefix or file path containing the data.
         file_format: The file format ('parquet', 'json', 'csv').
         iam_role_arn: IAM Role ARN with S3 read access.
+        has_super_column: True if the target table contains a SUPER type column.
 
     Returns:
         A complete SQL COPY query.
@@ -79,7 +81,10 @@ def _build_copy_query(
 
     fmt = file_format.lower()
     if fmt == "parquet":
-        format_clause = "FORMAT AS PARQUET"
+        if has_super_column:
+            format_clause = "FORMAT AS PARQUET SERIALIZETOJSON"
+        else:
+            format_clause = "FORMAT AS PARQUET"
     elif fmt == "json":
         format_clause = "FORMAT AS JSON 'auto'\nTIMEFORMAT 'auto'"
     elif fmt == "csv":
@@ -136,16 +141,18 @@ def load_s3_to_redshift(  # noqa: C901
     # Quote the target table to prevent reserved keyword conflicts (e.g. 'raw')
     target_table_quoted = f'"{schema}"."{table_name}"'
 
-    # Get column names to handle schema evolution / missing columns
+    # Get column names and types to handle schema evolution / missing columns
     get_cols_query = f"""
-        SELECT column_name
+        SELECT column_name, data_type
         FROM information_schema.columns
         WHERE table_schema = '{schema}'
         AND table_name = '{table_name.lower()}'
         ORDER BY ordinal_position;
     """
     execute_query(cursor, get_cols_query)
-    all_columns = [row[0].lower() for row in cursor.fetchall()]
+    columns_info = cursor.fetchall()
+    all_columns = [row[0].lower() for row in columns_info]
+    has_super_column = any(row[1].lower() == "super" for row in columns_info)
 
     if not all_columns:
         raise ValueError(f"No columns found for {target_table}. Ensure table exists.")
@@ -180,6 +187,7 @@ def load_s3_to_redshift(  # noqa: C901
         s3_url=s3_url,
         file_format=file_format,
         iam_role_arn=iam_role_arn,
+        has_super_column=has_super_column,
     )
     execute_query(cursor, copy_query)
 

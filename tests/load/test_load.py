@@ -64,11 +64,11 @@ def test_load_s3_to_redshift_success(
     mock_pq_instance.schema.names = ["TICKER"]
     mock_parquet_file.return_value = mock_pq_instance
     mock_cursor = unittest.mock.Mock()
-    # First call to execute is for fetching columns
+    # First call to execute is for fetching columns and types
     mock_cursor.fetchall.return_value = [
-        ("TICKER",),
-        ("BATCH_DATE",),
-        ("_CONATA_SOURCE",),
+        ("TICKER", "VARCHAR"),
+        ("BATCH_DATE", "DATE"),
+        ("_CONATA_SOURCE", "VARCHAR"),
     ]
     mock_cursor.execute.side_effect = [
         None,  # SELECT column_name FROM information_schema.columns
@@ -93,8 +93,8 @@ def test_load_s3_to_redshift_success(
     assert any("CREATE TEMPORARY TABLE temp_my_table" in q for q in calls)
     assert any("COPY temp_my_table" in q for q in calls)
     assert any(
-        'INSERT INTO "my_schema"."my_table" SELECT "TICKER", NULL AS BATCH_DATE, '
-        "'s3://bucket/path' AS _CONATA_SOURCE FROM" in q
+        'INSERT INTO "my_schema"."my_table" SELECT "ticker", NULL AS batch_date, '
+        "'s3://bucket/path' AS _conata_source FROM" in q
         for q in calls
     )
 
@@ -118,9 +118,9 @@ def test_load_s3_to_redshift_failure(
 
     # First call to execute is for fetching columns
     mock_cursor.fetchall.return_value = [
-        ("TICKER",),
-        ("BATCH_DATE",),
-        ("_CONATA_SOURCE",),
+        ("TICKER", "VARCHAR"),
+        ("BATCH_DATE", "DATE"),
+        ("_CONATA_SOURCE", "VARCHAR"),
     ]
 
     # Mock failure on COPY command
