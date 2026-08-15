@@ -1,6 +1,7 @@
 # 1. IAM Role cho EKS Cluster Control Plane
 resource "aws_iam_role" "eks_cluster" {
-  name = "${var.project_name}-eks-cluster-role"
+  force_detach_policies = true
+  name                  = "${var.project_name}-eks-cluster-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -68,7 +69,8 @@ resource "aws_eks_cluster" "main" {
 
 # 3. IAM Role cho EKS Node Groups (Worker Nodes)
 resource "aws_iam_role" "eks_nodes" {
-  name = "${var.project_name}-eks-node-role"
+  force_detach_policies = true
+  name                  = "${var.project_name}-eks-node-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -156,7 +158,8 @@ resource "aws_iam_openid_connect_provider" "eks" {
 
 # 6. IRSA: IAM Role for Dagster Service Account running on EKS
 resource "aws_iam_role" "dagster_service_account" {
-  name = "${var.project_name}-dagster-sa-role"
+  force_detach_policies = true
+  name                  = "${var.project_name}-dagster-sa-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -256,7 +259,8 @@ resource "aws_iam_role_policy_attachment" "dagster_sa_permissions_attach" {
 # 7. IRSA: IAM Role for External Secrets Operator, to sync AWS Secrets Manager
 # secrets into k8s Secrets (e.g. dagster-pg-credentials for the Dagster Helm chart).
 resource "aws_iam_role" "external_secrets_sa" {
-  name = "${var.project_name}-external-secrets-sa-role"
+  force_detach_policies = true
+  name                  = "${var.project_name}-external-secrets-sa-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -323,7 +327,8 @@ resource "aws_iam_openid_connect_provider" "github_actions" {
 # policy restricts to this exact repo AND only the main branch -- feature
 # branches cannot assume this role.
 resource "aws_iam_role" "github_actions_deploy" {
-  name = "${var.project_name}-github-actions-deploy-role"
+  force_detach_policies = true
+  name                  = "${var.project_name}-github-actions-deploy-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -455,7 +460,8 @@ resource "aws_eks_access_policy_association" "cluster_admins" {
 
 # 9. IRSA: IAM Role for Karpenter Controller
 resource "aws_iam_role" "karpenter_controller" {
-  name = "${var.project_name}-karpenter-controller-role"
+  force_detach_policies = true
+  name                  = "${var.project_name}-karpenter-controller-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -485,7 +491,8 @@ resource "aws_iam_role" "karpenter_controller" {
 # (EC2NodeClass.spec.role in src/k8s/manifest/karpenter/nodepool.yaml) --
 # no aws_iam_instance_profile resource needed here.
 resource "aws_iam_role" "karpenter_node" {
-  name = "${var.project_name}-karpenter-node-role"
+  force_detach_policies = true
+  name                  = "${var.project_name}-karpenter-node-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"

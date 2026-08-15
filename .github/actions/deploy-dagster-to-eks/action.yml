@@ -179,12 +179,12 @@ runs:
           -f infrastructure/helm/values.yaml \
           --set dagster-user-deployments.deployments[0].image.repository=${{ inputs.ecr-repository-url }} \
           --set dagster-user-deployments.deployments[0].image.tag=${{ steps.resolve-tag.outputs.tag }} \
-          --set dagster-user-deployments.deployments[0].env[7].value=${{ inputs.redshift-iam-role-arn }} \
-          --set dagster-user-deployments.deployments[0].env[8].value=${{ inputs.finops-raw-bucket }} \
-          --set dagster-user-deployments.deployments[0].env[9].value=${{ inputs.finops-model-artifacts-bucket }} \
-          --set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env[6].value=${{ inputs.redshift-iam-role-arn }} \
-          --set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env[7].value=${{ inputs.finops-raw-bucket }} \
-          --set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env[8].value=${{ inputs.finops-model-artifacts-bucket }} \
+          --set dagster-user-deployments.deployments[0].env[9].value=${{ inputs.redshift-iam-role-arn }} \
+          --set dagster-user-deployments.deployments[0].env[10].value=${{ inputs.finops-raw-bucket }} \
+          --set dagster-user-deployments.deployments[0].env[11].value=${{ inputs.finops-model-artifacts-bucket }} \
+          --set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env[8].value=${{ inputs.redshift-iam-role-arn }} \
+          --set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env[9].value=${{ inputs.finops-raw-bucket }} \
+          --set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env[10].value=${{ inputs.finops-model-artifacts-bucket }} \
           --set postgresql.postgresqlHost=${{ inputs.rds-address }} \
           --set postgresql.postgresqlUsername=${{ inputs.rds-username }} \
           --set postgresql.postgresqlDatabase=${{ inputs.rds-dbname }} \

@@ -69,14 +69,9 @@ def on_k8s() -> bool:
 
 
 def _io_manager_bucket_name() -> str:
-    cluster = kubernetes_cluster_name()
-    if cluster is None:
-        raise Exception("Not running within a Kubernetes cluster")
-    elif cluster == "adastria-staging":
-        return "fw-dagster-adastria-staging"
-    elif cluster == "adastria-prod":
-        return "fw-dagster-adastria-prod"
-    raise Exception(f"Unsupported k8s cluster: {cluster}")
+    """Get the S3 bucket name for Dagster IO Manager."""
+    # Priority: 1. ENV var, 2. Default bucket for this project
+    return os.getenv("DAGSTER_S3_IO_BUCKET", "finops-data-lake-raw")
 
 
 def io_manager(code_location_name: str) -> dagster.IOManagerDefinition:

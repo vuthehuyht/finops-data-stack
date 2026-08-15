@@ -194,7 +194,8 @@ resource "aws_s3_bucket_public_access_block" "model_artifacts_public_block" {
 
 # IAM Role for Spectrum
 resource "aws_iam_role" "redshift_s3" {
-  name = "${var.project_name}-redshift-s3-role"
+  force_detach_policies = true
+  name                  = "${var.project_name}-redshift-s3-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"

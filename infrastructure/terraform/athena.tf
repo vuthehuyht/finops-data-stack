@@ -49,7 +49,8 @@ resource "aws_secretsmanager_secret_version" "athena_redshift_val" {
 
 # 4. Configure Athena Workgroup to store query results
 resource "aws_athena_workgroup" "finops" {
-  name = "${var.project_name}_${var.environment}"
+  name          = "${var.project_name}_${var.environment}"
+  force_destroy = true
 
   configuration {
     result_configuration {
