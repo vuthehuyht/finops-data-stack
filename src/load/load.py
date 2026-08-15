@@ -145,13 +145,13 @@ def load_s3_to_redshift(  # noqa: C901
         ORDER BY ordinal_position;
     """
     execute_query(cursor, get_cols_query)
-    all_columns = [row[0].upper() for row in cursor.fetchall()]
+    all_columns = [row[0].lower() for row in cursor.fetchall()]
 
     if not all_columns:
         raise ValueError(f"No columns found for {target_table}. Ensure table exists.")
 
     base_columns = [
-        c for c in all_columns if not c.startswith("_CONATA_") and c != "BATCH_DATE"
+        c for c in all_columns if not c.startswith("_conata_") and c != "batch_date"
     ]
     base_cols_str = ", ".join(f'"{c}"' for c in base_columns)
 
@@ -183,20 +183,20 @@ def load_s3_to_redshift(  # noqa: C901
     # 3. Append data from the temporary table to the target table, injecting metadata
     select_items = []
     for col in all_columns:
-        if col == "BATCH_DATE":
+        if col == "batch_date":
             val = f"'{batch_date}'" if batch_date else "NULL"
-            select_items.append(f"{val} AS BATCH_DATE")
-        elif col == "_CONATA_SOURCE":
-            select_items.append(f"'{s3_url}' AS _CONATA_SOURCE")
-        elif col == "_CONATA_SOURCE_ROW_NUMBER":
+            select_items.append(f"{val} AS batch_date")
+        elif col == "_conata_source":
+            select_items.append(f"'{s3_url}' AS _conata_source")
+        elif col == "_conata_source_row_number":
             select_items.append(
-                "ROW_NUMBER() OVER(ORDER BY 1) AS _CONATA_SOURCE_ROW_NUMBER"
+                "ROW_NUMBER() OVER(ORDER BY 1) AS _conata_source_row_number"
             )
-        elif col == "_CONATA_PARTITION_KEY":
+        elif col == "_conata_partition_key":
             val = f"'{batch_date}'" if batch_date else "NULL"
-            select_items.append(f"{val} AS _CONATA_PARTITION_KEY")
-        elif col == "_CONATA_LOADED_AT":
-            select_items.append("SYSDATE AS _CONATA_LOADED_AT")
+            select_items.append(f"{val} AS _conata_partition_key")
+        elif col == "_conata_loaded_at":
+            select_items.append("SYSDATE AS _conata_loaded_at")
         else:
             select_items.append(f'"{col}"')
 

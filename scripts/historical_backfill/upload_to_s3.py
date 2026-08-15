@@ -48,8 +48,8 @@ def process_table(table_dir: Path, bucket: str) -> None:  # noqa: C901
     # Concatenate all dataframes
     final_df = pd.concat(dfs, ignore_index=True)
 
-    # Uppercase all columns to match base.py
-    final_df.columns = final_df.columns.str.upper()
+    # Lowercase all columns to match Redshift's unquoted identifier case
+    final_df.columns = final_df.columns.str.lower()
 
     # Ensure all columns are explicitly pandas 'string' dtype (not just object)
     # This guarantees PyArrow creates a String schema even if the column is all nulls.
