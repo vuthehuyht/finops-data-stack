@@ -188,12 +188,12 @@ deploy_eks:
 	helm upgrade --install dagster dagster/dagster -f infrastructure/helm/values.yaml -n dagster --create-namespace \
 		--set dagster-user-deployments.deployments\[0\].image.repository=$(ECR_REPO) \
 		--set dagster-user-deployments.deployments\[0\].image.tag=$(IMAGE_TAG) \
-		--set dagster-user-deployments.deployments\[0\].env\[7\].value=$$REDSHIFT_ROLE \
-		--set dagster-user-deployments.deployments\[0\].env\[8\].value=$$RAW_BUCKET \
-		--set dagster-user-deployments.deployments\[0\].env\[9\].value=$$MODEL_BUCKET \
-		--set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env\[6\].value=$$REDSHIFT_ROLE \
-		--set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env\[7\].value=$$RAW_BUCKET \
-		--set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env\[8\].value=$$MODEL_BUCKET \
+		--set dagster-user-deployments.deployments\[0\].env\[9\].value=$$REDSHIFT_ROLE \
+		--set dagster-user-deployments.deployments\[0\].env\[10\].value=$$RAW_BUCKET \
+		--set dagster-user-deployments.deployments\[0\].env\[11\].value=$$MODEL_BUCKET \
+		--set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env\[8\].value=$$REDSHIFT_ROLE \
+		--set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env\[9\].value=$$RAW_BUCKET \
+		--set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env\[10\].value=$$MODEL_BUCKET \
 		--set postgresql.postgresqlHost=$$RDS_HOST \
 		--set postgresql.postgresqlUsername=$$RDS_USER \
 		--set postgresql.postgresqlDatabase=$$RDS_DB

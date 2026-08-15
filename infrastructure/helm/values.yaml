@@ -32,7 +32,7 @@ global:
   postgresqlSecretName: "dagster-pg-credentials"
 
 nameOverride: ""
-fullnameOverride: ""
+fullnameOverride: "dagster"
 rbacEnabled: true
 imagePullSecrets: []
 
