@@ -199,9 +199,17 @@ def load_s3_to_redshift(  # noqa: C901
 
     select_clause = ", ".join(select_items)
 
-    # Xoá toàn bộ dữ liệu cũ trong bảng để tránh duplicate khi load lại toàn bộ dữ liệu
-    truncate_query = f"TRUNCATE TABLE {target_table_quoted};"
-    execute_query(cursor, truncate_query)
+    # Delete existing records for this partition to ensure idempotency
+    if batch_date:
+        delete_query = (
+            f"DELETE FROM {target_table_quoted} "
+            f"WHERE _CONATA_PARTITION_KEY = '{batch_date}';"
+        )
+        execute_query(cursor, delete_query)
+    else:
+        # Truncate the table if no batch_date is provided (Full Load)
+        truncate_query = f"TRUNCATE TABLE {target_table_quoted};"
+        execute_query(cursor, truncate_query)
 
     insert_query = (
         f"INSERT INTO {target_table_quoted} SELECT {select_clause} FROM {temp_table};"
