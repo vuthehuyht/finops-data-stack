@@ -18,19 +18,10 @@ jobs:
       pull-requests: write
       packages: read
 
-    services:
-      localstack:
-        image: localstack/localstack:3
-        ports:
-          - 4566:4566
-        env:
-          SERVICES: s3
-
     env:
       AWS_DEFAULT_REGION: ap-southeast-1
       AWS_ACCESS_KEY_ID: mock
       AWS_SECRET_ACCESS_KEY: mock
-      AWS_ENDPOINT_URL: http://localhost:4566
 
     steps:
       - name: Checkout Code
