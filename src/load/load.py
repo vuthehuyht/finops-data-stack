@@ -163,9 +163,7 @@ def load_s3_to_redshift(  # noqa: C901
         _validate_parquet_schema_count(
             s3_url, len(base_columns), table_name, base_columns
         )
-        temp_table_with_cols = temp_table
-    else:
-        temp_table_with_cols = f"{temp_table} ({base_cols_str})"
+    temp_table_with_cols = f"{temp_table} ({base_cols_str})"
 
     copy_query = _build_copy_query(
         temp_table=temp_table_with_cols,
