@@ -161,6 +161,13 @@ class BaseIngestPipeline(abc.ABC):
         result_df["_CONATA_PARTITION_KEY"] = self.batch_date
         result_df["_CONATA_LOADED_AT"] = pd.Timestamp.now(tz=datetime.UTC)
 
+        # Truncate string columns to prevent Redshift COPY Parquet length limit errors
+        # Safe length is 16000 chars for 65535 bytes (4 bytes max per utf-8 char)
+        for col in result_df.select_dtypes(include=["object", "string"]).columns:
+            result_df[col] = result_df[col].apply(
+                lambda x: x[:16000] if isinstance(x, str) else x
+            )
+
         return result_df
 
     def serialize(self, df: pd.DataFrame) -> str:
