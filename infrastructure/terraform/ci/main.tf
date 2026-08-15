@@ -51,7 +51,8 @@ resource "aws_security_group" "redshift_ci" {
 # ==============================================================================
 
 resource "aws_iam_role" "redshift_s3" {
-  name = "${var.project_name}-redshift-s3-role"
+  force_detach_policies = true
+  name                  = "${var.project_name}-redshift-s3-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"

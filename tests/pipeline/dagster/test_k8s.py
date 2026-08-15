@@ -4,7 +4,6 @@ import os
 import unittest.mock
 
 import dagster
-import pytest
 
 from src.pipeline.dagster import k8s
 
@@ -34,32 +33,16 @@ def test_on_k8s_returns_false_when_cluster_unset() -> None:
         assert k8s.on_k8s() is False
 
 
-@pytest.mark.parametrize(
-    ["cluster", "expected_bucket"],
-    [
-        pytest.param("adastria-staging", "fw-dagster-adastria-staging", id="staging"),
-        pytest.param("adastria-prod", "fw-dagster-adastria-prod", id="prod"),
-    ],
-)
-def test_io_manager_bucket_name_known_clusters(
-    cluster: str, expected_bucket: str
-) -> None:
-    with unittest.mock.patch.dict(os.environ, {"KUBERNETES_CLUSTER_NAME": cluster}):
-        assert k8s._io_manager_bucket_name() == expected_bucket
-
-
-def test_io_manager_bucket_name_raises_when_not_on_k8s() -> None:
+def test_io_manager_bucket_name_default() -> None:
     with unittest.mock.patch.dict(os.environ, {}, clear=True):
-        with pytest.raises(Exception, match="Not running within a Kubernetes cluster"):
-            k8s._io_manager_bucket_name()
+        assert k8s._io_manager_bucket_name() == "finops-data-lake-raw"
 
 
-def test_io_manager_bucket_name_raises_for_unknown_cluster() -> None:
+def test_io_manager_bucket_name_env_var() -> None:
     with unittest.mock.patch.dict(
-        os.environ, {"KUBERNETES_CLUSTER_NAME": "unknown-cluster"}
+        os.environ, {"DAGSTER_S3_IO_BUCKET": "my-custom-bucket"}
     ):
-        with pytest.raises(Exception, match="Unsupported k8s cluster"):
-            k8s._io_manager_bucket_name()
+        assert k8s._io_manager_bucket_name() == "my-custom-bucket"
 
 
 def test_io_manager_returns_fs_io_manager_when_not_on_k8s() -> None:
