@@ -5,6 +5,7 @@ import os
 import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import UTC
 from pathlib import Path
 
 import boto3
@@ -48,9 +49,31 @@ def process_table(table_dir: Path, bucket: str) -> None:  # noqa: C901
     # Concatenate all dataframes
     final_df = pd.concat(dfs, ignore_index=True)
 
+    # Uppercase all columns to match base.py
+    final_df.columns = final_df.columns.str.upper()
+
     from datetime import datetime
 
     current_date = datetime.now().strftime("%Y-%m-%d")
+
+    # Inject missing metadata columns
+    if "BATCH_DATE" not in final_df.columns:
+        final_df["BATCH_DATE"] = current_date
+    if "_CONATA_SOURCE" not in final_df.columns:
+        final_df["_CONATA_SOURCE"] = "api://backfill"
+    if "_CONATA_SOURCE_ROW_NUMBER" not in final_df.columns:
+        final_df["_CONATA_SOURCE_ROW_NUMBER"] = range(1, len(final_df) + 1)
+    if "_CONATA_PARTITION_KEY" not in final_df.columns:
+        final_df["_CONATA_PARTITION_KEY"] = current_date
+    if "_CONATA_LOADED_AT" not in final_df.columns:
+        final_df["_CONATA_LOADED_AT"] = pd.Timestamp.now(tz=UTC)
+
+    # Truncate string columns to prevent Redshift COPY Parquet length limit errors
+    for col in final_df.select_dtypes(include=["object", "string"]).columns:
+        final_df[col] = final_df[col].apply(
+            lambda x: x[:16000] if isinstance(x, str) else x
+        )
+
     unix_timestamp = int(time.time())
     s3_key = (
         f"raw/{table_name}/batch_date={current_date}/{unix_timestamp}/data_init.parquet"
