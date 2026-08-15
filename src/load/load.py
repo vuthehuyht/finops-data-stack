@@ -155,17 +155,14 @@ def load_s3_to_redshift(  # noqa: C901
     ]
     base_cols_str = ", ".join(f'"{c}"' for c in base_columns)
 
-    # 1. Create a temporary staging table mimicking the target table structure
-    create_temp_query = (
-        f"CREATE TEMPORARY TABLE {temp_table} (LIKE {target_table_quoted});"
-    )
+    # 1. Create a temporary staging table with EXACTLY the base columns.
+    create_temp_query = f"""
+        CREATE TEMPORARY TABLE {temp_table} AS
+        SELECT {base_cols_str}
+        FROM {target_table_quoted}
+        WHERE 1=0;
+    """
     execute_query(cursor, create_temp_query)
-
-    # Drop metadata columns from the temp table so its column count
-    # exactly matches the Parquet file. Redshift COPY FORMAT AS PARQUET
-    # does not support column lists and requires exact column counts.
-    for metadata_col in [c for c in all_columns if c not in base_columns]:
-        execute_query(cursor, f"ALTER TABLE {temp_table} DROP COLUMN {metadata_col};")
 
     # 2. Add validation to ensure source data column count matches target base columns
     if file_format.lower() == "parquet":
