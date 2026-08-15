@@ -61,11 +61,11 @@ def process_table(table_dir: Path, bucket: str) -> None:  # noqa: C901
 
     current_date = datetime.now().strftime("%Y-%m-%d")
 
-    # Truncate string columns to prevent Redshift COPY Parquet length limit errors
-    for col in final_df.select_dtypes(include=["object", "string"]).columns:
-        final_df[col] = final_df[col].apply(
-            lambda x: x[:16000] if isinstance(x, str) else x
-        )
+    # Truncate string columns to prevent Redshift COPY Parquet length limit errors.
+    # Use native .str.slice to preserve StringDtype instead of .apply() which
+    # falls back to object dtype.
+    for col in final_df.columns:
+        final_df[col] = final_df[col].str.slice(0, 16000)
 
     unix_timestamp = int(time.time())
     s3_key = (
