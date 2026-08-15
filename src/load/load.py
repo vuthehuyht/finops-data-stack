@@ -153,7 +153,6 @@ def load_s3_to_redshift(  # noqa: C901
     base_columns = [
         c for c in all_columns if not c.startswith("_CONATA_") and c != "BATCH_DATE"
     ]
-    base_cols_str = ", ".join(f'"{c}"' for c in base_columns)
 
     # 1. Create a temporary staging table mimicking the target table structure
     create_temp_query = (
@@ -166,7 +165,9 @@ def load_s3_to_redshift(  # noqa: C901
         _validate_parquet_schema_count(
             s3_url, len(base_columns), table_name, base_columns
         )
-    temp_table_with_cols = f"{temp_table} ({base_cols_str})"
+    # Use temp_table directly without column list so Redshift COPY reads all columns
+    # from the Parquet file, avoiding 'Unmatched number of columns' error.
+    temp_table_with_cols = temp_table
 
     copy_query = _build_copy_query(
         temp_table=temp_table_with_cols,
