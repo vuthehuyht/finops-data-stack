@@ -79,7 +79,7 @@ class PrometheusResource:
                 registry=self.registry,
                 grouping_key=_add_custom_grouping_key_from_env(
                     {
-                        "workspace": os.environ["DAGSTER_WORKSPACE_NAME"],
+                        "workspace": os.environ.get("DAGSTER_WORKSPACE_NAME", "finops"),
                         # For the label name (which is also used as a grouping key),
                         # we avoid `job` since it'd be masked by the value passed above;
                         # use `dagster_job` instead.
@@ -110,7 +110,7 @@ class PrometheusResource:
                 registry=self.registry,
                 grouping_key=_add_custom_grouping_key_from_env(
                     {
-                        "workspace": os.environ["DAGSTER_WORKSPACE_NAME"],
+                        "workspace": os.environ.get("DAGSTER_WORKSPACE_NAME", "finops"),
                         "sensor": sensor_name,
                     }
                 ),

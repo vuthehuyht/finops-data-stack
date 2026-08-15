@@ -178,6 +178,8 @@ dagster-user-deployments:
           value: ""
         - name: DAGSTER_K8S_SERVICE_ACCOUNT
           value: "dagster-sa"
+        - name: DAGSTER_WORKSPACE_NAME
+          value: "finops"
 
       # Always-on gRPC server serving definitions — runs on Core, same as
       # webserver/daemon (see nodeSelector note there).
@@ -300,6 +302,8 @@ runLauncher:
               value: ""
             - name: DAGSTER_K8S_SERVICE_ACCOUNT
               value: "dagster-sa"
+            - name: DAGSTER_WORKSPACE_NAME
+              value: "finops"
 
 ####################################################################################################
 # PostgreSQL — external RDS instance (aws_db_instance.dagster_meta), not chart-managed.
