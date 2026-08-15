@@ -41,10 +41,13 @@ def _validate_parquet_schema_count(
     parquet_file = pq.ParquetFile(io.BytesIO(obj_response["Body"].read()))
     parquet_cols = parquet_file.schema.names
 
-    if len(parquet_cols) != expected_count:
+    missing_cols = set(base_columns) - set(parquet_cols)
+
+    if missing_cols:
         raise ValueError(
-            f"Schema mismatch for {table_name}: Parquet file has {len(parquet_cols)} "
-            f"columns ({parquet_cols}), but Redshift expects {expected_count} columns "
+            f"Schema mismatch for {table_name}: Parquet file is missing "
+            f"columns {missing_cols}. Parquet has {len(parquet_cols)} columns "
+            f"({parquet_cols}), but Redshift needs {len(base_columns)} base columns "
             f"({base_columns})."
         )
 

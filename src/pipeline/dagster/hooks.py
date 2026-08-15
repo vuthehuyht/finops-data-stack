@@ -137,14 +137,17 @@ def _notify_op_failure_of_slack(context: HookContext) -> None:
     if cluster is None:
         return
     slack = WebClient(os.getenv("DAGSTER_SLACK_API_TOKEN"))
-    slack.chat_postMessage(
-        channel=f"#dagster-{cluster}",
-        attachments=[
-            {
-                "blocks": _op_failure_message_blocks(context),
-            },
-        ],
-    )
+    try:
+        slack.chat_postMessage(
+            channel=f"#dagster-{cluster}",
+            attachments=[
+                {
+                    "blocks": _op_failure_message_blocks(context),
+                },
+            ],
+        )
+    except Exception as e:
+        context.log.error(f"Failed to send Slack alert: {e}")
 
 
 def _slack_on_op_failure_hook(
