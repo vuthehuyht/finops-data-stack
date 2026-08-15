@@ -20,7 +20,7 @@ aws eks update-kubeconfig \
 Chạy lệnh sau để map port 3000 trên máy của bạn với port 80 của Dagster Service đang chạy trong EKS:
 
 ```bash
-kubectl port-forward svc/dagster-webserver 3000:80 -n dagster
+kubectl port-forward svc/dagster-dagster-webserver 3000:80 -n dagster
 ```
 
 *(Lưu ý: Nếu bạn sử dụng phiên bản Helm Chart Dagster cũ, tên service có thể là `dagster-dagit`. Khi đó lệnh sẽ là `kubectl port-forward svc/dagster-dagit 3000:80 -n dagster`)*
