@@ -51,6 +51,12 @@ def process_table(table_dir: Path, bucket: str) -> None:  # noqa: C901
     # Uppercase all columns to match base.py
     final_df.columns = final_df.columns.str.upper()
 
+    # Ensure all columns are explicitly pandas 'string' dtype (not just object)
+    # This guarantees PyArrow creates a String schema even if the column is all nulls.
+    for col in final_df.columns:
+        final_df[col] = final_df[col].replace(["nan", "NaN", "None", "<NA>"], pd.NA)
+    final_df = final_df.astype("string")
+
     from datetime import datetime
 
     current_date = datetime.now().strftime("%Y-%m-%d")
