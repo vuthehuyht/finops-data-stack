@@ -263,7 +263,7 @@ class _OpDecorator(_DecoratorBase):
         }
 
     def _default_k8s_service_account(self) -> str | None:
-        return "dagster-sa"
+        return os.environ.get("DAGSTER_K8S_SERVICE_ACCOUNT", "dagster-sa")
 
 
 @overload
@@ -322,7 +322,7 @@ class _AssetDecorator(_DecoratorBase):
         }
 
     def _default_k8s_service_account(self) -> str | None:
-        return "dagster-sa"
+        return os.environ.get("DAGSTER_K8S_SERVICE_ACCOUNT", "dagster-sa")
 
 
 @overload
