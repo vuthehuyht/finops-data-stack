@@ -60,6 +60,7 @@ module "sagemaker" {
   project_name               = var.project_name
   environment                = var.environment
   model_artifacts_bucket_arn = "arn:aws:s3:::${module.s3.model_artifacts_bucket_id}"
+  processed_bucket_arn       = "arn:aws:s3:::${module.s3.processed_bucket_id}"
 }
 
 # Call Module Redshift Serverless (Namespace, Workgroup, Spectrum IAM role)

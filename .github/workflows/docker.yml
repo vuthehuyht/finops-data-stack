@@ -80,19 +80,22 @@ jobs:
         id: tf-outputs
         working-directory: ./infrastructure/terraform
         run: |
+          terraform output -json > tf_outputs.json
           {
-            echo "eks_cluster_name=$(terraform output -raw eks_cluster_name)"
-            echo "ecr_repository_url=$(terraform output -raw ecr_repository_url)"
-            echo "rds_address=$(terraform output -raw rds_address)"
-            echo "rds_username=$(terraform output -raw rds_username)"
-            echo "rds_dbname=$(terraform output -raw rds_dbname)"
-            echo "dagster_sa_role_arn=$(terraform output -raw dagster_sa_role_arn)"
-            echo "external_secrets_sa_role_arn=$(terraform output -raw external_secrets_sa_role_arn)"
-            echo "karpenter_controller_role_arn=$(terraform output -raw karpenter_controller_role_arn)"
-            echo "karpenter_interruption_queue_name=$(terraform output -raw karpenter_interruption_queue_name)"
-            echo "redshift_iam_role_arn=$(terraform output -raw redshift_iam_role_arn)"
-            echo "raw_bucket_id=$(terraform output -raw raw_bucket_id)"
-            echo "model_artifacts_bucket_id=$(terraform output -raw model_artifacts_bucket_id)"
+            echo "eks_cluster_name=$(jq -r '.eks_cluster_name.value // ""' tf_outputs.json)"
+            echo "ecr_repository_url=$(jq -r '.ecr_repository_url.value // ""' tf_outputs.json)"
+            echo "rds_address=$(jq -r '.rds_address.value // ""' tf_outputs.json)"
+            echo "rds_username=$(jq -r '.rds_username.value // ""' tf_outputs.json)"
+            echo "rds_dbname=$(jq -r '.rds_dbname.value // ""' tf_outputs.json)"
+            echo "dagster_sa_role_arn=$(jq -r '.dagster_sa_role_arn.value // ""' tf_outputs.json)"
+            echo "external_secrets_sa_role_arn=$(jq -r '.external_secrets_sa_role_arn.value // ""' tf_outputs.json)"
+            echo "karpenter_controller_role_arn=$(jq -r '.karpenter_controller_role_arn.value // ""' tf_outputs.json)"
+            echo "karpenter_interruption_queue_name=$(jq -r '.karpenter_interruption_queue_name.value // ""' tf_outputs.json)"
+            echo "redshift_iam_role_arn=$(jq -r '.redshift_iam_role_arn.value // ""' tf_outputs.json)"
+            echo "raw_bucket_id=$(jq -r '.raw_bucket_id.value // ""' tf_outputs.json)"
+            echo "processed_bucket_id=$(jq -r '.processed_bucket_id.value // ""' tf_outputs.json)"
+            echo "model_artifacts_bucket_id=$(jq -r '.model_artifacts_bucket_id.value // ""' tf_outputs.json)"
+            echo "sagemaker_execution_role_arn=$(jq -r '.sagemaker_execution_role_arn.value // ""' tf_outputs.json)"
           } >> "$GITHUB_OUTPUT"
 
       - name: Deploy Dagster to EKS
@@ -111,4 +114,6 @@ jobs:
           karpenter-interruption-queue-name: ${{ steps.tf-outputs.outputs.karpenter_interruption_queue_name }}
           redshift-iam-role-arn: ${{ steps.tf-outputs.outputs.redshift_iam_role_arn }}
           finops-raw-bucket: ${{ steps.tf-outputs.outputs.raw_bucket_id }}
+          finops-processed-bucket: ${{ steps.tf-outputs.outputs.processed_bucket_id }}
           finops-model-artifacts-bucket: ${{ steps.tf-outputs.outputs.model_artifacts_bucket_id }}
+          sagemaker-execution-role-arn: ${{ steps.tf-outputs.outputs.sagemaker_execution_role_arn }}

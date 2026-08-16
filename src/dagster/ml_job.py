@@ -107,7 +107,7 @@ def gold_ml_training_dataset(
     load_config: LoadJobConfigResource,
 ) -> dagster.Output[str]:
     """Export FACT_ML_FEATURE_SET (last 24 months) to S3 as Parquet."""
-    s3_url = f"s3://{s3bucket.raw_bucket}/ml-training-data/{config.run_date}/"
+    s3_url = f"s3://{s3bucket.processed_bucket}/ml-training-data/{config.run_date}/"
     with redshift.get_connection() as conn:
         with conn.cursor() as cursor:
             row_count = unload_training_dataset(

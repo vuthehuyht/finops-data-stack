@@ -39,7 +39,9 @@ resource "aws_iam_policy" "sagemaker_s3" {
         ]
         Resource = [
           var.model_artifacts_bucket_arn,
-          "${var.model_artifacts_bucket_arn}/*"
+          "${var.model_artifacts_bucket_arn}/*",
+          var.processed_bucket_arn,
+          "${var.processed_bucket_arn}/*"
         ]
       }
     ]

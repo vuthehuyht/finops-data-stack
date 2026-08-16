@@ -224,6 +224,7 @@ def test_ml_daily_forecast_runs_batch_transform_successfully() -> None:
 
     mock_s3bucket = unittest.mock.MagicMock()
     mock_s3bucket.raw_bucket = "finops-raw-bucket-dev"
+    mock_s3bucket.processed_bucket = "finops-processed-bucket-dev"
 
     mock_s3 = unittest.mock.MagicMock()
     mock_s3_client = unittest.mock.MagicMock()
@@ -256,7 +257,7 @@ def test_ml_daily_forecast_runs_batch_transform_successfully() -> None:
     assert result.value["results"][0] == {"ticker": "AAA", "predicted_return": 0.05}
     assert result.value["results"][1] == {"ticker": "BBB", "predicted_return": -0.02}
     assert result.value["output_s3_uri"] == (
-        "s3://finops-raw-bucket-dev/ml-inference-output/2026-07-03/input.jsonl.out"
+        "s3://finops-processed-bucket-dev/ml-inference-output/2026-07-03/input.jsonl.out"
     )
 
     mock_sagemaker.create_model_if_not_exists.assert_called_once_with(

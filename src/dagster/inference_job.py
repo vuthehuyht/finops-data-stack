@@ -203,12 +203,12 @@ def ml_daily_forecast(  # noqa: C901
         # 3. Upload JSONL file to S3
         input_key = f"ml-inference-input/{validated_date}/input.jsonl"
         s3_client = s3.get_client()
-        s3_client.upload_file(local_input_path, s3bucket.raw_bucket, input_key)
+        s3_client.upload_file(local_input_path, s3bucket.processed_bucket, input_key)
 
         # 4. Run Batch Transform Job
-        input_s3_uri = f"s3://{s3bucket.raw_bucket}/{input_key}"
+        input_s3_uri = f"s3://{s3bucket.processed_bucket}/{input_key}"
         output_prefix = f"ml-inference-output/{validated_date}/"
-        output_s3_uri = f"s3://{s3bucket.raw_bucket}/{output_prefix}"
+        output_s3_uri = f"s3://{s3bucket.processed_bucket}/{output_prefix}"
         job_name = f"finops-forecast-{validated_date}-{int(time.time())}"
 
         context.log.info("Starting SageMaker Batch Transform Job: %s", job_name)
@@ -225,7 +225,9 @@ def ml_daily_forecast(  # noqa: C901
         # 5. Download output results to local
         output_key = f"{output_prefix}input.jsonl.out"
         local_output_path = os.path.join(tmpdir, "output.jsonl.out")
-        s3_client.download_file(s3bucket.raw_bucket, output_key, local_output_path)
+        s3_client.download_file(
+            s3bucket.processed_bucket, output_key, local_output_path
+        )
 
         # 6. Read results — output.jsonl.out is now self-contained
         # ({"ticker": ..., "predicted_return": ...} per line), no position

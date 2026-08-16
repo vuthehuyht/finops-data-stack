@@ -12,3 +12,8 @@ variable "model_artifacts_bucket_arn" {
   type        = string
   description = "The ARN of the S3 bucket storing model artifacts"
 }
+
+variable "processed_bucket_arn" {
+  type        = string
+  description = "The ARN of the S3 bucket storing processed data (ML training data)"
+}
