@@ -15,6 +15,8 @@ data "aws_subnets" "default" {
 
 data "aws_region" "current" {}
 
+data "aws_caller_identity" "current" {}
+
 # ==============================================================================
 # 2. SECURITY GROUP (Public Ingress for CI Runner)
 # ==============================================================================
@@ -122,4 +124,47 @@ resource "aws_redshiftserverless_usage_limit" "monthly_cost_cap" {
   amount        = var.monthly_cost_cap_usd
   period        = "monthly"
   breach_action = "deactivate"
+}
+
+# ==============================================================================
+# 5. S3 BUCKET FOR CI DATA
+# ==============================================================================
+
+resource "aws_s3_bucket" "ci_data" {
+  bucket        = "${var.project_name}-ci-data-${data.aws_caller_identity.current.account_id}"
+  force_destroy = true
+
+  tags = {
+    Environment = var.environment
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "ci_data" {
+  bucket = aws_s3_bucket.ci_data.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_iam_role_policy" "redshift_s3_ci_data_full_access" {
+  name = "${var.project_name}-redshift-s3-ci-data"
+  role = aws_iam_role.redshift_s3.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "s3:*"
+        ]
+        Effect = "Allow"
+        Resource = [
+          aws_s3_bucket.ci_data.arn,
+          "${aws_s3_bucket.ci_data.arn}/*"
+        ]
+      }
+    ]
+  })
 }

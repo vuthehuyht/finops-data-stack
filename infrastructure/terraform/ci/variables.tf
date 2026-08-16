@@ -4,6 +4,12 @@ variable "aws_region" {
   description = "AWS region to deploy CI resources"
 }
 
+variable "aws_profile" {
+  type        = string
+  default     = "default"
+  description = "AWS CLI profile to use for authentication"
+}
+
 variable "project_name" {
   type        = string
   default     = "finops-ci"

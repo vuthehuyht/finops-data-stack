@@ -5,7 +5,9 @@ import os
 import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import boto3
 import pandas as pd
@@ -57,9 +59,48 @@ def process_table(table_dir: Path, bucket: str) -> None:  # noqa: C901
         final_df[col] = final_df[col].replace(["nan", "NaN", "None", "<NA>"], pd.NA)
     final_df = final_df.astype("string")
 
-    from datetime import datetime
+    # =========================================================================
+    # REORDER COLUMNS TO MATCH REDSHIFT DDL (REQUIRED FOR PARQUET COPY BY POSITION)
+    # =========================================================================
+    ddl_path = Path(f"src/redshift/ddl/raw/RAW_{table_name.upper()}.sql.jinja")
+    if ddl_path.exists():
+        with open(ddl_path, encoding="utf-8") as f:
+            ddl_content = f.read()
 
-    current_date = datetime.now().strftime("%Y-%m-%d")
+        expected_columns = []
+        for line in ddl_content.split("\n"):
+            line = line.strip()
+            # Skip empty lines, comments, CREATE, DROP, and trailing parenthesis
+            if (
+                not line
+                or line.startswith("--")
+                or line.startswith("CREATE")
+                or line.startswith("DROP")
+                or line.startswith(")")
+            ):
+                continue
+
+            # Extract column name (first word, stripping quotes and commas)
+            col_name = line.split()[0].replace('"', "").replace(",", "").strip().lower()
+
+            # Skip metadata columns and batch_date which are handled separately
+            if col_name.startswith("_conata_") or col_name == "batch_date":
+                continue
+
+            if col_name:
+                expected_columns.append(col_name)
+
+        if expected_columns:
+            print(f"  [INFO] Reordering columns to match DDL: {expected_columns}")
+            # Add missing columns with NA
+            for col in expected_columns:
+                if col not in final_df.columns:
+                    final_df[col] = pd.NA
+
+            # Keep only expected columns in the exact order specified by the DDL
+            final_df = final_df[expected_columns]
+
+    current_date = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).strftime("%Y-%m-%d")
 
     # Truncate string columns to prevent Redshift COPY Parquet length limit errors.
     # Use native .str.slice to preserve StringDtype instead of .apply() which

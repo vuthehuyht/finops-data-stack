@@ -97,12 +97,12 @@ dev_local:
 ci_up:
 	@echo "Initializing CI resources in Default VPC..."
 	terraform -chdir=infrastructure/terraform/ci init
-	terraform -chdir=infrastructure/terraform/ci apply -auto-approve
+	terraform -chdir=infrastructure/terraform/ci apply -auto-approve -var="aws_profile=$(PROFILE)"
 
 # Destroy CI resources (Terraform)
 ci_down:
 	@echo "Destroying CI resources..."
-	terraform -chdir=infrastructure/terraform/ci destroy -auto-approve
+	terraform -chdir=infrastructure/terraform/ci destroy -auto-approve -var="aws_profile=$(PROFILE)"
 
 # Allow command syntax: make ci up or make ci down
 ci:
