@@ -1,14 +1,15 @@
 """Unit tests for the BaseClient retry and rate limiting capabilities."""
 
 import time
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 
 from src.ingest.client.base_client import BaseClient
 
 
-def test_base_client_retry_success_eventually() -> None:
+@patch("tenacity.nap.time.sleep")
+def test_base_client_retry_success_eventually(mock_sleep: Mock) -> None:
     """Verify that BaseClient retries on failure and returns when successful."""
     client = BaseClient(request_delay_seconds=0.0)  # disable delay for fast test
     mock_func = Mock()
@@ -26,7 +27,8 @@ def test_base_client_retry_success_eventually() -> None:
     assert mock_func.call_count == 3
 
 
-def test_base_client_retry_exhausted() -> None:
+@patch("tenacity.nap.time.sleep")
+def test_base_client_retry_exhausted(mock_sleep: Mock) -> None:
     """Verify that BaseClient propagates the error when retries are exhausted."""
     client = BaseClient(request_delay_seconds=0.0)
     mock_func = Mock()

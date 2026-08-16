@@ -256,6 +256,22 @@ def define_load_jobs() -> LoadJobBundle:
         job = dagster_lib.define_asset_job(
             job_name,
             selection=[asset],
+            k8s_config={
+                "container_config": {
+                    "resources": {
+                        "requests": {
+                            "cpu": "1",
+                            "memory": "2Gi",
+                            "ephemeral-storage": "1Gi",
+                        },
+                        "limits": {
+                            "cpu": "2",
+                            "memory": "4Gi",
+                            "ephemeral-storage": "2Gi",
+                        },
+                    }
+                }
+            },
             tags={
                 "limit_concurrent_job_runs_to_1": job_name,
                 "type": "load",
@@ -320,8 +336,16 @@ def define_load_jobs() -> LoadJobBundle:
         k8s_config={
             "container_config": {
                 "resources": {
-                    "requests": {"cpu": "2", "memory": "4Gi"},
-                    "limits": {"cpu": "4", "memory": "8Gi"},
+                    "requests": {
+                        "cpu": "2",
+                        "memory": "4Gi",
+                        "ephemeral-storage": "5Gi",
+                    },
+                    "limits": {
+                        "cpu": "4",
+                        "memory": "8Gi",
+                        "ephemeral-storage": "10Gi",
+                    },
                 }
             }
         },
