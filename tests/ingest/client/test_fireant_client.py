@@ -62,8 +62,11 @@ def test_login_raises_value_error_when_no_token_in_response(
         client._login("user@test.com", "pass")
 
 
+@patch("tenacity.nap.time.sleep")
 @patch("src.ingest.client.fireant_client.requests.post")
-def test_login_raises_http_error_on_bad_credentials(mock_post: MagicMock) -> None:
+def test_login_raises_http_error_on_bad_credentials(
+    mock_post: MagicMock, mock_sleep: MagicMock
+) -> None:
     """HTTP 401 from login propagates as HTTPError."""
     mock_post.return_value.raise_for_status.side_effect = requests.HTTPError(
         "401 Unauthorized"
@@ -99,8 +102,11 @@ def test_fetch_page_sends_correct_params(mock_get: MagicMock) -> None:
     assert kwargs["params"]["limit"] == _PAGE_SIZE
 
 
+@patch("tenacity.nap.time.sleep")
 @patch("src.ingest.client.fireant_client.requests.get")
-def test_fetch_page_raises_on_http_error(mock_get: MagicMock) -> None:
+def test_fetch_page_raises_on_http_error(
+    mock_get: MagicMock, mock_sleep: MagicMock
+) -> None:
     """HTTP error from /reports/search propagates as HTTPError."""
     mock_get.return_value.raise_for_status.side_effect = requests.HTTPError("500")
 

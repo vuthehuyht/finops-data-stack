@@ -1,3 +1,4 @@
+DROP TABLE IF EXISTS "{{ schema_name_raw }}"."RAW_EXCHANGE_RATES";
 -- Recreate RAW table: RAW_EXCHANGE_RATES
 CREATE TABLE IF NOT EXISTS "{{ schema_name_raw }}"."RAW_EXCHANGE_RATES" (
   PAIR VARCHAR(256),

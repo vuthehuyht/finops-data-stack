@@ -340,13 +340,21 @@ def _process_dbt_event(
         yield dagster_event
 
 
-def get_k8s_config(required_memory_gib: int = 3) -> dict[str, Any]:
+def get_k8s_config(required_memory_gib: int = 1) -> dict[str, Any]:
     """Generate minimal K8s resources requirements config."""
     return {
         "container_config": {
             "resources": {
-                "requests": {"memory": f"{required_memory_gib}Gi", "cpu": "500m"},
-                "limits": {"memory": f"{required_memory_gib}Gi", "cpu": "1000m"},
+                "requests": {
+                    "memory": f"{required_memory_gib}Gi",
+                    "cpu": "500m",
+                    "ephemeral-storage": "1Gi",
+                },
+                "limits": {
+                    "memory": f"{required_memory_gib}Gi",
+                    "cpu": "1000m",
+                    "ephemeral-storage": "1Gi",
+                },
             }
         }
     }
@@ -370,7 +378,7 @@ def get_dbt_project_assets(
                 enable_code_references=True
             )
         ),
-        k8s_config=get_k8s_config(3),
+        k8s_config=get_k8s_config(1),
         select=select,
         exclude=exclude,
         partitions_def=dagster.DailyPartitionsDefinition(

@@ -1,3 +1,4 @@
+DROP TABLE IF EXISTS "{{ schema_name_raw }}"."RAW_FOREIGN_TRADING";
 -- Recreate RAW table: RAW_FOREIGN_TRADING
 CREATE TABLE IF NOT EXISTS "{{ schema_name_raw }}"."RAW_FOREIGN_TRADING" (
   TICKER VARCHAR(256),

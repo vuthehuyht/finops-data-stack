@@ -39,12 +39,15 @@ def _validate_parquet_schema_count(
 
     obj_response = s3.get_object(Bucket=bucket, Key=parquet_keys[0])
     parquet_file = pq.ParquetFile(io.BytesIO(obj_response["Body"].read()))
-    parquet_cols = parquet_file.schema.names
+    parquet_cols = [c.lower() for c in parquet_file.schema.names]
 
-    if len(parquet_cols) != expected_count:
+    missing_cols = set(base_columns) - set(parquet_cols)
+
+    if missing_cols:
         raise ValueError(
-            f"Schema mismatch for {table_name}: Parquet file has {len(parquet_cols)} "
-            f"columns ({parquet_cols}), but Redshift expects {expected_count} columns "
+            f"Schema mismatch for {table_name}: Parquet file is missing "
+            f"columns {missing_cols}. Parquet has {len(parquet_cols)} columns "
+            f"({parquet_cols}), but Redshift needs {len(base_columns)} base columns "
             f"({base_columns})."
         )
 
@@ -59,6 +62,7 @@ def _build_copy_query(
     s3_url: str,
     file_format: str,
     iam_role_arn: str,
+    has_super_column: bool = False,
 ) -> str:
     """Dynamically construct a Redshift COPY query based on the file format.
 
@@ -67,6 +71,7 @@ def _build_copy_query(
         s3_url: S3 prefix or file path containing the data.
         file_format: The file format ('parquet', 'json', 'csv').
         iam_role_arn: IAM Role ARN with S3 read access.
+        has_super_column: True if the target table contains a SUPER type column.
 
     Returns:
         A complete SQL COPY query.
@@ -76,7 +81,10 @@ def _build_copy_query(
 
     fmt = file_format.lower()
     if fmt == "parquet":
-        format_clause = "FORMAT AS PARQUET"
+        if has_super_column:
+            format_clause = "FORMAT AS PARQUET SERIALIZETOJSON"
+        else:
+            format_clause = "FORMAT AS PARQUET"
     elif fmt == "json":
         format_clause = "FORMAT AS JSON 'auto'\nTIMEFORMAT 'auto'"
     elif fmt == "csv":
@@ -133,29 +141,34 @@ def load_s3_to_redshift(  # noqa: C901
     # Quote the target table to prevent reserved keyword conflicts (e.g. 'raw')
     target_table_quoted = f'"{schema}"."{table_name}"'
 
-    # Get column names to handle schema evolution / missing columns
+    # Get column names and types to handle schema evolution / missing columns
     get_cols_query = f"""
-        SELECT column_name
+        SELECT column_name, data_type
         FROM information_schema.columns
         WHERE table_schema = '{schema}'
         AND table_name = '{table_name.lower()}'
         ORDER BY ordinal_position;
     """
     execute_query(cursor, get_cols_query)
-    all_columns = [row[0].upper() for row in cursor.fetchall()]
+    columns_info = cursor.fetchall()
+    all_columns = [row[0].lower() for row in columns_info]
+    has_super_column = any(row[1].lower() == "super" for row in columns_info)
 
     if not all_columns:
         raise ValueError(f"No columns found for {target_table}. Ensure table exists.")
 
     base_columns = [
-        c for c in all_columns if not c.startswith("_CONATA_") and c != "BATCH_DATE"
+        c for c in all_columns if not c.startswith("_conata_") and c != "batch_date"
     ]
     base_cols_str = ", ".join(f'"{c}"' for c in base_columns)
 
-    # 1. Create a temporary staging table mimicking the target table structure
-    create_temp_query = (
-        f"CREATE TEMPORARY TABLE {temp_table} (LIKE {target_table_quoted});"
-    )
+    # 1. Create a temporary staging table with EXACTLY the base columns.
+    create_temp_query = f"""
+        CREATE TEMPORARY TABLE {temp_table} AS
+        SELECT {base_cols_str}
+        FROM {target_table_quoted}
+        WHERE 1=0;
+    """
     execute_query(cursor, create_temp_query)
 
     # 2. Add validation to ensure source data column count matches target base columns
@@ -163,6 +176,8 @@ def load_s3_to_redshift(  # noqa: C901
         _validate_parquet_schema_count(
             s3_url, len(base_columns), table_name, base_columns
         )
+
+    if file_format.lower() == "parquet":
         temp_table_with_cols = temp_table
     else:
         temp_table_with_cols = f"{temp_table} ({base_cols_str})"
@@ -172,34 +187,43 @@ def load_s3_to_redshift(  # noqa: C901
         s3_url=s3_url,
         file_format=file_format,
         iam_role_arn=iam_role_arn,
+        has_super_column=has_super_column,
     )
     execute_query(cursor, copy_query)
 
     # 3. Append data from the temporary table to the target table, injecting metadata
     select_items = []
     for col in all_columns:
-        if col == "BATCH_DATE":
+        if col == "batch_date":
             val = f"'{batch_date}'" if batch_date else "NULL"
-            select_items.append(f"{val} AS BATCH_DATE")
-        elif col == "_CONATA_SOURCE":
-            select_items.append(f"'{s3_url}' AS _CONATA_SOURCE")
-        elif col == "_CONATA_SOURCE_ROW_NUMBER":
+            select_items.append(f"{val} AS batch_date")
+        elif col == "_conata_source":
+            select_items.append(f"'{s3_url}' AS _conata_source")
+        elif col == "_conata_source_row_number":
             select_items.append(
-                "ROW_NUMBER() OVER(ORDER BY 1) AS _CONATA_SOURCE_ROW_NUMBER"
+                "ROW_NUMBER() OVER(ORDER BY 1) AS _conata_source_row_number"
             )
-        elif col == "_CONATA_PARTITION_KEY":
+        elif col == "_conata_partition_key":
             val = f"'{batch_date}'" if batch_date else "NULL"
-            select_items.append(f"{val} AS _CONATA_PARTITION_KEY")
-        elif col == "_CONATA_LOADED_AT":
-            select_items.append("SYSDATE AS _CONATA_LOADED_AT")
+            select_items.append(f"{val} AS _conata_partition_key")
+        elif col == "_conata_loaded_at":
+            select_items.append("SYSDATE AS _conata_loaded_at")
         else:
             select_items.append(f'"{col}"')
 
     select_clause = ", ".join(select_items)
 
-    # Xoá toàn bộ dữ liệu cũ trong bảng để tránh duplicate khi load lại toàn bộ dữ liệu
-    truncate_query = f"TRUNCATE TABLE {target_table_quoted};"
-    execute_query(cursor, truncate_query)
+    # Delete existing records for this partition to ensure idempotency
+    if batch_date:
+        delete_query = (
+            f"DELETE FROM {target_table_quoted} "
+            f"WHERE _CONATA_PARTITION_KEY = '{batch_date}';"
+        )
+        execute_query(cursor, delete_query)
+    else:
+        # Truncate the table if no batch_date is provided (Full Load)
+        truncate_query = f"TRUNCATE TABLE {target_table_quoted};"
+        execute_query(cursor, truncate_query)
 
     insert_query = (
         f"INSERT INTO {target_table_quoted} SELECT {select_clause} FROM {temp_table};"

@@ -9,7 +9,7 @@
 
 SELECT
   COMMODITY_NAME::VARCHAR(256) AS COMMODITY_NAME,
-  DATE::DATE AS DATE,
+  NULLIF(NULLIF(LOWER(DATE), 'nan'), '')::DATE AS DATE,
   NULLIF(NULLIF(LOWER(PRICE), 'nan'), '')::NUMERIC(38, 4) AS PRICE,
   {{ datacore_common_metadata() }}
 FROM {{ latest_source(source("RAW", "RAW_COMMODITIES_PRICE"), ['COMMODITY_NAME','DATE']) }}

@@ -73,21 +73,27 @@ class PrometheusResource:
         This method sets "dagster_job" and "op" labels as grouping keys of the metrics.
         """
         if on_k8s():
-            prometheus_client.push_to_gateway(
-                gateway=self.GATEWAY,
-                job="dagster",
-                registry=self.registry,
-                grouping_key=_add_custom_grouping_key_from_env(
-                    {
-                        "workspace": os.environ["DAGSTER_WORKSPACE_NAME"],
-                        # For the label name (which is also used as a grouping key),
-                        # we avoid `job` since it'd be masked by the value passed above;
-                        # use `dagster_job` instead.
-                        "dagster_job": job_name,
-                        "op": op_name,
-                    }
-                ),
-            )
+            try:
+                prometheus_client.push_to_gateway(
+                    gateway=self.GATEWAY,
+                    job="dagster",
+                    registry=self.registry,
+                    grouping_key=_add_custom_grouping_key_from_env(
+                        {
+                            "workspace": os.environ.get(
+                                "DAGSTER_WORKSPACE_NAME", "finops"
+                            ),
+                            # For the label name, we avoid `job` since it'd be
+                            # masked by the value passed above;
+                            # use `dagster_job` instead.
+                            "dagster_job": job_name,
+                            "op": op_name,
+                        }
+                    ),
+                )
+            except Exception:
+                # Bỏ qua lỗi nếu hệ thống chưa cài Prometheus Pushgateway
+                pass
         else:
             j = LOCAL_METRICS_STORAGE.get(job_name, {})
             LOCAL_METRICS_STORAGE[job_name] = j
@@ -104,17 +110,22 @@ class PrometheusResource:
         This method sets "sensor_name" label as grouping keys of the metrics.
         """
         if on_k8s():
-            prometheus_client.push_to_gateway(
-                gateway=self.GATEWAY,
-                job="dagster",
-                registry=self.registry,
-                grouping_key=_add_custom_grouping_key_from_env(
-                    {
-                        "workspace": os.environ["DAGSTER_WORKSPACE_NAME"],
-                        "sensor": sensor_name,
-                    }
-                ),
-            )
+            try:
+                prometheus_client.push_to_gateway(
+                    gateway=self.GATEWAY,
+                    job="dagster",
+                    registry=self.registry,
+                    grouping_key=_add_custom_grouping_key_from_env(
+                        {
+                            "workspace": os.environ.get(
+                                "DAGSTER_WORKSPACE_NAME", "finops"
+                            ),
+                            "sensor": sensor_name,
+                        }
+                    ),
+                )
+            except Exception:
+                pass
         else:
             s = LOCAL_METRICS_STORAGE.get(sensor_name, {})
             LOCAL_METRICS_STORAGE[sensor_name] = s

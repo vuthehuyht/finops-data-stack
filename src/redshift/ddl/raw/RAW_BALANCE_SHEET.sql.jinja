@@ -1,3 +1,4 @@
+DROP TABLE IF EXISTS "{{ schema_name_raw }}"."RAW_BALANCE_SHEET";
 -- Recreate RAW table: RAW_BALANCE_SHEET
 CREATE TABLE IF NOT EXISTS "{{ schema_name_raw }}"."RAW_BALANCE_SHEET" (
   TICKER VARCHAR(256),

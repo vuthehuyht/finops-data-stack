@@ -89,9 +89,11 @@ def test_vnstock_client_get_stock_price_eod_accepts_custom_source(
     assert call_kwargs["source"] == "KBS"
 
 
+@patch("tenacity.nap.time.sleep")
 @patch("src.ingest.client.vnstock_client.Vnstock")
 def test_vnstock_client_get_stock_price_eod_propagates_error(
     mock_vnstock_class: MagicMock,
+    mock_sleep: MagicMock,
 ) -> None:
     """Verify get_stock_price_eod propagates API errors after retries."""
     mock_vnstock = MagicMock()
@@ -135,9 +137,11 @@ def test_vnstock_client_get_company_news_returns_dataframe(
     assert result.equals(mock_df)
 
 
+@patch("tenacity.nap.time.sleep")
 @patch("src.ingest.client.vnstock_client.Vnstock")
 def test_vnstock_client_get_company_news_propagates_error(
     mock_vnstock_class: MagicMock,
+    mock_sleep: MagicMock,
 ) -> None:
     """Verify get_company_news propagates API errors."""
     mock_vnstock = MagicMock()

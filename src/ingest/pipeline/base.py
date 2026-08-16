@@ -1,7 +1,6 @@
 """Base ingestion pipeline defining abstract lifecycle for S3 storage upload."""
 
 import abc
-import datetime
 import logging
 import os
 import tempfile
@@ -122,7 +121,6 @@ class BaseIngestPipeline(abc.ABC):
         1. Uppercase all column names from source.
         2. Retain only columns declared in `schema_columns` (uppercased).
         3. Fill any missing declared columns with None and warn.
-        4. Inject _CONATA_* metadata columns at the end.
 
         Args:
             df: Raw DataFrame retrieved from fetch().
@@ -154,12 +152,12 @@ class BaseIngestPipeline(abc.ABC):
         # Reorder to schema order, dropping any extra columns
         result_df = result_df[expected_cols]
 
-        # Inject metadata columns
-        result_df["BATCH_DATE"] = self.batch_date
-        result_df["_CONATA_SOURCE"] = self.source_uri_prefix
-        result_df["_CONATA_SOURCE_ROW_NUMBER"] = range(1, len(result_df) + 1)
-        result_df["_CONATA_PARTITION_KEY"] = self.batch_date
-        result_df["_CONATA_LOADED_AT"] = pd.Timestamp.now(tz=datetime.UTC)
+        # Truncate string columns to prevent Redshift COPY Parquet length limit errors
+        # Safe length is 16000 chars for 65535 bytes (4 bytes max per utf-8 char)
+        for col in result_df.select_dtypes(include=["object", "string"]).columns:
+            result_df[col] = result_df[col].apply(
+                lambda x: x[:16000] if isinstance(x, str) else x
+            )
 
         return result_df
 

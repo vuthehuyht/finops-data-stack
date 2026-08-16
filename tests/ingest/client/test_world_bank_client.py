@@ -80,9 +80,11 @@ def test_world_bank_client_get_indicator_returns_empty_when_malformed(
     assert result == []
 
 
+@patch("tenacity.nap.time.sleep")
 @patch("src.ingest.client.world_bank_client.httpx.get")
 def test_world_bank_client_get_indicator_raises_on_http_error(
     mock_get: MagicMock,
+    mock_sleep: MagicMock,
 ) -> None:
     """Verify get_indicator raises on non-2xx HTTP response."""
     mock_get.return_value = _mock_response({}, status_code=503)
