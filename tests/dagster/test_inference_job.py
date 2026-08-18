@@ -146,7 +146,7 @@ def test_ml_data_quality_gate_raises_on_null_rate_breach() -> None:
     from src.dagster.inference_job import MlInferenceGateConfig, ml_data_quality_gate
     from src.ml.config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS
 
-    row = {"TRADING_DATE": "2026-07-03", "TICKER": "AAA"}
+    row = {"trading_date": "2026-07-03", "ticker": "AAA"}
     for column in SEQUENCE_FEATURE_COLUMNS + TABULAR_FEATURE_COLUMNS:
         row[column] = None
     df = pd.DataFrame([row])
@@ -165,7 +165,7 @@ def test_ml_data_quality_gate_passes_and_returns_trading_date() -> None:
     from src.dagster.inference_job import MlInferenceGateConfig, ml_data_quality_gate
     from src.ml.config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS
 
-    row = {"TRADING_DATE": "2026-07-03", "TICKER": "AAA"}
+    row = {"trading_date": "2026-07-03", "ticker": "AAA"}
     for column in SEQUENCE_FEATURE_COLUMNS + TABULAR_FEATURE_COLUMNS:
         row[column] = 1.0
     df = pd.DataFrame([row])
@@ -192,7 +192,7 @@ def _build_ticker_block(ticker: str, end_date: str) -> pd.DataFrame:
     dates = pd.date_range(end=end_date, periods=WINDOW_SIZE)
     rows = []
     for date in dates:
-        row = {"TICKER": ticker, "TRADING_DATE": date}
+        row = {"ticker": ticker, "trading_date": date}
         for column in SEQUENCE_FEATURE_COLUMNS + TABULAR_FEATURE_COLUMNS:
             row[column] = 1.0
         rows.append(row)
@@ -272,7 +272,7 @@ def test_ml_daily_forecast_raises_when_no_valid_tickers() -> None:
     from src.dagster.inference_job import ml_daily_forecast
 
     # Ticker rỗng
-    df = pd.DataFrame(columns=["TICKER", "TRADING_DATE"])
+    df = pd.DataFrame(columns=["ticker", "trading_date"])
 
     mock_redshift = unittest.mock.MagicMock()
     mock_redshift.get_connection.return_value.__enter__.return_value = (
