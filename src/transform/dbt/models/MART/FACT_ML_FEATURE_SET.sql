@@ -1,7 +1,9 @@
 {{
   config(
-    materialized='table',
-    unique_key=['TICKER', 'TRADING_DATE']
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key=['TICKER', 'TRADING_DATE'],
+    merge_exclude_columns=['DATACORE_CREATE_DATETIME', 'DATACORE_CREATE_PROGRAM', 'DATACORE_CREATE_BY']
   )
 }}
 
@@ -26,6 +28,9 @@ WITH BASE AS (
       ROWS BETWEEN 1 FOLLOWING AND 10 FOLLOWING
     ) AS MAX_CLOSE_NEXT_10D
   FROM {{ ref('STG_STOCK_PRICE_EOD') }}
+  {% if is_incremental() %}
+  WHERE BATCH_DATE = {{ current_batch_date() }}
+  {% endif %}
 )
 
 SELECT

@@ -238,7 +238,7 @@ def test_sagemaker_resource_run_batch_transform_job() -> None:
             "AssembleWith": "Line",
         },
         TransformResources={
-            "InstanceType": "ml.m5.large",
+            "InstanceType": "ml.g4dn.xlarge",
             "InstanceCount": 1,
         },
     )
