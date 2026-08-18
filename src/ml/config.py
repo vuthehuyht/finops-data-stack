@@ -27,10 +27,6 @@ TABULAR_FEATURE_COLUMNS = [
     "pb_ratio",
     "roe",
     "roa",
-    "price_momentum_1m",
-    "price_momentum_3m",
-    "volatility_30d",
-    "relative_strength_vs_vnindex",
     "revenue_growth_yoy",
     "net_profit_growth_yoy",
     "gross_margin",
@@ -46,4 +42,4 @@ LSTM_HIDDEN_SIZE = 64
 LSTM_NUM_LAYERS = 1
 MLP_HIDDEN_SIZES = (32, 16)
 FUSION_HIDDEN_SIZE = 32
-DROPOUT_RATE = 0.2
+DROPOUT_RATE = 0.4

@@ -39,6 +39,7 @@ class TimeSeriesBranch(nn.Module):
         num_layers: int = LSTM_NUM_LAYERS,
     ) -> None:
         super().__init__()
+        self.norm = nn.LayerNorm(input_size)
         self.lstm = nn.LSTM(
             input_size=input_size,
             hidden_size=hidden_size,
@@ -48,6 +49,7 @@ class TimeSeriesBranch(nn.Module):
 
     def forward(self, sequence: torch.Tensor) -> torch.Tensor:
         """Args: sequence of shape (batch, window_size, input_size)."""
+        sequence = self.norm(sequence)
         _, (last_hidden, _) = self.lstm(sequence)
         return last_hidden[-1]
 
@@ -62,10 +64,11 @@ class TabularBranch(nn.Module):
         dropout_rate: float = DROPOUT_RATE,
     ) -> None:
         super().__init__()
-        layers: list[nn.Module] = []
+        layers: list[nn.Module] = [nn.BatchNorm1d(input_size)]
         in_size = input_size
         for hidden_size in hidden_sizes:
             layers.append(nn.Linear(in_size, hidden_size))
+            layers.append(nn.BatchNorm1d(hidden_size))
             layers.append(nn.ReLU())
             layers.append(nn.Dropout(dropout_rate))
             in_size = hidden_size
