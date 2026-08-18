@@ -4,6 +4,7 @@ import datetime
 import json
 from dataclasses import dataclass, field
 
+import botocore.exceptions
 import dagster
 import pydantic
 from dagster_aws.s3 import S3Resource
@@ -257,12 +258,21 @@ def ml_model_evaluation(
 
     champion_version = ssm.get_parameter(_ACTIVE_VERSION_PARAM)
     champion_metrics = None
-    if champion_version is not None:
+    if champion_version is not None and champion_version != "none":
         champion_key = f"{model_version_prefix(champion_version)}metadata.json"
-        champion_body = s3_client.get_object(Bucket=target_bucket, Key=champion_key)[
-            "Body"
-        ].read()
-        champion_metrics = json.loads(champion_body)["metrics"]
+        try:
+            champion_body = s3_client.get_object(
+                Bucket=target_bucket, Key=champion_key
+            )["Body"].read()
+            champion_metrics = json.loads(champion_body)["metrics"]
+        except botocore.exceptions.ClientError as e:
+            if e.response["Error"]["Code"] == "NoSuchKey":
+                context.log.warning(
+                    f"Champion metadata not found for version {champion_version}. "
+                    "Treating as no existing champion."
+                )
+            else:
+                raise
 
     threshold_param = ssm.get_parameter(_EVALUATION_THRESHOLD_PARAM)
     threshold = (

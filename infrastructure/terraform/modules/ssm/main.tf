@@ -1,8 +1,12 @@
 resource "aws_ssm_parameter" "model_active_version" {
   name        = "/${var.project_name}/model/active_version"
   type        = "String"
-  value       = "v1"
+  value       = "none"
   description = "The active deployed version of the ML model"
+
+  lifecycle {
+    ignore_changes = [value]
+  }
 
   tags = {
     Environment = var.environment
@@ -14,6 +18,10 @@ resource "aws_ssm_parameter" "model_endpoint_name" {
   type        = "String"
   value       = "pending"
   description = "The active SageMaker Serverless Inference Endpoint name"
+
+  lifecycle {
+    ignore_changes = [value]
+  }
 
   tags = {
     Environment = var.environment

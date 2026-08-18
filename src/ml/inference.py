@@ -31,8 +31,8 @@ except ImportError:
     # — config.py is a plain sibling of inference.py in that directory.
     from config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS
 
-_DATE_COLUMN = "TRADING_DATE"
-_TICKER_COLUMN = "TICKER"
+_DATE_COLUMN = "trading_date"
+_TICKER_COLUMN = "ticker"
 
 
 def next_trading_day(anchor_date: datetime.date) -> datetime.date:

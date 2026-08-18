@@ -99,7 +99,7 @@ def ml_data_quality_gate(
     if len(df) == 0:
         raise ValueError(f"{_FEATURE_TABLE} has no rows; cannot run inference.")
 
-    trading_date = _validate_iso_date(df["TRADING_DATE"].iloc[0])
+    trading_date = _validate_iso_date(df["trading_date"].iloc[0])
     null_rates = check_feature_null_rate(
         df,
         SEQUENCE_FEATURE_COLUMNS + TABULAR_FEATURE_COLUMNS,
@@ -173,7 +173,7 @@ def ml_daily_forecast(  # noqa: C901
         )
 
     tickers = sorted(
-        df.loc[df["TRADING_DATE"] == pd.Timestamp(validated_date), "TICKER"].unique()
+        df.loc[df["trading_date"] == pd.Timestamp(validated_date), "ticker"].unique()
     )
 
     results = []
