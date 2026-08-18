@@ -248,7 +248,7 @@ def define_silver_jobs() -> SilverJobBundle:
     if sensor_jobs:
         bundle.sensors.append(
             _create_sensor_for_jobs(
-                "silver_job_sensor", all_upstream_keys, sensor_jobs, asset_to_upstream
+                "stg_job_sensor", all_upstream_keys, sensor_jobs, asset_to_upstream
             )
         )
 

@@ -29,7 +29,7 @@ WITH BASE AS (
     ) AS MAX_CLOSE_NEXT_10D
   FROM {{ ref('STG_STOCK_PRICE_EOD') }}
   {% if is_incremental() %}
-  WHERE BATCH_DATE = {{ current_batch_date() }}
+    WHERE BATCH_DATE = {{ current_batch_date() }}
   {% endif %}
 )
 

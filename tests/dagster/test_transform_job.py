@@ -98,7 +98,7 @@ def test_define_silver_jobs_asset_keys() -> None:
 
 def test_define_silver_jobs_sensor_name() -> None:
     bundle = define_silver_jobs()
-    assert bundle.sensors[0].name == "silver_job_sensor"
+    assert bundle.sensors[0].name == "stg_job_sensor"
 
 
 def test_transform_schedule_evaluates() -> None:
