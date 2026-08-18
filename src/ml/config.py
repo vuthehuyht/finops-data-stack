@@ -12,11 +12,17 @@ MODEL_NAME = "finops-multimodal-regressor"
 TARGET_COLUMN = "label_next_5d_return"
 
 # Daily-changing signals fed into the LSTM branch as a WINDOW_SIZE-day sequence.
-SEQUENCE_FEATURE_COLUMNS = ["close", "volume", "sma_20", "sma_50", "rsi_14", "macd"]
+SEQUENCE_FEATURE_COLUMNS = [
+    "moving_average_20d",
+    "moving_average_50d",
+    "price_momentum_1m",
+    "price_momentum_3m",
+    "volatility_30d",
+    "relative_strength_vs_vnindex",
+]
 
 # Slow-changing, quarter-driven snapshot fed into the MLP branch.
 TABULAR_FEATURE_COLUMNS = [
-    "market_cap",
     "pe_ratio",
     "pb_ratio",
     "roe",

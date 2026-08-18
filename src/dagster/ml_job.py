@@ -149,19 +149,16 @@ def ml_training_job(
         with redshift.get_connection() as conn:
             with conn.cursor() as cursor:
                 query = """
-                WITH dates AS (
-                    SELECT DISTINCT TRADING_DATE FROM MART.FACT_ML_FEATURE_SET
-                ),
-                ranked AS (
-                    SELECT
-                        TRADING_DATE,
-                        PERCENT_RANK() OVER (ORDER BY TRADING_DATE) as pct
-                    FROM dates
-                )
                 SELECT
                     MAX(CASE WHEN pct <= 0.8 THEN TRADING_DATE END),
                     MAX(CASE WHEN pct <= 0.9 THEN TRADING_DATE END)
-                FROM ranked;
+                FROM (
+                    SELECT
+                        TRADING_DATE,
+                        PERCENT_RANK() OVER (ORDER BY TRADING_DATE) AS pct
+                    FROM MART.FACT_ML_FEATURE_SET
+                    WHERE LABEL_NEXT_5D_RETURN IS NOT NULL
+                )
                 """
                 cursor.execute(query)
                 row = cursor.fetchone()
