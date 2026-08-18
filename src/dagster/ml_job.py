@@ -258,7 +258,7 @@ def ml_model_evaluation(
 
     champion_version = ssm.get_parameter(_ACTIVE_VERSION_PARAM)
     champion_metrics = None
-    if champion_version is not None:
+    if champion_version is not None and champion_version != "none":
         champion_key = f"{model_version_prefix(champion_version)}metadata.json"
         try:
             champion_body = s3_client.get_object(
