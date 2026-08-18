@@ -25,8 +25,8 @@ except ImportError:
         WINDOW_SIZE,
     )
 
-_DATE_COLUMN = "TRADING_DATE"
-_TICKER_COLUMN = "TICKER"
+_DATE_COLUMN = "trading_date"
+_TICKER_COLUMN = "ticker"
 
 
 def time_based_split(
