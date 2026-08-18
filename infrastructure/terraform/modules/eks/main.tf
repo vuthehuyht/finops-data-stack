@@ -211,7 +211,9 @@ resource "aws_iam_policy" "dagster_sa_permissions" {
           var.processed_bucket_arn,
           "${var.processed_bucket_arn}/*",
           var.model_artifacts_bucket_arn,
-          "${var.model_artifacts_bucket_arn}/*"
+          "${var.model_artifacts_bucket_arn}/*",
+          var.dagster_io_bucket_arn,
+          "${var.dagster_io_bucket_arn}/*"
         ]
       },
       # Read/write permissions for SSM Parameter Store related to Model
@@ -246,6 +248,15 @@ resource "aws_iam_policy" "dagster_sa_permissions" {
         Effect   = "Allow"
         Action   = "iam:PassRole"
         Resource = "arn:aws:iam::*:role/*-sagemaker-execution-role"
+      },
+      # CloudWatch Logs permissions for SageMaker Training logs
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:DescribeLogStreams",
+          "logs:GetLogEvents"
+        ]
+        Resource = "arn:aws:logs:*:*:log-group:/aws/sagemaker/TrainingJobs:*"
       }
     ]
   })

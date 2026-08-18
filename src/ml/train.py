@@ -106,10 +106,14 @@ def _train_one_epoch(
     loader: DataLoader,
     optimizer: torch.optim.Optimizer,
     loss_fn: torch.nn.Module,
+    device: torch.device,
 ) -> float:
     model.train()
     total_loss = 0.0
     for sequence, tabular, target in loader:
+        sequence = sequence.to(device)
+        tabular = tabular.to(device)
+        target = target.to(device)
         optimizer.zero_grad()
         prediction = model(sequence, tabular).squeeze(-1)
         loss = loss_fn(prediction, target)
@@ -120,11 +124,16 @@ def _train_one_epoch(
 
 
 @torch.no_grad()
-def _evaluate(model: FusionModel, loader: DataLoader) -> TrainingMetrics:
+def _evaluate(
+    model: FusionModel, loader: DataLoader, device: torch.device
+) -> TrainingMetrics:
     model.eval()
     all_predictions = []
     all_targets = []
     for sequence, tabular, target in loader:
+        sequence = sequence.to(device)
+        tabular = tabular.to(device)
+        target = target.to(device)
         prediction = model(sequence, tabular).squeeze(-1)
         all_predictions.append(prediction)
         all_targets.append(target)
@@ -160,26 +169,44 @@ def main() -> None:
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size)
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size)
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+
     model = FusionModel(
         sequence_input_size=len(SEQUENCE_FEATURE_COLUMNS),
         tabular_input_size=len(TABULAR_FEATURE_COLUMNS),
-    )
+    ).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
     loss_fn = torch.nn.HuberLoss()
 
+    best_val_rmse = float("inf")
+    patience = 5
+    patience_counter = 0
+
+    os.makedirs(args.model_dir, exist_ok=True)
+    best_model_path = os.path.join(args.model_dir, "model.pt")
+
     for epoch in range(args.epochs):
-        train_loss = _train_one_epoch(model, train_loader, optimizer, loss_fn)
-        val_metrics = _evaluate(model, val_loader)
+        train_loss = _train_one_epoch(model, train_loader, optimizer, loss_fn, device)
+        val_metrics = _evaluate(model, val_loader, device)
         print(
             f"epoch={epoch} train_loss={train_loss:.6f} "
             f"val_rmse={val_metrics.rmse:.6f} val_mae={val_metrics.mae:.6f}"
         )
+        if val_metrics.rmse < best_val_rmse:
+            best_val_rmse = val_metrics.rmse
+            patience_counter = 0
+            torch.save(model.state_dict(), best_model_path)
+        else:
+            patience_counter += 1
+            if patience_counter >= patience:
+                print(f"Early stopping at epoch {epoch}")
+                break
 
-    test_metrics = _evaluate(model, test_loader)
+    # Load best model for testing
+    model.load_state_dict(torch.load(best_model_path, weights_only=True))
+    test_metrics = _evaluate(model, test_loader, device)
     print(f"test_rmse={test_metrics.rmse:.6f} test_mae={test_metrics.mae:.6f}")
-
-    os.makedirs(args.model_dir, exist_ok=True)
-    torch.save(model.state_dict(), os.path.join(args.model_dir, "model.pt"))
     _bundle_serving_code(args.model_dir)
 
     metadata = {

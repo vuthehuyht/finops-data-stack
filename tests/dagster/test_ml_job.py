@@ -33,8 +33,8 @@ def test_ml_training_job_config_defaults() -> None:
     assert config.epochs == 20
     assert config.batch_size == 64
     assert config.learning_rate == 1e-3
-    # train_end_date must be chronologically before val_end_date.
-    assert config.train_end_date < config.val_end_date
+    assert config.train_end_date == "auto"
+    assert config.val_end_date == "auto"
 
 
 def test_ml_evaluation_config_default_threshold() -> None:
@@ -117,6 +117,8 @@ def test_ml_training_job_passes_model_artifacts_bucket() -> None:
     )
     mock_sagemaker.model_artifacts_bucket = "finops-model-artifacts-dev"
 
+    mock_redshift = unittest.mock.MagicMock()
+
     context = dagster.build_asset_context()
 
     with unittest.mock.patch("src.dagster.ml_job.launch_training_job") as mock_launch:
@@ -129,8 +131,9 @@ def test_ml_training_job_passes_model_artifacts_bucket() -> None:
         ml_training_job(
             context,
             "s3://bucket/ml-training-data/2026-07-03/",
-            MlTrainingJobConfig(),
+            MlTrainingJobConfig(train_end_date="2026-07-01", val_end_date="2026-07-02"),
             mock_sagemaker,
+            mock_redshift,
         )
 
     _, kwargs = mock_launch.call_args

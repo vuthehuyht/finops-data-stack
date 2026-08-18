@@ -58,3 +58,19 @@ Hệ thống sử dụng các dịch vụ Managed của AWS để quản lý vò
   - Path: `s3://finops-model-artifacts/<model_name>/<version>/`
   - Chứa: `model.tar.gz` (weights), `metadata.json` (metrics, hyperparameters).
 - **CI/CD for ML (MLOps):** Quy trình thăng cấp mô hình (Promotion) được thực hiện thông qua việc cập nhật active version lên SSM Parameter Store (`/finops/model/active_version`). Luồng dự báo hàng ngày sẽ tự động tham chiếu phiên bản này để kích hoạt Transform Job trên SageMaker.
+
+## 6. Lưu trữ dữ liệu (Data Storage for ML)
+
+Dữ liệu phục vụ vòng đời Machine Learning được phân tách chặt chẽ trên **Amazon S3** theo nguyên tắc Data Lake Tiering và tuân thủ IAM Least-Privilege:
+
+- **Dữ liệu huấn luyện (Training Data):**
+  - Lưu tại: `s3://finops-data-lake-processed/ml-training-data/<run_date>/`
+  - Nguồn gốc: Redshift Data Mart (`FACT_ML_FEATURE_SET`) export (UNLOAD) thẳng sang S3 dưới dạng Parquet.
+- **Dữ liệu suy luận hàng ngày (Inference Data):**
+  - **Input (JSON Lines):** `s3://finops-data-lake-processed/ml-inference-input/<trading_date>/input.jsonl`
+  - **Output (JSON Lines):** `s3://finops-data-lake-processed/ml-inference-output/<trading_date>/input.jsonl.out` (SageMaker Batch Transform ghi trực tiếp kết quả vào thư mục này).
+- **Trọng số mô hình (Model Artifacts):**
+  - Lưu tại: `s3://finops-model-artifacts/...`
+  - Tuyệt đối không lưu trữ dữ liệu dạng bảng/tabular trong bucket này để đảm bảo phân tách rõ ràng giữa "Code/Model" và "Data".
+
+*Lưu ý:* Role thực thi của SageMaker (`sagemaker-execution-role`) được cấp quyền đọc/ghi trên cả bucket `processed` (để lấy data train/predict và ghi kết quả) và bucket `model_artifacts` (để lưu model weights). Dữ liệu thô (raw) được giữ an toàn tại `raw_bucket` không cho phép SageMaker truy cập.

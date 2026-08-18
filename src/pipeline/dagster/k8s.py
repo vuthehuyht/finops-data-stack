@@ -71,7 +71,7 @@ def on_k8s() -> bool:
 def _io_manager_bucket_name() -> str:
     """Get the S3 bucket name for Dagster IO Manager."""
     # Priority: 1. ENV var, 2. Default bucket for this project
-    return os.getenv("DAGSTER_S3_IO_BUCKET", "finops-data-lake-raw")
+    return os.getenv("DAGSTER_S3_IO_BUCKET", "finops-dagster-io")
 
 
 def io_manager(code_location_name: str) -> dagster.IOManagerDefinition:

@@ -7,6 +7,7 @@ API — no custom Docker image.
 
 from dataclasses import dataclass
 
+import boto3
 from sagemaker.core import image_uris
 from sagemaker.core.helper.session_helper import Session
 from sagemaker.core.shapes.shapes import OutputDataConfig
@@ -59,7 +60,10 @@ def launch_training_job(
         TrainingJobResult with the completed job name and model artifact URI.
     """
     if sagemaker_session is None:
-        sagemaker_session = Session(default_bucket=model_artifacts_bucket)
+        sagemaker_session = Session(
+            boto_session=boto3.Session(region_name=_REGION),
+            default_bucket=model_artifacts_bucket,
+        )
 
     training_image = image_uris.retrieve(
         framework="pytorch",

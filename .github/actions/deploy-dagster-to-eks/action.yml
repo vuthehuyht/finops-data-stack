@@ -49,8 +49,16 @@ inputs:
     description: "S3 Bucket for raw data"
     required: true
 
+  finops-processed-bucket:
+    description: "S3 Bucket for processed data"
+    required: true
+
   finops-model-artifacts-bucket:
     description: "S3 Bucket for model artifacts"
+    required: true
+
+  sagemaker-execution-role-arn:
+    description: "IAM Role ARN for SageMaker execution"
     required: true
 
 runs:
@@ -181,10 +189,14 @@ runs:
           --set dagster-user-deployments.deployments[0].image.tag=${{ steps.resolve-tag.outputs.tag }} \
           --set dagster-user-deployments.deployments[0].env[9].value=${{ inputs.redshift-iam-role-arn }} \
           --set dagster-user-deployments.deployments[0].env[10].value=${{ inputs.finops-raw-bucket }} \
-          --set dagster-user-deployments.deployments[0].env[11].value=${{ inputs.finops-model-artifacts-bucket }} \
+          --set dagster-user-deployments.deployments[0].env[11].value=${{ inputs.finops-processed-bucket }} \
+          --set dagster-user-deployments.deployments[0].env[12].value=${{ inputs.finops-model-artifacts-bucket }} \
+          --set dagster-user-deployments.deployments[0].env[13].value=${{ inputs.sagemaker-execution-role-arn }} \
           --set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env[8].value=${{ inputs.redshift-iam-role-arn }} \
           --set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env[9].value=${{ inputs.finops-raw-bucket }} \
-          --set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env[10].value=${{ inputs.finops-model-artifacts-bucket }} \
+          --set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env[10].value=${{ inputs.finops-processed-bucket }} \
+          --set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env[11].value=${{ inputs.finops-model-artifacts-bucket }} \
+          --set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env[12].value=${{ inputs.sagemaker-execution-role-arn }} \
           --set postgresql.postgresqlHost=${{ inputs.rds-address }} \
           --set postgresql.postgresqlUsername=${{ inputs.rds-username }} \
           --set postgresql.postgresqlDatabase=${{ inputs.rds-dbname }} \

@@ -39,7 +39,7 @@ resource "aws_iam_role" "redshift_s3" {
 
 resource "aws_iam_role_policy_attachment" "redshift_s3_readonly" {
   role       = aws_iam_role.redshift_s3.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+  policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
 }
 
 resource "aws_iam_role_policy_attachment" "redshift_glue_access" {

@@ -35,7 +35,7 @@ def test_on_k8s_returns_false_when_cluster_unset() -> None:
 
 def test_io_manager_bucket_name_default() -> None:
     with unittest.mock.patch.dict(os.environ, {}, clear=True):
-        assert k8s._io_manager_bucket_name() == "finops-data-lake-raw"
+        assert k8s._io_manager_bucket_name() == "finops-dagster-io"
 
 
 def test_io_manager_bucket_name_env_var() -> None:

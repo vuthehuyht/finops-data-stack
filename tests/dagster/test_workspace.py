@@ -161,7 +161,7 @@ def test_workspace_has_transform_sensors() -> None:
         assert len(defs.sensor_defs) == 4
         sensor_names = {s.name for s in defs.sensor_defs}
         assert "load_job_sensor" in sensor_names
-        assert "silver_job_sensor" in sensor_names
+        assert "stg_job_sensor" in sensor_names
         assert "mart_job_sensor" in sensor_names
         assert "ml_daily_inference_sensor" in sensor_names
 

@@ -39,7 +39,9 @@ resource "aws_iam_policy" "sagemaker_s3" {
         ]
         Resource = [
           var.model_artifacts_bucket_arn,
-          "${var.model_artifacts_bucket_arn}/*"
+          "${var.model_artifacts_bucket_arn}/*",
+          var.processed_bucket_arn,
+          "${var.processed_bucket_arn}/*"
         ]
       }
     ]
@@ -62,4 +64,10 @@ resource "aws_iam_role_policy_attachment" "sagemaker_logs" {
 resource "aws_iam_role_policy_attachment" "sagemaker_ecr" {
   role       = aws_iam_role.sagemaker_execution.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+}
+
+# Allow standard SageMaker operations (including VPC and CloudWatch metrics)
+resource "aws_iam_role_policy_attachment" "sagemaker_full_access" {
+  role       = aws_iam_role.sagemaker_execution.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSageMakerFullAccess"
 }

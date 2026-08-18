@@ -60,6 +60,7 @@ module "sagemaker" {
   project_name               = var.project_name
   environment                = var.environment
   model_artifacts_bucket_arn = "arn:aws:s3:::${module.s3.model_artifacts_bucket_id}"
+  processed_bucket_arn       = "arn:aws:s3:::${module.s3.processed_bucket_id}"
 }
 
 # Call Module Redshift Serverless (Namespace, Workgroup, Spectrum IAM role)
@@ -84,6 +85,7 @@ module "eks" {
   raw_bucket_arn               = "arn:aws:s3:::${module.s3.raw_bucket_id}"
   processed_bucket_arn         = "arn:aws:s3:::${module.s3.processed_bucket_id}"
   model_artifacts_bucket_arn   = "arn:aws:s3:::${module.s3.model_artifacts_bucket_id}"
+  dagster_io_bucket_arn        = "arn:aws:s3:::${module.s3.dagster_io_bucket_id}"
   db_credentials_secret_arn    = module.secrets.db_credentials_secret_arn
   cluster_admin_principal_arns = var.cluster_admin_principal_arns
 }

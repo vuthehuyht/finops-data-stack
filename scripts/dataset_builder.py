@@ -212,14 +212,10 @@ class FinOpsDatasetBuilder:
 
         if not df_foreign.empty:
             df_foreign["trading_date"] = pd.to_datetime(df_foreign["trading_date"])
-            df_foreign["net_foreign_val"] = df_foreign["buyForeignValue"].fillna(
-                0
-            ) - df_foreign["sellForeignValue"].fillna(0)
+            df_foreign["net_foreign_val"] = df_foreign["net_val"].fillna(0)
             df_price = pd.merge(
                 df_price,
-                df_foreign[
-                    ["ticker", "trading_date", "buyForeignValue", "net_foreign_val"]
-                ],
+                df_foreign[["ticker", "trading_date", "buy_val", "net_foreign_val"]],
                 on=["ticker", "trading_date"],
                 how="left",
             )
@@ -227,7 +223,7 @@ class FinOpsDatasetBuilder:
             def compute_foreign(g):
                 g["total_trading_val"] = g["close"] * g["volume"]
                 g["foreign_buy_ratio_10d"] = self._safe_divide(
-                    g["buyForeignValue"].rolling(10).sum(),
+                    g["buy_val"].rolling(10).sum(),
                     g["total_trading_val"].rolling(10).sum(),
                 )
                 g["net_foreign_flow_momentum_1m"] = (

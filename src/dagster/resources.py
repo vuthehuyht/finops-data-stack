@@ -38,6 +38,12 @@ class S3BucketResource(dagster.ConfigurableResource):
         default_factory=lambda: os.getenv("FINOPS_RAW_BUCKET", "finops-data-lake-raw"),
         description="S3 bucket holding Bronze layer Parquet files.",
     )
+    processed_bucket: str = Field(
+        default_factory=lambda: os.getenv(
+            "FINOPS_PROCESSED_BUCKET", "finops-data-lake-processed"
+        ),
+        description="S3 bucket holding processed/exported ML data.",
+    )
 
 
 class DbtConfigResource(dagster.ConfigurableResource):
@@ -113,7 +119,7 @@ class SageMakerResource(dagster.ConfigurableResource):
         model_name: str,
         input_s3_uri: str,
         output_s3_uri: str,
-        instance_type: str = "ml.m5.large",
+        instance_type: str = "ml.g4dn.xlarge",
     ) -> None:
         """Launch a SageMaker Batch Transform Job and block until it completes."""
         client = boto3.client("sagemaker", region_name=self.region_name)

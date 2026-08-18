@@ -64,14 +64,18 @@ class MlTrainingJobConfig(dagster.Config):
     # 65 VN trading days (5-day week), comfortably above the minimum window
     # size the dataset needs to produce even one training sample per ticker.
     train_end_date: str = pydantic.Field(
-        default_factory=lambda: (
-            datetime.date.today() - datetime.timedelta(days=180)
-        ).isoformat()
+        default="auto",
+        description=(
+            "End date for the training set. If 'auto', resolves to 80th "
+            "percentile of data in Redshift."
+        ),
     )
     val_end_date: str = pydantic.Field(
-        default_factory=lambda: (
-            datetime.date.today() - datetime.timedelta(days=90)
-        ).isoformat()
+        default="auto",
+        description=(
+            "End date for the validation set. If 'auto', resolves to 90th "
+            "percentile of data in Redshift."
+        ),
     )
     epochs: int = pydantic.Field(default=20)
     batch_size: int = pydantic.Field(default=64)
@@ -107,7 +111,7 @@ def gold_ml_training_dataset(
     load_config: LoadJobConfigResource,
 ) -> dagster.Output[str]:
     """Export FACT_ML_FEATURE_SET (last 24 months) to S3 as Parquet."""
-    s3_url = f"s3://{s3bucket.raw_bucket}/ml-training-data/{config.run_date}/"
+    s3_url = f"s3://{s3bucket.processed_bucket}/ml-training-data/{config.run_date}/"
     with redshift.get_connection() as conn:
         with conn.cursor() as cursor:
             row_count = unload_training_dataset(
@@ -135,14 +139,56 @@ def ml_training_job(
     training_dataset_s3_url: str,
     config: MlTrainingJobConfig,
     sagemaker: SageMakerResource,
+    redshift: RedshiftResource,
 ) -> dagster.Output[dict[str, str]]:
     """Launch and block on a SageMaker Training Job using the exported dataset."""
+    train_end_date = config.train_end_date
+    val_end_date = config.val_end_date
+
+    if train_end_date == "auto" or val_end_date == "auto":
+        with redshift.get_connection() as conn:
+            with conn.cursor() as cursor:
+                query = """
+                SELECT
+                    MAX(CASE WHEN pct <= 0.8 THEN TRADING_DATE END),
+                    MAX(CASE WHEN pct <= 0.9 THEN TRADING_DATE END)
+                FROM (
+                    SELECT
+                        TRADING_DATE,
+                        PERCENT_RANK() OVER (ORDER BY TRADING_DATE) AS pct
+                    FROM MART.FACT_ML_FEATURE_SET
+                    WHERE LABEL_NEXT_5D_RETURN IS NOT NULL
+                )
+                """
+                cursor.execute(query)
+                row = cursor.fetchone()
+                if row and row[0] and row[1]:
+                    if train_end_date == "auto":
+                        train_end_date = (
+                            row[0].isoformat()
+                            if hasattr(row[0], "isoformat")
+                            else str(row[0])
+                        )
+                    if val_end_date == "auto":
+                        val_end_date = (
+                            row[1].isoformat()
+                            if hasattr(row[1], "isoformat")
+                            else str(row[1])
+                        )
+                    context.log.info(
+                        "Auto-resolved dates from Redshift: "
+                        f"train_end_date={train_end_date}, "
+                        f"val_end_date={val_end_date}"
+                    )
+                else:
+                    raise RuntimeError("Failed to resolve auto dates from Redshift.")
+
     result = launch_training_job(
         role_arn=sagemaker.execution_role_arn,
         input_s3_uri=training_dataset_s3_url,
         hyperparameters={
-            "train-end-date": config.train_end_date,
-            "val-end-date": config.val_end_date,
+            "train-end-date": train_end_date,
+            "val-end-date": val_end_date,
             "epochs": str(config.epochs),
             "batch-size": str(config.batch_size),
             "learning-rate": str(config.learning_rate),

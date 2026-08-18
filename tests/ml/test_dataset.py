@@ -6,7 +6,7 @@ import pandas as pd
 def _make_dates_df(start: str, periods: int) -> pd.DataFrame:
     dates = pd.date_range(start=start, periods=periods, freq="D")
     return pd.DataFrame(
-        {"TRADING_DATE": dates.strftime("%Y-%m-%d"), "VALUE": range(periods)}
+        {"trading_date": dates.strftime("%Y-%m-%d"), "VALUE": range(periods)}
     )
 
 
@@ -18,15 +18,15 @@ def test_time_based_split_partitions_by_date_cutoffs() -> None:
         df, train_end_date="2026-01-05", val_end_date="2026-01-07"
     )
 
-    assert list(train_df["TRADING_DATE"]) == [
+    assert list(train_df["trading_date"]) == [
         "2026-01-01",
         "2026-01-02",
         "2026-01-03",
         "2026-01-04",
         "2026-01-05",
     ]
-    assert list(val_df["TRADING_DATE"]) == ["2026-01-06", "2026-01-07"]
-    assert list(test_df["TRADING_DATE"]) == [
+    assert list(val_df["trading_date"]) == ["2026-01-06", "2026-01-07"]
+    assert list(test_df["trading_date"]) == [
         "2026-01-08",
         "2026-01-09",
         "2026-01-10",
@@ -43,10 +43,10 @@ def test_time_based_split_no_leakage_across_cutoffs() -> None:
     )
 
     assert (
-        pd.to_datetime(train_df["TRADING_DATE"]) <= pd.Timestamp("2026-01-15")
+        pd.to_datetime(train_df["trading_date"]) <= pd.Timestamp("2026-01-15")
     ).all()
-    assert (pd.to_datetime(val_df["TRADING_DATE"]) > pd.Timestamp("2026-01-15")).all()
-    assert (pd.to_datetime(val_df["TRADING_DATE"]) <= pd.Timestamp("2026-01-20")).all()
+    assert (pd.to_datetime(val_df["trading_date"]) > pd.Timestamp("2026-01-15")).all()
+    assert (pd.to_datetime(val_df["trading_date"]) <= pd.Timestamp("2026-01-20")).all()
 
 
 def test_time_based_split_raises_when_val_before_train() -> None:
@@ -67,11 +67,12 @@ def _make_feature_df(tickers: list[str], days: int) -> pd.DataFrame:
     for ticker in tickers:
         dates = pd.date_range(start="2026-01-01", periods=days, freq="D")
         for i, date in enumerate(dates):
-            row = {"TICKER": ticker, "TRADING_DATE": date.strftime("%Y-%m-%d")}
+            row = {"ticker": ticker, "trading_date": date.strftime("%Y-%m-%d")}
             for col in SEQUENCE_FEATURE_COLUMNS:
                 row[col] = float(i)
             for col in TABULAR_FEATURE_COLUMNS:
-                row[col] = float(i) * 0.1
+                if col not in SEQUENCE_FEATURE_COLUMNS:
+                    row[col] = float(i) * 0.1
             row["label_next_5d_return"] = 0.01 * i
             rows.append(row)
     return pd.DataFrame(rows)
@@ -119,6 +120,7 @@ def test_stock_sequence_dataset_getitem_values() -> None:
     """
     import numpy as np
 
+    from src.ml.config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS
     from src.ml.dataset import StockSequenceDataset
 
     df = _make_feature_df(["AAA"], days=30)
@@ -130,8 +132,13 @@ def test_stock_sequence_dataset_getitem_values() -> None:
     # SEQUENCE_FEATURE_COLUMNS all equal 29.0 for the last day.
     assert np.allclose(sequence[-1].numpy(), 29.0)
 
-    # TABULAR_FEATURE_COLUMNS from last row: 29 * 0.1 = 2.9.
-    assert np.allclose(tabular.numpy(), 2.9)
+    # TABULAR_FEATURE_COLUMNS from last row:
+    # 29 * 0.1 = 2.9 for exclusive tabulars, 29.0 for overlaps.
+    expected_tabular = [
+        29.0 if col in SEQUENCE_FEATURE_COLUMNS else 2.9
+        for col in TABULAR_FEATURE_COLUMNS
+    ]
+    assert np.allclose(tabular.numpy(), expected_tabular)
 
     # label_next_5d_return from last row: 29 * 0.01 = 0.29.
     assert np.isclose(float(target), 0.29)

@@ -12,3 +12,8 @@ output "model_artifacts_bucket_id" {
   value       = aws_s3_bucket.model_artifacts.id
   description = "The ID/Name of the Model Artifacts S3 bucket"
 }
+
+output "dagster_io_bucket_id" {
+  value = aws_s3_bucket.dagster_io.id
+}
+

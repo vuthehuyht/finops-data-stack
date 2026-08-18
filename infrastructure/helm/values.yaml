@@ -139,7 +139,7 @@ dagster-user-deployments:
         - name: KUBERNETES_CLUSTER_NAME
           value: "finops-eks-cluster"
         - name: DAGSTER_S3_IO_BUCKET
-          value: "finops-data-lake-raw"
+          value: "finops-dagster-io"
         - name: REDSHIFT_HOST
           valueFrom:
             secretKeyRef:
@@ -174,7 +174,11 @@ dagster-user-deployments:
           value: ""
         - name: FINOPS_RAW_BUCKET
           value: ""
+        - name: FINOPS_PROCESSED_BUCKET
+          value: ""
         - name: FINOPS_MODEL_ARTIFACTS_BUCKET
+          value: ""
+        - name: SAGEMAKER_EXECUTION_ROLE_ARN
           value: ""
         - name: DAGSTER_K8S_SERVICE_ACCOUNT
           value: "dagster-sa"
@@ -263,7 +267,7 @@ runLauncher:
             - name: KUBERNETES_CLUSTER_NAME
               value: "finops-eks-cluster"
             - name: DAGSTER_S3_IO_BUCKET
-              value: "finops-data-lake-raw"
+              value: "finops-dagster-io"
             - name: REDSHIFT_HOST
               valueFrom:
                 secretKeyRef:
@@ -298,7 +302,11 @@ runLauncher:
               value: ""
             - name: FINOPS_RAW_BUCKET
               value: ""
+            - name: FINOPS_PROCESSED_BUCKET
+              value: ""
             - name: FINOPS_MODEL_ARTIFACTS_BUCKET
+              value: ""
+            - name: SAGEMAKER_EXECUTION_ROLE_ARN
               value: ""
             - name: DAGSTER_K8S_SERVICE_ACCOUNT
               value: "dagster-sa"
