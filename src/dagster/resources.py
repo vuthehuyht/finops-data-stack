@@ -119,7 +119,7 @@ class SageMakerResource(dagster.ConfigurableResource):
         model_name: str,
         input_s3_uri: str,
         output_s3_uri: str,
-        instance_type: str = "ml.m5.large",
+        instance_type: str = "ml.g4dn.xlarge",
     ) -> None:
         """Launch a SageMaker Batch Transform Job and block until it completes."""
         client = boto3.client("sagemaker", region_name=self.region_name)

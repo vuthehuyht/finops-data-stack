@@ -48,3 +48,9 @@ variable "cluster_admin_principal_arns" {
   default     = []
   description = "Additional IAM principal ARNs (e.g. human operators running kubectl/helm manually) granted EKS cluster-admin access via Access Entries. bootstrap_cluster_creator_admin_permissions is intentionally not set on the cluster (ForceNew risk), so the cluster creator does not get automatic access -- add their ARN here instead."
 }
+
+variable "dagster_io_bucket_arn" {
+  type        = string
+  description = "ARN of the S3 bucket for Dagster IO Manager"
+}
+

@@ -139,7 +139,7 @@ dagster-user-deployments:
         - name: KUBERNETES_CLUSTER_NAME
           value: "finops-eks-cluster"
         - name: DAGSTER_S3_IO_BUCKET
-          value: "finops-data-lake-raw"
+          value: "finops-dagster-io"
         - name: REDSHIFT_HOST
           valueFrom:
             secretKeyRef:
@@ -267,7 +267,7 @@ runLauncher:
             - name: KUBERNETES_CLUSTER_NAME
               value: "finops-eks-cluster"
             - name: DAGSTER_S3_IO_BUCKET
-              value: "finops-data-lake-raw"
+              value: "finops-dagster-io"
             - name: REDSHIFT_HOST
               valueFrom:
                 secretKeyRef:
