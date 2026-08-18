@@ -37,8 +37,8 @@ def test_build_latest_window_returns_last_window_size_rows() -> None:
 
     df = pd.DataFrame(
         {
-            "TICKER": ["AAA"] * 5 + ["BBB"] * 5,
-            "TRADING_DATE": list(pd.date_range("2026-01-01", periods=5)) * 2,
+            "ticker": ["AAA"] * 5 + ["BBB"] * 5,
+            "trading_date": list(pd.date_range("2026-01-01", periods=5)) * 2,
             "SEQ_COL": [10, 20, 30, 40, 50, 100, 200, 300, 400, 500],
             "TAB_COL": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
         }
@@ -61,8 +61,8 @@ def test_build_latest_window_raises_when_insufficient_history() -> None:
 
     df = pd.DataFrame(
         {
-            "TICKER": ["AAA", "AAA"],
-            "TRADING_DATE": pd.date_range("2026-01-01", periods=2),
+            "ticker": ["AAA", "AAA"],
+            "trading_date": pd.date_range("2026-01-01", periods=2),
             "SEQ_COL": [10, 20],
             "TAB_COL": [1, 2],
         }
