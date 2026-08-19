@@ -19,7 +19,7 @@ This file serves as the main context entrypoint for AI Agents. It provides a com
 - **Stack**: AWS (S3, Redshift Serverless, SageMaker Serverless, EKS), **Dagster** (orchestrator), **dbt** (transformation).
 - **Python Version**: `>=3.12`, package manager: `uv`.
 - **Execution Rules**: All terminal commands (e.g., `python`, `pytest`, `ruff`, `dagster`, `dbt`) **MUST** be run using `uv run` (e.g., `uv run pytest`, `uv run dagster dev`).
-- **Directory Layout (Flywheel Architecture)**:
+- **Directory Layout**:
   - `src/common/` — Shared AWS Utils, DB Utils, Logging.
   - `src/dagster/` — Software-Defined Assets, Jobs, Sensors, Resources.
   - `src/ingest/` — Ingestion layer (Crawl/API -> S3).

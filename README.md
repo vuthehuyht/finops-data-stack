@@ -9,7 +9,7 @@ Hệ thống Data Pipeline và AI tự động hóa việc thu thập, xử lý 
 *   **Tối ưu chi phí**: Vận hành trên hạ tầng AWS Serverless (Redshift Serverless, SageMaker Serverless).
 
 ## 🏗 Kiến trúc hệ thống (Architecture)
-Hệ thống tuân thủ mô hình **Flywheel Architecture** với các thành phần chính:
+Hệ thống gồm các thành phần chính:
 *   **Orchestration**: Dagster (Điều phối dựa trên Software-Defined Assets).
 *   **Data Lake**: Amazon S3 (Bronze/Silver/Gold).
 *   **Data Warehouse**: Amazon Redshift Serverless.
@@ -21,7 +21,7 @@ Hệ thống tuân thủ mô hình **Flywheel Architecture** với các thành p
 ```text
 finops-data-stack/
 ├── docs/                      # Tài liệu thiết kế chi tiết
-├── src/                       # Flywheel Core (Mã nguồn xử lý dữ liệu)
+├── src/                       # Mã nguồn xử lý dữ liệu
 │   ├── common/                # AWS Utils, DB Utils, Logging
 │   ├── dagster/               # Logic điều phối (Assets, Jobs, Sensors)
 │   ├── ingest/                # Ingestion layer (Crawl/API -> S3)

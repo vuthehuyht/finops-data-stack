@@ -71,14 +71,14 @@ Luồng này chạy định kỳ hàng Quý (sau khi các doanh nghiệp công b
 - Xây dựng mô hình Deep Learning Multimodal và tích hợp vào Dagster.
 - Thiết lập luồng Re-training hàng quý và luồng Inference hàng ngày.
 
-## 7. Cấu trúc thư mục dự án (Flywheel Architecture)
+## 7. Cấu trúc thư mục dự án
 
-Dự án tuân thủ nghiêm ngặt cấu trúc **Flywheel** để đảm bảo tính module hóa và khả năng mở rộng, tương đương với chuẩn hệ thống Data Core, nhưng sử dụng tên thư mục `src` theo chuẩn Python:
+Dự án tổ chức thư mục `src` theo module hóa domain, sử dụng tên thư mục `src` theo chuẩn Python:
 
 ```text
 finops-data-stack/
 ├── docs/                      # Tài liệu nghiệp vụ và kỹ thuật
-├── src/                       # Trái tim xử lý dữ liệu của hệ thống (Flywheel Core)
+├── src/                       # Trái tim xử lý dữ liệu của hệ thống
 │   ├── common/                 # Tiện ích dùng chung (S3, Redshift, Logging utils)
 │   ├── dagster/                # Logic điều phối (Jobs, Sensors, Assets, Resources)
 │   ├── pipeline/dagster/       # Thư viện wrapper nội bộ cho Dagster (asset/job
