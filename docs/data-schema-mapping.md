@@ -13,10 +13,10 @@ Dữ liệu giao dịch hàng ngày phản ánh cung cầu của thị trường
 
 | Tên Bảng | Thuộc tính (Schema - All Bronze are String) | Nguồn Khuyến Nghị | Tần suất |
 | :--- | :--- | :--- | :--- |
-| `raw_stock_price_eod` | `ticker`, `trading_date`, `open`, `high`, `low`, `close`, `volume`, `value`, `adjusted_close` | `vnstock` (SSI/TCBS API) | Daily (EOD) |
-| `raw_index_price_eod` | `index_name`, `trading_date`, `open`, `high`, `low`, `close`, `volume` | `vnstock` | Daily (EOD) |
-| `raw_foreign_trading` | `ticker`, `trading_date`, `buy_vol`, `sell_vol`, `buy_val`, `sell_val`, `net_val` | `vnstock` | Daily (EOD) |
-| `raw_proprietary_trading` | `ticker`, `trading_date`, `buy_vol`, `sell_vol`, `net_val` | VNDIRECT / SSI (Fallback: Mock) | Daily (EOD) |
+| `RAW_STOCK_PRICE_EOD` | `TICKER`, `TRADING_DATE`, `OPEN`, `HIGH`, `LOW`, `CLOSE`, `VOLUME`, `VALUE`, `ADJUSTED_CLOSE` | `vnstock` (SSI/TCBS API) | Daily (EOD) |
+| `RAW_INDEX_PRICE_EOD` | `INDEX_NAME`, `TRADING_DATE`, `OPEN`, `HIGH`, `LOW`, `CLOSE`, `VOLUME` | `vnstock` | Daily (EOD) |
+| `RAW_FOREIGN_TRADING` | `TICKER`, `TRADING_DATE`, `BUY_VOL`, `SELL_VOL`, `BUY_VAL`, `SELL_VAL`, `NET_VAL` | `vnstock` | Daily (EOD) |
+| `RAW_PROPRIETARY_TRADING` | `TICKER`, `TRADING_DATE`, `BUY_VOL`, `SELL_VOL`, `NET_VAL` | VNDIRECT / SSI (Fallback: Mock) | Daily (EOD) |
 
 ## 2. Dữ liệu Cơ bản (Fundamental Data)
 
@@ -24,11 +24,10 @@ Dữ liệu sức khỏe tài chính dùng để tính toán giá trị nội t�
 
 | Tên Bảng | Thuộc tính (Schema - All Bronze are String) | Nguồn Khuyến Nghị | Tần suất |
 | :--- | :--- | :--- | :--- |
-| `raw_balance_sheet` | `ticker`, `period`, `year`, `total_assets`, `current_assets`, `cash`, `inventory`, `total_liabilities`, `short_term_debt`, `long_term_debt`, `equity` | `vnstock` / CafeF API | Hàng Quý |
-| `raw_income_statement` | `ticker`, `period`, `year`, `revenue`, `cogs`, `gross_profit`, `operating_expenses`, `operating_profit`, `financial_income`, `financial_expenses`, `net_profit_after_tax` | `vnstock` / CafeF API | Hàng Quý |
-| `raw_cashflow_statement` | `ticker`, `period`, `year`, `cfo`, `cfi`, `cff`, `net_cash_flow`, `capex` | `vnstock` / CafeF API | Hàng Quý |
-| `raw_financial_ratios` | `ticker`, `period`, `year`, `shares_outstanding`, `market_cap` | `vnstock` (VCI — nguồn TCBS cũ đã ngừng hỗ trợ) | Hàng Quý |
-| `raw_company_profile` | `ticker`, `company_name`, `industry`, `exchange`, `description` | `vnstock` / SSC | 1 lần / Cập nhật khi có đổi |
+| `RAW_BALANCE_SHEET` | `TICKER`, `PERIOD`, `YEAR`, `TOTAL_ASSETS`, `CURRENT_ASSETS`, `CASH`, `INVENTORY`, `TOTAL_LIABILITIES`, `SHORT_TERM_DEBT`, `LONG_TERM_DEBT`, `EQUITY` | `vnstock` / CafeF API | Hàng Quý |
+| `RAW_INCOME_STATEMENT` | `TICKER`, `PERIOD`, `YEAR`, `REVENUE`, `COGS`, `GROSS_PROFIT`, `OPERATING_EXPENSES`, `OPERATING_PROFIT`, `FINANCIAL_INCOME`, `FINANCIAL_EXPENSES`, `NET_PROFIT_AFTER_TAX` | `vnstock` / CafeF API | Hàng Quý |
+| `RAW_CASHFLOW_STATEMENT` | `TICKER`, `PERIOD`, `YEAR`, `CFO`, `CFI`, `CFF`, `NET_CASH_FLOW`, `CAPEX` | `vnstock` / CafeF API | Hàng Quý |
+| `RAW_COMPANY_PROFILE` | `TICKER`, `COMPANY_NAME`, `INDUSTRY`, `EXCHANGE`, `OUTSTANDING_SHARE`, `DESCRIPTION` | `vnstock` / SSC | 1 lần / Cập nhật khi có đổi |
 
 ## 3. Dữ liệu Vĩ mô & Hàng hóa (Macro & Commodities)
 
@@ -36,12 +35,12 @@ Bối cảnh kinh tế tác động đến định giá (Đặc biệt quan tr�
 
 | Tên Bảng | Thuộc tính (Schema - All Bronze are String) | Nguồn Khuyến Nghị | Tần suất |
 | :--- | :--- | :--- | :--- |
-| `raw_macro_indicators` | `indicator_name`, `report_date`, `value`, `unit` | World Bank API (`world_bank_client.py`) | Hàng Tháng / Quý |
-| `raw_interest_rates` | `rate_type`, `date`, `rate_value` | Yahoo Finance — US benchmark rates (^IRX: Fed proxy, ^TNX: 10Y Treasury, ^FVX: 5Y Treasury) | Daily |
-| `raw_exchange_rates` | `pair`, `date`, `exchange_rate` | Yahoo Finance — pairs: USD/VND, EUR/VND, GBP/VND, JPY/VND, CNY/VND | Daily |
-| `raw_commodities_price`| `commodity_name`, `date`, `price` | Yahoo Finance (`yahoo_finance_client.py`) | Daily |
+| `RAW_MACRO_INDICATORS` | `INDICATOR_NAME`, `REPORT_DATE`, `VALUE`, `UNIT` | World Bank API (`world_bank_client.py`) | Hàng Tháng / Quý |
+| `RAW_INTEREST_RATES` | `RATE_TYPE`, `DATE`, `RATE_VALUE` | Yahoo Finance — US benchmark rates (^IRX: Fed proxy, ^TNX: 10Y Treasury, ^FVX: 5Y Treasury) | Daily |
+| `RAW_EXCHANGE_RATES` | `PAIR`, `DATE`, `EXCHANGE_RATE` | Yahoo Finance — pairs: USD/VND, EUR/VND, GBP/VND, JPY/VND, CNY/VND | Daily |
+| `RAW_COMMODITIES_PRICE`| `COMMODITY_NAME`, `DATE`, `PRICE` | Yahoo Finance (`yahoo_finance_client.py`) | Daily |
 
-**Lưu ý chi tiết hàng hóa (raw_commodities_price):** Cần thu thập ít nhất các mã: `Brent Crude`, `WTI`, `Gasoline Singapore (92/95)`, `Baltic Dirty Tanker Index`, `Gold`, `Steel HRC`.
+**Lưu ý chi tiết hàng hóa (RAW_COMMODITIES_PRICE):** Cần thu thập ít nhất các mã: `Brent Crude`, `WTI`, `Gasoline Singapore (92/95)`, `Baltic Dirty Tanker Index`, `Gold`, `Steel HRC`.
 
 ## 4. Dữ liệu Phi cấu trúc & Sự kiện (Alternative/Text Data)
 
@@ -49,10 +48,9 @@ Dữ liệu văn bản phục vụ trích xuất cảm xúc thị trường (Sen
 
 | Tên Bảng | Thuộc tính (Schema - All Bronze are String) | Nguồn Khuyến Nghị | Tần suất |
 | :--- | :--- | :--- | :--- |
-| `raw_news_articles` | `article_id`, `ticker`, `publish_time`, `title`, `summary`, `content`, `source`, `url` | RSS Feeds / Web Scraping | Real-time / Daily |
-| `raw_corporate_events` | `event_id`, `ticker`, `event_type`, `ex_right_date`, `record_date`, `event_details` | VSD / CafeF | Daily |
-| `raw_insider_transactions`| `ticker`, `deal_announce_date`, `deal_method`, `deal_action`, `deal_quantity`, `deal_price`, `deal_ratio` | vnstock / CafeF (Fallback: Mock) | Daily |
-| `raw_analyst_reports` | `report_id`, `ticker`, `brokerage_firm`, `publish_date`, `title`, `description`, `file_name` | FireAnt API | Daily |
+| `RAW_NEWS_ARTICLES` | `ARTICLE_ID`, `TICKER`, `PUBLISH_TIME`, `TITLE`, `SUMMARY`, `CONTENT`, `SOURCE`, `URL` | RSS Feeds / Web Scraping | Real-time / Daily |
+| `RAW_CORPORATE_EVENTS` | `EVENT_ID`, `TICKER`, `EVENT_TYPE`, `EX_RIGHT_DATE`, `RECORD_DATE`, `EVENT_DETAILS` | VSD / CafeF | Daily |
+| `RAW_ANALYST_REPORTS` | `REPORT_ID`, `TICKER`, `BROKERAGE_FIRM`, `PUBLISH_DATE`, `TITLE`, `DESCRIPTION`, `FILE_NAME` | FireAnt API | Daily |
 
 ## 5. Metadata Quản trị Dữ liệu (Raw Layer)
 
@@ -65,5 +63,3 @@ Dữ liệu văn bản phục vụ trích xuất cảm xúc thị trường (Sen
 | `_CONATA_SOURCE_ROW_NUMBER` | `INTEGER` | Số thứ tự bản ghi từ nguồn. | `1` |
 | `_CONATA_PARTITION_KEY` | `STRING` | Khóa phân vùng (YYYYMMDD). | `20260615` |
 | `_CONATA_LOADED_AT` | `TIMESTAMP` | Thời điểm dữ liệu nạp vào hệ thống. | `2026-06-15 14:30:00` |
-
-iểm dữ liệu nạp vào hệ thống. | `2026-06-15 14:30:00` |

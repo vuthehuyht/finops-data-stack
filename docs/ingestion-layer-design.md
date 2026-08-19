@@ -2,9 +2,9 @@
 
 ## 1. Overview
 
-Ingestion Layer (Tầng thu thập dữ liệu) là bước khởi đầu của toàn bộ Data Pipeline. Nhiệm vụ cốt lõi là thu thập dữ liệu thô từ các nguồn khác nhau (APIs chứng khoán, cổng thông tin vĩ mô, tin tức doanh nghiệp...), chuẩn hóa tên cột và tiêm trường metadata hệ thống (`_CONATA_*`), lưu trữ tạm thời dưới dạng file Parquet nén Snappy, và tải lên AWS S3 (Bronze Layer/Raw).
+Ingestion Layer (Tầng thu thập dữ liệu) là bước khởi đầu của toàn bộ Data Pipeline. Nhiệm vụ cốt lõi là thu thập dữ liệu thô từ các nguồn khác nhau (APIs chứng khoán, cổng thông tin vĩ mô, tin tức doanh nghiệp...), chuẩn hóa tên cột theo schema khai báo (`schema_columns`), lưu trữ tạm thời dưới dạng file Parquet nén Snappy, và tải lên AWS S3 (Bronze Layer/Raw). Các trường metadata hệ thống (`_CONATA_*`, `BATCH_DATE`) **không** được tiêm ở tầng này — chúng được Load Layer (`src/load/load.py`) tiêm khi nạp dữ liệu từ S3 vào Redshift (xem mục 3.C).
 
-Tài liệu này đặc tả chi tiết kiến trúc hướng đối tượng cho Ingestion Layer, cách tổ chức 17 file logic pipeline độc lập tương ứng với 17 bảng dữ liệu thô, cơ chế an toàn (Retry & Rate Limiting), cách tích hợp vào Dagster và kế hoạch kiểm thử.
+Tài liệu này đặc tả chi tiết kiến trúc hướng đối tượng cho Ingestion Layer, cách tổ chức 15 file logic pipeline độc lập tương ứng với 15 bảng dữ liệu thô, cơ chế an toàn (Retry & Rate Limiting), cách tích hợp vào Dagster và kế hoạch kiểm thử.
 
 ______________________________________________________________________
 
@@ -37,7 +37,6 @@ src/ingest/
     ├── balance_sheet.py        # Thu thập Bảng cân đối kế toán (RAW_BALANCE_SHEET)
     ├── income_statement.py     # Thu thập Báo cáo kết quả KD (RAW_INCOME_STATEMENT)
     ├── cashflow_statement.py   # Thu thập Báo cáo lưu chuyển tiền tệ (RAW_CASHFLOW_STATEMENT)
-    ├── financial_ratios.py     # Thu thập Các chỉ số tài chính (RAW_FINANCIAL_RATIOS)
     ├── company_profile.py      # Thu thập Thông tin hồ sơ DN (RAW_COMPANY_PROFILE)
     │
     # --- MACRO & COMMODITIES (Tần suất chạy: Linh hoạt theo ngày/tháng) ---
@@ -49,7 +48,6 @@ src/ingest/
     # --- QUALITATIVE DATA (Tần suất chạy: Hàng ngày/Real-time) ---
     ├── news_articles.py        # Thu thập tin tức doanh nghiệp (RAW_NEWS_ARTICLES)
     ├── corporate_events.py     # Thu thập lịch sự kiện doanh nghiệp (RAW_CORPORATE_EVENTS)
-    ├── insider_transactions.py # Thu thập giao dịch cổ đông nội bộ (RAW_INSIDER_TRANSACTIONS)
     └── analyst_reports.py      # Thu thập báo cáo phân tích doanh nghiệp (RAW_ANALYST_REPORTS)
 ```
 
@@ -116,7 +114,6 @@ Lớp trừu tượng định nghĩa khung sườn (Template Method) cho vòng �
 
 ```python
 import abc
-import datetime
 import logging
 import os
 import tempfile
@@ -150,12 +147,15 @@ class BaseIngestPipeline(abc.ABC):
         symbols: list[str] | None = None,
         s3_client: "S3Client | None" = None,
         bucket_name: str = "finops-raw-dev",
+        logger: logging.Logger | None = None,
     ) -> None:
+        # `logger` cho phép Dagster asset truyền vào `context.log` để log đi
+        # thẳng vào Dagster event stream; nếu không truyền, fallback logging chuẩn.
         self.batch_date = batch_date
         self.symbols = symbols or []
         self.s3_client = s3_client
         self.bucket_name = bucket_name
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger = logger or logging.getLogger(self.__class__.__name__)
 
     @property
     @abc.abstractmethod
@@ -186,13 +186,18 @@ class BaseIngestPipeline(abc.ABC):
         pass
 
     def standardize(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Standardize column names, filter to schema, and inject metadata.
+        """Standardize column names and filter to declared schema.
 
         Column selection order:
         1. Uppercase all column names from source.
         2. Retain only columns declared in schema_columns (uppercased).
         3. Fill any missing declared columns with None and warn.
-        4. Inject _CONATA_* metadata columns at the end.
+        4. Truncate string columns to 16000 ký tự để tránh lỗi giới hạn độ dài
+           Parquet (65535 bytes) khi Redshift thực hiện COPY.
+
+        Lưu ý: hàm này KHÔNG tiêm các cột metadata `_CONATA_*` hay `BATCH_DATE`
+        — việc tiêm metadata được Load Layer (`src/load/load.py`) đảm nhiệm khi
+        nạp dữ liệu từ S3 vào Redshift (xem mục 3.C).
         """
         result_df = df.copy()
         result_df.columns = result_df.columns.str.upper()
@@ -212,11 +217,10 @@ class BaseIngestPipeline(abc.ABC):
 
         result_df = result_df[expected_cols]
 
-        result_df["BATCH_DATE"] = self.batch_date
-        result_df["_CONATA_SOURCE"] = self.source_uri_prefix
-        result_df["_CONATA_SOURCE_ROW_NUMBER"] = range(1, len(result_df) + 1)
-        result_df["_CONATA_PARTITION_KEY"] = self.batch_date
-        result_df["_CONATA_LOADED_AT"] = pd.Timestamp.now(tz=datetime.UTC)
+        for col in result_df.select_dtypes(include=["object", "string"]).columns:
+            result_df[col] = result_df[col].apply(
+                lambda x: x[:16000] if isinstance(x, str) else x
+            )
 
         return result_df
 
@@ -258,7 +262,18 @@ class BaseIngestPipeline(abc.ABC):
                 os.unlink(temp_path)
 ```
 
-> **Note — `ProprietaryTradingPipeline`:** `fetch()` raises `NotImplementedError`. vnstock v4 does not expose proprietary trading data for any supported source (VCI, KBS). The pipeline skeleton exists in `src/ingest/pipeline/proprietary_trading.py` but requires a paid data source (FiinTrade or Vietstock) to implement.
+> **Note — `ProprietaryTradingPipeline`:** đã được implement (không còn `NotImplementedError`). `fetch()` gọi `FireAntClient.get_historical_quotes()` (yêu cầu biến môi trường `FIREANT_EMAIL`/`FIREANT_PASSWORD`) để lấy giá trị giao dịch tự doanh ròng theo ngày. FireAnt chỉ trả về `propTradingNetValue` (giá trị ròng), không tách được khối lượng mua/bán riêng, nên `buy_vol`/`sell_vol` luôn được ghi cứng là `"0"` trong output.
+
+### C. Metadata Injection tại Load Layer (`src/load/load.py`)
+
+Các cột hệ thống `BATCH_DATE`, `_CONATA_SOURCE`, `_CONATA_SOURCE_ROW_NUMBER`, `_CONATA_PARTITION_KEY`, `_CONATA_LOADED_AT` được khai báo trong DDL của mọi bảng `RAW_*` (`src/redshift/ddl/raw/*.sql.jinja`) nhưng **không nằm trong file Parquet do Ingestion Layer tạo ra**. Chúng được `load_s3_to_redshift()` tiêm vào bằng câu lệnh `INSERT ... SELECT` sau khi `COPY` dữ liệu thô vào bảng tạm:
+
+- `BATCH_DATE` / `_CONATA_PARTITION_KEY`: giá trị `batch_date` truyền vào từ Dagster asset.
+- `_CONATA_SOURCE`: chính là `s3_url` của file Parquet vừa COPY.
+- `_CONATA_SOURCE_ROW_NUMBER`: `ROW_NUMBER() OVER(ORDER BY 1)` được sinh tại thời điểm INSERT.
+- `_CONATA_LOADED_AT`: `SYSDATE` tại thời điểm INSERT.
+
+Việc tách metadata injection ra khỏi Ingestion Layer giúp tránh lỗi type-casting khi ghi Parquet và cho phép Load Layer xử lý idempotency (xoá theo `_CONATA_PARTITION_KEY` trước khi insert lại).
 
 ______________________________________________________________________
 
@@ -284,12 +299,13 @@ sequenceDiagram
     API-->>C: Trả về dữ liệu thô (JSON/CSV)
     C-->>P: Trả về DataFrame thô
     P-->>B: Trả về DataFrame thô
-    B->>B: Gọi .standardize() (chuyển UPPERCASE, tiêm metadata _CONATA_*)
+    B->>B: Gọi .standardize() (chuyển UPPERCASE, lọc theo schema_columns, truncate string)
     B->>B: Gọi .serialize() (ghi file tạm Parquet nén Snappy)
     B->>S3: Gọi .upload() (tải lên S3 Bronze)
     S3-->>B: Xác nhận upload hoàn tất
     B->>B: Xóa file tạm ở local (dọn dẹp đĩa)
     B-->>D: Trả về s3_url của file Parquet
+    Note over D: load_job_sensor sẽ kích hoạt Load Job,<br/>tiêm metadata _CONATA_* khi COPY vào Redshift
 ```
 
 ______________________________________________________________________
@@ -306,8 +322,8 @@ ______________________________________________________________________
 ## 6. Error Handling & Security
 
 - **Không Catch-and-Ignore Exception**: Mọi ngoại lệ trong quá trình lấy dữ liệu, ghi file, và tải lên S3 đều phải để văng tự do (fail loudly) để hệ thống điều phối (Dagster) ghi nhận lỗi và gửi thông báo cảnh báo kịp thời.
-- **Bảo mật Thông tin nhạy cảm**: Tuyệt đối không lưu cứng (hardcode) các API keys, AWS credentials trong code. Các API clients phải truy xuất các giá trị này qua biến môi trường hoặc AWS Secrets Manager đã được Dagster resource bọc sẵn.
-- **Cơ chế Fallback & Mocking**: Đối với các nguồn dữ liệu nhạy cảm hoặc không có API miễn phí ổn định (`RAW_PROPRIETARY_TRADING`, `RAW_INSIDER_TRANSACTIONS`), pipeline thực hiện cơ chế cào đa tầng (Primary API -> HTML Scraper -> Fallback Mock Generator). Khi kích hoạt Mock Generator, dữ liệu mô phỏng sẽ được tự động tạo dựa trên tương quan dữ liệu giá thực tế (EOD) của ngày batch để toàn bộ pipeline không bao giờ bị dừng đột ngột. Cột `_CONATA_SOURCE` sẽ ghi lại chính xác nguồn dữ liệu thực tế được sử dụng (`api://`, `scrape://`, hoặc `mock://`) để phục vụ kiểm toán dữ liệu.
+- **Bảo mật Thông tin nhạy cảm**: Tuyệt đối không lưu cứng (hardcode) các API keys, AWS credentials trong code. Các API clients phải truy xuất các giá trị này qua biến môi trường hoặc AWS Secrets Manager đã được Dagster resource bọc sẵn. Ví dụ: `ProprietaryTradingPipeline` và `AnalystReportsPipeline` (FireAnt) đọc `FIREANT_EMAIL`/`FIREANT_PASSWORD` từ biến môi trường.
+- **Không có cơ chế Mock/Fallback tự động**: Hiện tại không có pipeline nào implement scraper HTML hay mock generator dự phòng. Khi API nguồn lỗi hoặc trả về rỗng, exception văng tự do (fail loudly) hoặc `run()` trả về chuỗi rỗng nếu `fetch()` trả về DataFrame trống — không có tầng fallback sinh dữ liệu giả lập.
 
 ______________________________________________________________________
 
@@ -325,8 +341,8 @@ ______________________________________________________________________
 
 **Pipeline tests** (`tests/ingest/`):
 
-- `test_base_pipeline.py`: Uses a concrete test subclass of `BaseIngestPipeline` to verify: column uppercasing, `schema_columns` filtering, missing-column fill-with-None, `_CONATA_*` metadata injection, and S3 upload path format (boto3 mocked via `unittest.mock.patch`).
-- Per-pipeline files (`test_stock_price_eod_pipeline.py`, `test_balance_sheet_pipeline.py`, etc.): Each verifies the `fetch()` implementation for that pipeline using mocked clients.
+- `test_base_pipeline.py`: Uses a concrete test subclass of `BaseIngestPipeline` to verify: column uppercasing, `schema_columns` filtering, missing-column fill-with-None, custom/default logger injection, S3 upload path format (boto3 mocked via `unittest.mock.patch`), and temp-file cleanup on both success and failure.
+- Per-pipeline files (`test_stock_price_eod_pipeline.py`, `test_balance_sheet_pipeline.py`, etc.): Each verifies the `fetch()` implementation for that pipeline using mocked clients. `test_company_pipelines.py` covers both `CompanyProfilePipeline` and `CorporateEventsPipeline` in one file.
 
 ### Lệnh thực thi
 
