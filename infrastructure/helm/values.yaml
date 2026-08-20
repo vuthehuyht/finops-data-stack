@@ -140,6 +140,8 @@ dagster-user-deployments:
           value: "finops-eks-cluster"
         - name: DAGSTER_S3_IO_BUCKET
           value: "finops-dagster-io"
+        - name: DAGSTER_SLACK_CHANNEL_ID
+          value: "PLACEHOLDER_SLACK_CHANNEL_ID"
         - name: REDSHIFT_HOST
           valueFrom:
             secretKeyRef:
@@ -273,6 +275,8 @@ runLauncher:
               value: "finops-eks-cluster"
             - name: DAGSTER_S3_IO_BUCKET
               value: "finops-dagster-io"
+            - name: DAGSTER_SLACK_CHANNEL_ID
+              value: "PLACEHOLDER_SLACK_CHANNEL_ID"
             - name: REDSHIFT_HOST
               valueFrom:
                 secretKeyRef:
