@@ -34,6 +34,12 @@ variable "fireant_password" {
   description = "FireAnt account password, for analyst reports ingestion"
 }
 
+variable "fireant_proxy_url" {
+  type        = string
+  sensitive   = true
+  description = "FireAnt proxy URL to bypass WAF"
+}
+
 variable "cluster_admin_principal_arns" {
   type        = list(string)
   default     = []

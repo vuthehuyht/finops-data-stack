@@ -76,6 +76,12 @@ variable "fireant_password" {
   description = "FireAnt account password, for analyst reports ingestion"
 }
 
+variable "fireant_proxy_url" {
+  type        = string
+  sensitive   = true
+  description = "FireAnt proxy URL to bypass WAF"
+}
+
 variable "slack_api_token" {
   type      = string
   sensitive = true
