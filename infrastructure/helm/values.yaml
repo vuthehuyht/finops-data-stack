@@ -170,6 +170,11 @@ dagster-user-deployments:
             secretKeyRef:
               name: dagster-pg-credentials
               key: fireant_password
+        - name: FIREANT_PROXY_URL
+          valueFrom:
+            secretKeyRef:
+              name: dagster-pg-credentials
+              key: fireant_proxy_url
         - name: REDSHIFT_IAM_ROLE_ARN
           value: ""
         - name: FINOPS_RAW_BUCKET
@@ -298,6 +303,11 @@ runLauncher:
                 secretKeyRef:
                   name: dagster-pg-credentials
                   key: fireant_password
+            - name: FIREANT_PROXY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: dagster-pg-credentials
+                  key: fireant_proxy_url
             - name: REDSHIFT_IAM_ROLE_ARN
               value: ""
             - name: FINOPS_RAW_BUCKET
