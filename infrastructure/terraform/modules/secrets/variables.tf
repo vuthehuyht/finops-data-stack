@@ -86,3 +86,8 @@ variable "slack_api_token" {
   type      = string
   sensitive = true
 }
+
+variable "slack_channel_id" {
+  type        = string
+  description = "Slack Channel ID for alerts"
+}

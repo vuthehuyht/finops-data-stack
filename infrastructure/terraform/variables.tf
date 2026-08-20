@@ -51,3 +51,8 @@ variable "slack_api_token" {
   sensitive   = true
   description = "Slack API token for Dagster alerts"
 }
+
+variable "slack_channel_id" {
+  type        = string
+  description = "Slack Channel ID for alerts"
+}

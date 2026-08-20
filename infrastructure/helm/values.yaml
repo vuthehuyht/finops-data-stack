@@ -141,7 +141,10 @@ dagster-user-deployments:
         - name: DAGSTER_S3_IO_BUCKET
           value: "finops-dagster-io"
         - name: DAGSTER_SLACK_CHANNEL_ID
-          value: "C0BR66ZAF47"
+          valueFrom:
+            secretKeyRef:
+              name: dagster-slack-api-token
+              key: DAGSTER_SLACK_CHANNEL_ID
         - name: REDSHIFT_HOST
           valueFrom:
             secretKeyRef:
@@ -276,7 +279,10 @@ runLauncher:
             - name: DAGSTER_S3_IO_BUCKET
               value: "finops-dagster-io"
             - name: DAGSTER_SLACK_CHANNEL_ID
-              value: "C0BR66ZAF47"
+              valueFrom:
+                secretKeyRef:
+                  name: dagster-slack-api-token
+                  key: DAGSTER_SLACK_CHANNEL_ID
             - name: REDSHIFT_HOST
               valueFrom:
                 secretKeyRef:
