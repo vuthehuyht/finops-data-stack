@@ -317,6 +317,11 @@ def define_ml_jobs() -> MlJobBundle:
             _TRAINING_JOB_ASSET_KEY,
             _MODEL_EVALUATION_ASSET_KEY,
         ],
+        k8s_config={
+            "pod_spec_config": {
+                "node_selector": {"karpenter.sh/capacity-type": "on-demand"}
+            }
+        },
         tags={"type": "ml"},
     )
     schedule = dagster.ScheduleDefinition(
