@@ -152,12 +152,17 @@ class BaseIngestPipeline(abc.ABC):
         # Reorder to schema order, dropping any extra columns
         result_df = result_df[expected_cols]
 
+        # Convert everything to string to match Redshift Bronze VARCHAR schema
+        for col in result_df.columns:
+            result_df[col] = result_df[col].replace(
+                ["nan", "NaN", "None", "<NA>"], pd.NA
+            )
+        result_df = result_df.astype("string")
+
         # Truncate string columns to prevent Redshift COPY Parquet length limit errors
         # Safe length is 16000 chars for 65535 bytes (4 bytes max per utf-8 char)
-        for col in result_df.select_dtypes(include=["object", "string"]).columns:
-            result_df[col] = result_df[col].apply(
-                lambda x: x[:16000] if isinstance(x, str) else x
-            )
+        for col in result_df.columns:
+            result_df[col] = result_df[col].str.slice(0, 16000)
 
         return result_df
 
