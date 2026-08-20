@@ -170,11 +170,11 @@ class _DecoratorBase(abc.ABC):
                 "resources": {
                     "requests": {
                         "cpu": "100m",
-                        "memory": "1Gi",
+                        "memory": "1Gi" if op else "512Mi",
                         "ephemeral-storage": "1Gi",
                     },
                     "limits": {
-                        "memory": "1Gi",
+                        "memory": "1Gi" if op else "512Mi",
                         "ephemeral-storage": "1Gi",
                     },
                 },
