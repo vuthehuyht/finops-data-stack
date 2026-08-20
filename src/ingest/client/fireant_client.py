@@ -1,5 +1,7 @@
 """FireAnt REST API client for fetching analyst research reports."""
 
+import os
+
 import requests
 
 from src.ingest.client.base_client import BaseClient
@@ -26,11 +28,18 @@ class FireAntClient(BaseClient):
             request_delay_seconds: Spacing delay between requests.
         """
         super().__init__(request_delay_seconds=request_delay_seconds)
+        self._session = requests.Session()
+        proxy_url = os.environ.get("FIREANT_PROXY_URL")
+        if proxy_url:
+            self._session.proxies.update({"http": proxy_url, "https": proxy_url})
+
         token = self._login(email, password)
-        self._headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-        }
+        self._session.headers.update(
+            {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            }
+        )
 
     def _login(self, email: str, password: str) -> str:
         """Authenticate with FireAnt and return the access token.
@@ -46,7 +55,7 @@ class FireAntClient(BaseClient):
             ValueError: If the login response does not contain a token.
             requests.HTTPError: If the login request fails.
         """
-        response = requests.post(
+        response = self._session.post(
             f"{_BASE_URL}/authentication/login",
             json={"email": email, "password": password, "rememberMe": True},
             timeout=30,
@@ -76,9 +85,8 @@ class FireAntClient(BaseClient):
         Returns:
             Raw JSON response dict with keys 'total' and 'reports'.
         """
-        response = requests.get(
+        response = self._session.get(
             f"{_BASE_URL}/reports/search",
-            headers=self._headers,
             params={
                 "symbol": symbol,
                 "startDate": start_date,
@@ -124,9 +132,8 @@ class FireAntClient(BaseClient):
         self, symbol: str, start_date: str, end_date: str, offset: int
     ) -> list[dict]:
         """Fetch a single page of historical quotes from FireAnt API."""
-        response = requests.get(
+        response = self._session.get(
             f"{_BASE_URL}/symbols/{symbol}/historical-quotes",
-            headers=self._headers,
             params={
                 "startDate": start_date,
                 "endDate": end_date,
