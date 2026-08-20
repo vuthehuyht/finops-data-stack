@@ -12,11 +12,11 @@ def default_container_env() -> list[dict[str, Any]]:
     return [
         {
             "name": "AWS_REGION",
-            "value": os.environ.get("AWS_REGION", "ap-northeast-1"),
+            "value": os.environ.get("AWS_REGION", "ap-southeast-1"),
         },
         {
             "name": "AWS_DEFAULT_REGION",
-            "value": os.environ.get("AWS_DEFAULT_REGION", "ap-northeast-1"),
+            "value": os.environ.get("AWS_DEFAULT_REGION", "ap-southeast-1"),
         },
         {
             "name": "AWS_STS_REGIONAL_ENDPOINTS",
@@ -25,6 +25,10 @@ def default_container_env() -> list[dict[str, Any]]:
         {
             "name": "LOG4J_FORMAT_MSG_NO_LOOKUPS",
             "value": "true",
+        },
+        {
+            "name": "HOME",
+            "value": "/tmp",
         },
     ]
 
