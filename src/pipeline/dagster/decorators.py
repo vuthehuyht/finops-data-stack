@@ -130,6 +130,18 @@ class _DecoratorBase(abc.ABC):
                 },
             },
             "pod_spec_config": {
+                # Force step pods to run on Spot worker nodes
+                "node_selector": {
+                    "node-group": "worker",
+                },
+                "tolerations": [
+                    {
+                        "key": "spotWorker",
+                        "operator": "Equal",
+                        "value": "true",
+                        "effect": "NoSchedule",
+                    }
+                ],
                 # Per-step k8s serviceaccount. The default serviceaccount comes
                 # with minimal IAM permissions to manipulate S3 objects (for logs and io
                 # managers).
