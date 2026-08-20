@@ -63,6 +63,9 @@ class BaseClient:
             raise e
         except SystemExit as e:
             logger.warning(
-                "API call triggered sys.exit (possibly rate limit): %s. Retrying...", e
+                "API call triggered sys.exit (possibly rate limit): %s. "
+                "Sleeping for 60 seconds before letting tenacity retry...",
+                e,
             )
+            time.sleep(60)
             raise RuntimeError(f"SystemExit raised: {e}") from e

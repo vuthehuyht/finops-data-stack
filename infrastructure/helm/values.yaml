@@ -71,7 +71,7 @@ dagsterWebserver:
       memory: "512Mi"
     limits:
       cpu: "1000m"
-      memory: "1536Mi"
+      memory: "2Gi"
 
   readinessProbe:
     httpGet:
@@ -210,7 +210,7 @@ dagster-user-deployments:
           memory: "512Mi"
         limits:
           cpu: "1"
-          memory: "3Gi"
+          memory: "1Gi"
 
       readinessProbe:
         enabled: true
@@ -254,7 +254,7 @@ runLauncher:
           memory: "1Gi"
         limits:
           cpu: "1"
-          memory: "3Gi"
+          memory: "1Gi"
 
       failPodOnRunFailure: false
 
@@ -269,6 +269,7 @@ runLauncher:
         podSpecConfig:
           nodeSelector:
             node-group: worker
+            karpenter.sh/capacity-type: spot
           tolerations:
             - key: "spotWorker"
               operator: "Equal"

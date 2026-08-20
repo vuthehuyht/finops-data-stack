@@ -327,6 +327,11 @@ def define_inference_jobs() -> InferenceJobBundle:
             _DAILY_FORECAST_ASSET_KEY,
             _PUBLISH_FORECAST_RESULTS_ASSET_KEY,
         ],
+        k8s_config={
+            "pod_spec_config": {
+                "node_selector": {"karpenter.sh/capacity-type": "on-demand"}
+            }
+        },
         tags={"type": "ml"},
     )
 

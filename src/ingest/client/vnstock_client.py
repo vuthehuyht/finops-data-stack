@@ -35,9 +35,9 @@ class VnStockClient(BaseClient):
         Returns:
             DataFrame containing stock historical price.
         """
-        stock_obj = self.client.stock(symbol=symbol, source=source)
 
         def _fetch() -> pd.DataFrame:
+            stock_obj = self.client.stock(symbol=symbol, source=source)
             return stock_obj.quote.history(start=start_date, end=end_date)
 
         return self.call_api_with_retry(_fetch)
@@ -52,9 +52,9 @@ class VnStockClient(BaseClient):
         Returns:
             DataFrame containing news articles from vnstock v4.
         """
-        stock_obj = self.client.stock(symbol=symbol, source=source)
 
         def _fetch() -> pd.DataFrame:
+            stock_obj = self.client.stock(symbol=symbol, source=source)
             return stock_obj.company.news()
 
         return self.call_api_with_retry(_fetch)
