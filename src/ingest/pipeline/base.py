@@ -194,6 +194,9 @@ class BaseIngestPipeline(abc.ABC):
             The uploaded S3 URL string.
         """
         unix_timestamp = int(time.time())
+        # The parent folder for this batch_date
+        batch_prefix_s3_url = f"s3://{self.bucket_name}/raw/{self.table_name}/batch_date={self.batch_date}/"
+
         # Folder structure:
         # raw/<table_name>/batch_date=<date>/<timestamp>/<table_name>.parquet
         s3_key = (
@@ -202,6 +205,13 @@ class BaseIngestPipeline(abc.ABC):
             f"{unix_timestamp}/{self.table_name}.parquet"
         )
         s3_url = f"s3://{self.bucket_name}/{s3_key}"
+
+        from src.common.s3_util import delete_s3_prefix
+
+        self.logger.info(
+            "Cleaning up existing S3 prefix for idempotency: %s", batch_prefix_s3_url
+        )
+        delete_s3_prefix(batch_prefix_s3_url, self.s3_client, self.logger)
 
         self.logger.info("Uploading file to S3 destination: %s", s3_url)
         upload_to_s3(

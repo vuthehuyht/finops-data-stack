@@ -189,6 +189,27 @@ def delete_s3_objects(
             raise RuntimeError(f"Failed to delete objects: {errors}")
 
 
+def delete_s3_prefix(
+    s3_url: str,
+    s3_client: S3Client,
+    logger: logging.Logger,
+) -> None:
+    """Delete all S3 objects under a specified prefix.
+
+    Args:
+        s3_url (str): Target S3 URL prefix.
+        s3_client (S3Client): S3 client.
+        logger (Logger): Logger to write the progress.
+    """
+    (bucket, _) = split_s3_url(s3_url)
+    keys = list(list_s3_keys(s3_url, s3_client))
+    if keys:
+        logger.info("Found %d objects under prefix %s to delete.", len(keys), s3_url)
+        delete_s3_objects(bucket, keys, s3_client, logger)
+    else:
+        logger.info("No objects found under prefix %s to delete.", s3_url)
+
+
 def delete_s3_object(
     s3_url: str,
     s3_client: S3Client,
