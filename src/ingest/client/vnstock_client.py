@@ -12,7 +12,7 @@ logger = get_dagster_logger()
 class VnStockClient(BaseClient):
     """Client for fetching stock price and fundamental data from Vietnam market."""
 
-    def __init__(self, request_delay_seconds: float = 1.0) -> None:
+    def __init__(self, request_delay_seconds: float = 2.5) -> None:
         """Initialize VnStockClient.
 
         Args:

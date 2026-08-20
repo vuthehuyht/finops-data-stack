@@ -61,3 +61,8 @@ class BaseClient:
         except Exception as e:
             logger.warning("API call failed: %s. Retrying...", e)
             raise e
+        except SystemExit as e:
+            logger.warning(
+                "API call triggered sys.exit (possibly rate limit): %s. Retrying...", e
+            )
+            raise RuntimeError(f"SystemExit raised: {e}") from e
