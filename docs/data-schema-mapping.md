@@ -38,7 +38,7 @@ Bối cảnh kinh tế tác động đến định giá (Đặc biệt quan tr�
 | `RAW_MACRO_INDICATORS` | `INDICATOR_NAME`, `REPORT_DATE`, `VALUE`, `UNIT` | World Bank API (`world_bank_client.py`) | Hàng Tháng / Quý |
 | `RAW_INTEREST_RATES` | `RATE_TYPE`, `DATE`, `RATE_VALUE` | Yahoo Finance — US benchmark rates (^IRX: Fed proxy, ^TNX: 10Y Treasury, ^FVX: 5Y Treasury) | Daily |
 | `RAW_EXCHANGE_RATES` | `PAIR`, `DATE`, `EXCHANGE_RATE` | Yahoo Finance — pairs: USD/VND, EUR/VND, GBP/VND, JPY/VND, CNY/VND | Daily |
-| `RAW_COMMODITIES_PRICE`| `COMMODITY_NAME`, `DATE`, `PRICE` | Yahoo Finance (`yahoo_finance_client.py`) | Daily |
+| `RAW_COMMODITIES_PRICE` | `COMMODITY_NAME`, `DATE`, `PRICE` | Yahoo Finance (`yahoo_finance_client.py`) | Daily |
 
 **Lưu ý chi tiết hàng hóa (RAW_COMMODITIES_PRICE):** Cần thu thập ít nhất các mã: `Brent Crude`, `WTI`, `Gasoline Singapore (92/95)`, `Baltic Dirty Tanker Index`, `Gold`, `Steel HRC`.
 
