@@ -5,7 +5,7 @@
 # AWS Profile configuration
 PROFILE ?= default
 ifdef profile
-  PROFILE = $(profile)
+    PROFILE = $(profile)
 endif
 export AWS_PROFILE = $(PROFILE)
 

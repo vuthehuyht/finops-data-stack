@@ -11,7 +11,8 @@ import json
 import os
 import shutil
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import torch
@@ -210,7 +211,7 @@ def main() -> None:
     _bundle_serving_code(args.model_dir)
 
     metadata = {
-        "trained_at": datetime.now(UTC).isoformat(),
+        "trained_at": datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).isoformat(),
         "hyperparameters": {
             "window_size": args.window_size,
             "epochs": args.epochs,

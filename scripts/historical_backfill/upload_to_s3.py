@@ -5,7 +5,7 @@ import os
 import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -100,7 +100,9 @@ def process_table(table_dir: Path, bucket: str) -> None:  # noqa: C901
             # Keep only expected columns in the exact order specified by the DDL
             final_df = final_df[expected_columns]
 
-    current_date = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).strftime("%Y-%m-%d")
+    current_date = (
+        datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")) - timedelta(days=1)
+    ).strftime("%Y-%m-%d")
 
     # Truncate string columns to prevent Redshift COPY Parquet length limit errors.
     # Use native .str.slice to preserve StringDtype instead of .apply() which
