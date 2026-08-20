@@ -145,6 +145,11 @@ dagster-user-deployments:
             secretKeyRef:
               name: dagster-slack-api-token
               key: DAGSTER_SLACK_CHANNEL_ID
+        - name: DAGSTER_SLACK_API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: dagster-slack-api-token
+              key: token
         - name: REDSHIFT_HOST
           valueFrom:
             secretKeyRef:
@@ -283,6 +288,11 @@ runLauncher:
                 secretKeyRef:
                   name: dagster-slack-api-token
                   key: DAGSTER_SLACK_CHANNEL_ID
+            - name: DAGSTER_SLACK_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: dagster-slack-api-token
+                  key: token
             - name: REDSHIFT_HOST
               valueFrom:
                 secretKeyRef:
