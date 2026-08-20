@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 import pandas as pd
 
-from src.common.s3_util import upload_to_s3
+from src.common.s3_util import delete_s3_prefix, upload_to_s3
 
 if TYPE_CHECKING:
     from mypy_boto3_s3.client import S3Client
@@ -205,8 +205,6 @@ class BaseIngestPipeline(abc.ABC):
             f"{unix_timestamp}/{self.table_name}.parquet"
         )
         s3_url = f"s3://{self.bucket_name}/{s3_key}"
-
-        from src.common.s3_util import delete_s3_prefix
 
         self.logger.info(
             "Cleaning up existing S3 prefix for idempotency: %s", batch_prefix_s3_url
