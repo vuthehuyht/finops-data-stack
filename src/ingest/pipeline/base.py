@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 import pandas as pd
 
-from src.common.s3_util import upload_to_s3
+from src.common.s3_util import delete_s3_prefix, upload_to_s3
 
 if TYPE_CHECKING:
     from mypy_boto3_s3.client import S3Client
@@ -152,12 +152,17 @@ class BaseIngestPipeline(abc.ABC):
         # Reorder to schema order, dropping any extra columns
         result_df = result_df[expected_cols]
 
+        # Convert everything to string to match Redshift Bronze VARCHAR schema
+        for col in result_df.columns:
+            result_df[col] = result_df[col].replace(
+                ["nan", "NaN", "None", "<NA>"], pd.NA
+            )
+        result_df = result_df.astype("string")
+
         # Truncate string columns to prevent Redshift COPY Parquet length limit errors
         # Safe length is 16000 chars for 65535 bytes (4 bytes max per utf-8 char)
-        for col in result_df.select_dtypes(include=["object", "string"]).columns:
-            result_df[col] = result_df[col].apply(
-                lambda x: x[:16000] if isinstance(x, str) else x
-            )
+        for col in result_df.columns:
+            result_df[col] = result_df[col].str.slice(0, 16000)
 
         return result_df
 
@@ -189,6 +194,9 @@ class BaseIngestPipeline(abc.ABC):
             The uploaded S3 URL string.
         """
         unix_timestamp = int(time.time())
+        # The parent folder for this batch_date
+        batch_prefix_s3_url = f"s3://{self.bucket_name}/raw/{self.table_name}/batch_date={self.batch_date}/"
+
         # Folder structure:
         # raw/<table_name>/batch_date=<date>/<timestamp>/<table_name>.parquet
         s3_key = (
@@ -197,6 +205,11 @@ class BaseIngestPipeline(abc.ABC):
             f"{unix_timestamp}/{self.table_name}.parquet"
         )
         s3_url = f"s3://{self.bucket_name}/{s3_key}"
+
+        self.logger.info(
+            "Cleaning up existing S3 prefix for idempotency: %s", batch_prefix_s3_url
+        )
+        delete_s3_prefix(batch_prefix_s3_url, self.s3_client, self.logger)
 
         self.logger.info("Uploading file to S3 destination: %s", s3_url)
         upload_to_s3(

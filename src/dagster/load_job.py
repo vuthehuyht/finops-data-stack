@@ -307,7 +307,9 @@ def define_load_jobs() -> LoadJobBundle:
         config_schema={
             "batch_date": dagster.Field(
                 str,
-                default_value=datetime.datetime.now().strftime("%Y-%m-%d"),
+                default_value=(
+                    datetime.datetime.now() - datetime.timedelta(days=1)
+                ).strftime("%Y-%m-%d"),
                 is_required=False,
             )
         }

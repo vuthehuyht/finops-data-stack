@@ -48,7 +48,7 @@ def test_define_ingest_jobs_returns_bundle() -> None:
     bundle = define_ingest_jobs()
     assert isinstance(bundle, IngestJobBundle)
     assert len(bundle.assets) == 15
-    assert len(bundle.jobs) == 15
+    assert len(bundle.jobs) == 16
     assert len(bundle.schedules) == 15
 
 
@@ -106,3 +106,22 @@ def test_all_ingest_assets_have_input_group() -> None:
     assert len(_ALL_INGEST_ASSETS) == 15
     for asset in _ALL_INGEST_ASSETS:
         assert asset.group_names_by_key[asset.key] == "INPUT"
+
+
+def test_ingest_all_raw_data_job_exists() -> None:
+    from src.dagster.ingest_job import define_ingest_jobs
+
+    bundle = define_ingest_jobs()
+    job_names = {j.name for j in bundle.jobs}
+    assert "ingest_all_raw_data_job" in job_names
+
+
+def test_ingest_all_config_mapping() -> None:
+    from src.dagster.ingest_job import ingest_all_config_mapping
+
+    config_dict = ingest_all_config_mapping.config_fn({"batch_date": "2026-08-19"})
+    ops = config_dict.get("ops", {})
+    assert len(ops) == 15
+    assert "INPUT__RAW_STOCK_PRICE_EOD" in ops
+    assert ops["INPUT__RAW_STOCK_PRICE_EOD"]["config"]["batch_date"] == "2026-08-19"
+    assert ops["INPUT__RAW_STOCK_PRICE_EOD"]["config"]["symbols"] == []

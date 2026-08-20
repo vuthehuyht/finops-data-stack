@@ -526,6 +526,24 @@ _ALL_INGEST_ASSETS: list[dagster.AssetsDefinition] = [
 ]
 
 
+@dagster.config_mapping(
+    config_schema={
+        "batch_date": dagster.Field(
+            str,
+            default_value=datetime.date.today().isoformat(),
+            is_required=False,
+        )
+    }
+)
+def ingest_all_config_mapping(val: dict) -> dict:
+    batch_date = val["batch_date"]
+    ops = {}
+    for asset in _ALL_INGEST_ASSETS:
+        asset_py_id = asset.key.to_python_identifier()
+        ops[asset_py_id] = {"config": {"batch_date": batch_date, "symbols": []}}
+    return {"ops": ops}
+
+
 @functools.cache
 def define_ingest_jobs() -> IngestJobBundle:
     """Build Dagster assets, jobs, and schedules for all INPUT ingestion assets."""
@@ -547,5 +565,21 @@ def define_ingest_jobs() -> IngestJobBundle:
         bundle.schedules.append(
             _make_ingest_schedule(job, job_name, asset.key.to_python_identifier())
         )
+
+    ingest_all_job = dagster_lib.define_asset_job(
+        "ingest_all_raw_data_job",
+        selection=bundle.assets,
+        config=ingest_all_config_mapping,
+        tags={
+            "limit_concurrent_job_runs_to_1": "ingest_all_raw_data_job",
+            "type": "ingest",
+        },
+        description=(
+            "Manual job to ingest all raw data tables concurrently for a "
+            "given batch_date. Pipelines handle the daily/quarterly/yearly "
+            "fetch logic internally."
+        ),
+    )
+    bundle.jobs.append(ingest_all_job)
 
     return bundle

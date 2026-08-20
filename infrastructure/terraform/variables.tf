@@ -34,6 +34,12 @@ variable "fireant_password" {
   description = "FireAnt account password, for analyst reports ingestion"
 }
 
+variable "fireant_proxy_url" {
+  type        = string
+  sensitive   = true
+  description = "FireAnt proxy URL to bypass WAF"
+}
+
 variable "cluster_admin_principal_arns" {
   type        = list(string)
   default     = []
@@ -44,4 +50,9 @@ variable "slack_api_token" {
   type        = string
   sensitive   = true
   description = "Slack API token for Dagster alerts"
+}
+
+variable "slack_channel_id" {
+  type        = string
+  description = "Slack Channel ID for alerts"
 }

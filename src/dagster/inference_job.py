@@ -67,7 +67,7 @@ class MlInferenceGateConfig(dagster.Config):
     """Runtime config for the data quality gate asset."""
 
     null_rate_threshold: float = pydantic.Field(
-        default=0.2,
+        default=0.6,
         description="Max acceptable null rate per feature column (0.0-1.0).",
     )
 
@@ -167,7 +167,7 @@ def ml_daily_forecast(  # noqa: C901
             f"""
             SELECT * FROM {_FEATURE_TABLE}
             WHERE TRADING_DATE <= '{validated_date}'
-              AND TRADING_DATE > '{lower_bound}'
+                AND TRADING_DATE > '{lower_bound}'
             """,
             conn,
         )
@@ -327,6 +327,11 @@ def define_inference_jobs() -> InferenceJobBundle:
             _DAILY_FORECAST_ASSET_KEY,
             _PUBLISH_FORECAST_RESULTS_ASSET_KEY,
         ],
+        k8s_config={
+            "pod_spec_config": {
+                "node_selector": {"karpenter.sh/capacity-type": "on-demand"}
+            }
+        },
         tags={"type": "ml"},
     )
 

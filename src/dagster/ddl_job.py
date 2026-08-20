@@ -18,6 +18,14 @@ from src.redshift import ddl_executor
         ),
         "schema_name_mart": dagster.Field(str, default_value="mart", is_required=False),
     },
+    k8s_config={
+        "container_config": {
+            "resources": {
+                "requests": {"memory": "512Mi"},
+                "limits": {"memory": "1Gi"},
+            }
+        }
+    },
 )
 def execute_ddl_op(context: dagster.OpExecutionContext) -> None:
     """Execute DDL for Raw Layer on Redshift."""

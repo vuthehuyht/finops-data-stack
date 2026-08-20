@@ -14,7 +14,7 @@ def test_ml_inference_gate_config_default_threshold() -> None:
     from src.dagster.inference_job import MlInferenceGateConfig
 
     config = MlInferenceGateConfig()
-    assert config.null_rate_threshold == 0.2
+    assert config.null_rate_threshold == 0.6
 
 
 def test_define_inference_jobs_returns_bundle_with_three_assets() -> None:

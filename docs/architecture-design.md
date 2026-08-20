@@ -48,7 +48,7 @@ Luồng này chạy định kỳ hàng Quý (sau khi các doanh nghiệp công b
 1. **Historical Data Preparation:** Xuất toàn bộ lịch sử `FACT_ML_FEATURE_SET` từ Redshift (không lọc theo lookback — dữ liệu đủ nhỏ nên không cần giới hạn cửa sổ thời gian).
 1. **Training Job (SageMaker):** Khởi chạy SageMaker Training Job (GPU). Sau khi hoàn tất, model artifact (`model.tar.gz`) được đẩy lên **Amazon S3**.
 1. **Model Registration:** Versioning model bằng cấu trúc thư mục trên S3 (`s3://finops-model-artifacts/<model_name>/<version>/`, gồm `model.tar.gz` + `metadata.json` chứa metrics đánh giá) — không dùng SageMaker Model Registry API.
-1. **Model Evaluation & Approval:** So sánh mô hình mới (Challenger) vs mô hình hiện tại (Champion). Nếu đạt yêu cầu, quản trị viên (hoặc auto-approve script) phê duyệt model trong Registry.
+1. **Model Evaluation:** Tự động so sánh mô hình mới (Challenger) vs mô hình hiện tại (Champion) dựa trên RMSE — Challenger phải cải thiện RMSE tối thiểu `evaluation_threshold` % (đọc từ SSM `/finops/model/evaluation_threshold`, có fallback trong config asset) so với Champion mới được coi là đạt; không có bước phê duyệt thủ công.
 1. **Model Promotion:** Thăng cấp active version của mô hình mới nhất bằng cách lưu version của nó lên SSM Parameter Store (`/finops/model/active_version`), giúp luồng dự báo hàng ngày tự động nhận diện và sử dụng.
 
 ## 5. Phased Implementation Plan
@@ -71,25 +71,29 @@ Luồng này chạy định kỳ hàng Quý (sau khi các doanh nghiệp công b
 - Xây dựng mô hình Deep Learning Multimodal và tích hợp vào Dagster.
 - Thiết lập luồng Re-training hàng quý và luồng Inference hàng ngày.
 
-## 7. Cấu trúc thư mục dự án (Flywheel Architecture)
+## 7. Cấu trúc thư mục dự án
 
-Dự án tuân thủ nghiêm ngặt cấu trúc **Flywheel** để đảm bảo tính module hóa và khả năng mở rộng, tương đương với chuẩn hệ thống Data Core, nhưng sử dụng tên thư mục `src` theo chuẩn Python:
+Dự án tổ chức thư mục `src` theo module hóa domain, sử dụng tên thư mục `src` theo chuẩn Python:
 
 ```text
 finops-data-stack/
 ├── docs/                      # Tài liệu nghiệp vụ và kỹ thuật
-├── src/                       # Trái tim xử lý dữ liệu của hệ thống (Flywheel Core)
-│   ├── common/                # Tiện ích dùng chung (S3, Redshift, Logging utils)
-│   ├── dagster/               # Logic điều phối (Jobs, Sensors, Assets, Resources)
-│   ├── ingest/                # Ingestion layer (Crawl/API code đẩy vào S3)
-│   ├── load/                  # Load layer (Logic nạp từ S3 vào Redshift)
-│   ├── transform/             # Transformation layer (dbt project)
-│   │   └── dbt/               # Mã nguồn dbt (models, tests, macros)
-│   ├── pipeline/              # Định nghĩa các luồng xử lý end-to-end
-│   ├── ml/                    # Machine Learning layer (Train/Inference code)
-│   ├── docker/                # Dockerfiles cho từng thành phần
-│   └── k8s/                   # Kubernetes manifests (ArgoCD)
-├── infrastructure/            # Hạ tầng đám mây (Terraform/CloudFormation)
+├── src/                       # Trái tim xử lý dữ liệu của hệ thống
+│   ├── common/                 # Tiện ích dùng chung (S3, Redshift, Logging utils)
+│   ├── dagster/                # Logic điều phối (Jobs, Sensors, Assets, Resources)
+│   ├── pipeline/dagster/       # Thư viện wrapper nội bộ cho Dagster (asset/job
+│   │                           #   decorators, hooks, k8s config) — dùng bởi src/dagster/
+│   ├── ingest/
+│   │   ├── client/             # API/crawl client cho từng nguồn dữ liệu (TCBS, FireAnt...)
+│   │   └── pipeline/           # Ingestion layer — 1 pipeline/nguồn dữ liệu, đẩy vào S3
+│   ├── load/                   # Load layer (Logic nạp từ S3 vào Redshift)
+│   ├── redshift/                # DDL và tiện ích thực thi DDL cho Redshift
+│   ├── transform/               # Transformation layer (dbt project)
+│   │   └── dbt/                 # Mã nguồn dbt (models RAW/STG/MART, tests, macros)
+│   ├── ml/                      # Machine Learning layer (Train/Inference code)
+│   ├── docker/                  # Dockerfiles cho từng thành phần
+│   └── k8s/                     # Kubernetes manifests (ArgoCD)
+├── infrastructure/            # Hạ tầng đám mây (Terraform, Helm charts)
 ├── tools/                     # Các công cụ hỗ trợ dev và CI/CD
 ├── pyproject.toml             # Quản lý dependency bằng uv
 └── README.md

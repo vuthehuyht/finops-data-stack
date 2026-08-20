@@ -187,16 +187,16 @@ runs:
           -f infrastructure/helm/values.yaml \
           --set dagster-user-deployments.deployments[0].image.repository=${{ inputs.ecr-repository-url }} \
           --set dagster-user-deployments.deployments[0].image.tag=${{ steps.resolve-tag.outputs.tag }} \
-          --set dagster-user-deployments.deployments[0].env[9].value=${{ inputs.redshift-iam-role-arn }} \
-          --set dagster-user-deployments.deployments[0].env[10].value=${{ inputs.finops-raw-bucket }} \
-          --set dagster-user-deployments.deployments[0].env[11].value=${{ inputs.finops-processed-bucket }} \
-          --set dagster-user-deployments.deployments[0].env[12].value=${{ inputs.finops-model-artifacts-bucket }} \
-          --set dagster-user-deployments.deployments[0].env[13].value=${{ inputs.sagemaker-execution-role-arn }} \
-          --set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env[8].value=${{ inputs.redshift-iam-role-arn }} \
-          --set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env[9].value=${{ inputs.finops-raw-bucket }} \
-          --set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env[10].value=${{ inputs.finops-processed-bucket }} \
-          --set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env[11].value=${{ inputs.finops-model-artifacts-bucket }} \
-          --set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env[12].value=${{ inputs.sagemaker-execution-role-arn }} \
+          --set dagster-user-deployments.deployments[0].env[12].value=${{ inputs.redshift-iam-role-arn }} \
+          --set dagster-user-deployments.deployments[0].env[13].value=${{ inputs.finops-raw-bucket }} \
+          --set dagster-user-deployments.deployments[0].env[14].value=${{ inputs.finops-processed-bucket }} \
+          --set dagster-user-deployments.deployments[0].env[15].value=${{ inputs.finops-model-artifacts-bucket }} \
+          --set dagster-user-deployments.deployments[0].env[16].value=${{ inputs.sagemaker-execution-role-arn }} \
+          --set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env[11].value=${{ inputs.redshift-iam-role-arn }} \
+          --set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env[12].value=${{ inputs.finops-raw-bucket }} \
+          --set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env[13].value=${{ inputs.finops-processed-bucket }} \
+          --set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env[14].value=${{ inputs.finops-model-artifacts-bucket }} \
+          --set runLauncher.config.k8sRunLauncher.runK8sConfig.containerConfig.env[15].value=${{ inputs.sagemaker-execution-role-arn }} \
           --set postgresql.postgresqlHost=${{ inputs.rds-address }} \
           --set postgresql.postgresqlUsername=${{ inputs.rds-username }} \
           --set postgresql.postgresqlDatabase=${{ inputs.rds-dbname }} \

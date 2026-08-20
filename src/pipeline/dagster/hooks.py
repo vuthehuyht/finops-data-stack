@@ -96,8 +96,9 @@ def append_slack_on_job_failure_sensor_if_on_k8s(
         return list
     else:
         cluster = kubernetes_cluster_name()
+        channel = os.getenv("DAGSTER_SLACK_CHANNEL_ID", f"#dagster-{cluster}")
         sensor = make_slack_on_run_failure_sensor(
-            channel=f"#dagster-{cluster}",
+            channel=channel,
             # Note that this code is evaluated at workspace pods.
             slack_token=os.getenv("DAGSTER_SLACK_API_TOKEN"),  # type: ignore[arg-type]
             blocks_fn=_slack_blocks_fn,
@@ -136,10 +137,11 @@ def _notify_op_failure_of_slack(context: HookContext) -> None:
     cluster = kubernetes_cluster_name()
     if cluster is None:
         return
+    channel = os.getenv("DAGSTER_SLACK_CHANNEL_ID", f"#dagster-{cluster}")
     slack = WebClient(os.getenv("DAGSTER_SLACK_API_TOKEN"))
     try:
         slack.chat_postMessage(
-            channel=f"#dagster-{cluster}",
+            channel=channel,
             attachments=[
                 {
                     "blocks": _op_failure_message_blocks(context),

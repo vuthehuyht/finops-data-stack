@@ -53,9 +53,9 @@ def test_base_pipeline_standardize_missing_column() -> None:
 
     standardized_df = pipeline.standardize(raw_df)
 
-    # Missing 'close' column must be added as None
+    # Missing 'close' column must be added as None/NA
     assert "CLOSE" in standardized_df.columns
-    assert standardized_df["CLOSE"].iloc[0] is None
+    assert pd.isna(standardized_df["CLOSE"].iloc[0])
 
 
 @patch("src.ingest.pipeline.base.upload_to_s3")

@@ -71,7 +71,7 @@ dagsterWebserver:
       memory: "512Mi"
     limits:
       cpu: "1000m"
-      memory: "1536Mi"
+      memory: "2Gi"
 
   readinessProbe:
     httpGet:
@@ -140,6 +140,16 @@ dagster-user-deployments:
           value: "finops-eks-cluster"
         - name: DAGSTER_S3_IO_BUCKET
           value: "finops-dagster-io"
+        - name: DAGSTER_SLACK_CHANNEL_ID
+          valueFrom:
+            secretKeyRef:
+              name: dagster-slack-api-token
+              key: DAGSTER_SLACK_CHANNEL_ID
+        - name: DAGSTER_SLACK_API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: dagster-slack-api-token
+              key: token
         - name: REDSHIFT_HOST
           valueFrom:
             secretKeyRef:
@@ -170,6 +180,11 @@ dagster-user-deployments:
             secretKeyRef:
               name: dagster-pg-credentials
               key: fireant_password
+        - name: FIREANT_PROXY_URL
+          valueFrom:
+            secretKeyRef:
+              name: dagster-pg-credentials
+              key: fireant_proxy_url
         - name: REDSHIFT_IAM_ROLE_ARN
           value: ""
         - name: FINOPS_RAW_BUCKET
@@ -195,7 +210,7 @@ dagster-user-deployments:
           memory: "512Mi"
         limits:
           cpu: "1"
-          memory: "3Gi"
+          memory: "1Gi"
 
       readinessProbe:
         enabled: true
@@ -236,10 +251,10 @@ runLauncher:
       resources:
         requests:
           cpu: "250m"
-          memory: "1Gi"
+          memory: "512Mi"
         limits:
           cpu: "1"
-          memory: "3Gi"
+          memory: "512Mi"
 
       failPodOnRunFailure: false
 
@@ -254,6 +269,7 @@ runLauncher:
         podSpecConfig:
           nodeSelector:
             node-group: worker
+            karpenter.sh/capacity-type: spot
           tolerations:
             - key: "spotWorker"
               operator: "Equal"
@@ -268,6 +284,16 @@ runLauncher:
               value: "finops-eks-cluster"
             - name: DAGSTER_S3_IO_BUCKET
               value: "finops-dagster-io"
+            - name: DAGSTER_SLACK_CHANNEL_ID
+              valueFrom:
+                secretKeyRef:
+                  name: dagster-slack-api-token
+                  key: DAGSTER_SLACK_CHANNEL_ID
+            - name: DAGSTER_SLACK_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: dagster-slack-api-token
+                  key: token
             - name: REDSHIFT_HOST
               valueFrom:
                 secretKeyRef:
@@ -298,6 +324,11 @@ runLauncher:
                 secretKeyRef:
                   name: dagster-pg-credentials
                   key: fireant_password
+            - name: FIREANT_PROXY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: dagster-pg-credentials
+                  key: fireant_proxy_url
             - name: REDSHIFT_IAM_ROLE_ARN
               value: ""
             - name: FINOPS_RAW_BUCKET

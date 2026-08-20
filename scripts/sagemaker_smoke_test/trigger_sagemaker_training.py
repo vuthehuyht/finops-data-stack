@@ -12,6 +12,7 @@ the design spec for how to obtain them).
 import argparse
 import datetime
 import os
+from zoneinfo import ZoneInfo
 
 import boto3
 from sagemaker.core import image_uris
@@ -157,7 +158,9 @@ def _launch_training_job(
 
 def main() -> None:
     args = _parse_args()
-    timestamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d-%H%M%S")
+    timestamp = datetime.datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).strftime(
+        "%Y%m%d-%H%M%S"
+    )
 
     print(f"Building features from {args.raw_data_dir} into {args.data_path} ...")
     _build_features(args.raw_data_dir, args.data_path)

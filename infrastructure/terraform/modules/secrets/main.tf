@@ -22,6 +22,8 @@ resource "aws_secretsmanager_secret_version" "credentials_val" {
     redshift_dbname   = var.redshift_dbname
     fireant_email     = var.fireant_email
     fireant_password  = var.fireant_password
+    fireant_proxy_url = var.fireant_proxy_url
     slack_api_token   = var.slack_api_token
+    slack_channel_id  = var.slack_channel_id
   })
 }

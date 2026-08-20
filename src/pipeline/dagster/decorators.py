@@ -130,6 +130,19 @@ class _DecoratorBase(abc.ABC):
                 },
             },
             "pod_spec_config": {
+                # Force step pods to run on Spot worker nodes
+                "node_selector": {
+                    "node-group": "worker",
+                    "karpenter.sh/capacity-type": "spot",
+                },
+                "tolerations": [
+                    {
+                        "key": "spotWorker",
+                        "operator": "Equal",
+                        "value": "true",
+                        "effect": "NoSchedule",
+                    }
+                ],
                 # Per-step k8s serviceaccount. The default serviceaccount comes
                 # with minimal IAM permissions to manipulate S3 objects (for logs and io
                 # managers).
@@ -157,11 +170,11 @@ class _DecoratorBase(abc.ABC):
                 "resources": {
                     "requests": {
                         "cpu": "100m",
-                        "memory": "2Gi",
+                        "memory": "1Gi" if op else "512Mi",
                         "ephemeral-storage": "1Gi",
                     },
                     "limits": {
-                        "memory": "3Gi",
+                        "memory": "1Gi" if op else "512Mi",
                         "ephemeral-storage": "1Gi",
                     },
                 },

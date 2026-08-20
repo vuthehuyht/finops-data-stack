@@ -32,7 +32,7 @@ Data Mesh / Lakehouse architecture on AWS, orchestrated by **Dagster** (Software
 4. Model Evaluation & Approval: compare Challenger vs Champion.
 5. Model Promotion: update active model version in SSM Parameter Store.
 
-## `src/` Directory Structure (Flywheel Architecture)
+## `src/` Directory Structure
 
 ```text
 src/
