@@ -194,15 +194,20 @@ class BaseIngestPipeline(abc.ABC):
             The uploaded S3 URL string.
         """
         unix_timestamp = int(time.time())
+        # S3 paths should be lowercase and exclude the RAW_ prefix
+        clean_name = self.table_name.removeprefix("RAW_").lower()
+
         # The parent folder for this batch_date
-        batch_prefix_s3_url = f"s3://{self.bucket_name}/raw/{self.table_name}/batch_date={self.batch_date}/"
+        batch_prefix_s3_url = (
+            f"s3://{self.bucket_name}/raw/{clean_name}/batch_date={self.batch_date}/"
+        )
 
         # Folder structure:
-        # raw/<table_name>/batch_date=<date>/<timestamp>/<table_name>.parquet
+        # raw/<clean_name>/batch_date=<date>/<timestamp>/<clean_name>.parquet
         s3_key = (
-            f"raw/{self.table_name}/"
+            f"raw/{clean_name}/"
             f"batch_date={self.batch_date}/"
-            f"{unix_timestamp}/{self.table_name}.parquet"
+            f"{unix_timestamp}/{clean_name}.parquet"
         )
         s3_url = f"s3://{self.bucket_name}/{s3_key}"
 

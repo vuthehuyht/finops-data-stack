@@ -1,19 +1,3 @@
-# Random username và password for Redshift admin user
-resource "random_string" "redshift_username" {
-  length  = 8
-  special = false
-  numeric = false
-  upper   = false
-}
-
-resource "random_password" "redshift_admin" {
-  length      = 16
-  special     = false
-  min_numeric = 1
-  min_upper   = 1
-  min_lower   = 1
-}
-
 # 1. IAM Role for Redshift Serverless to access S3 (Spectrum)
 resource "aws_iam_role" "redshift_s3" {
   force_detach_policies = true
@@ -51,8 +35,8 @@ resource "aws_iam_role_policy_attachment" "redshift_glue_access" {
 resource "aws_redshiftserverless_namespace" "main" {
   namespace_name      = "${var.project_name}-redshift-namespace"
   db_name             = "${var.project_name}_db"
-  admin_username      = "rsadmin_${random_string.redshift_username.result}"
-  admin_user_password = random_password.redshift_admin.result
+  admin_username      = var.admin_username
+  admin_user_password = var.admin_password
   iam_roles           = [aws_iam_role.redshift_s3.arn]
 
   tags = {

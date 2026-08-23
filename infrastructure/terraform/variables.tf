@@ -56,3 +56,14 @@ variable "slack_channel_id" {
   type        = string
   description = "Slack Channel ID for alerts"
 }
+variable "redshift_admin_username" {
+  type        = string
+  description = "Admin username for Redshift Serverless (e.g. rsadmin)"
+  default     = "rsadmin"
+}
+
+variable "redshift_admin_password" {
+  type        = string
+  sensitive   = true
+  description = "Admin password for Redshift Serverless (can be set via TF_VAR_redshift_admin_password env)"
+}

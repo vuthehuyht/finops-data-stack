@@ -20,7 +20,7 @@ output "admin_username" {
 }
 
 output "admin_password" {
-  value       = random_password.redshift_admin.result
+  value       = aws_redshiftserverless_namespace.main.admin_user_password
   sensitive   = true
   description = "The database admin password (sensitive)"
 }
