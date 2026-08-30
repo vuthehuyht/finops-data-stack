@@ -82,9 +82,9 @@ def test_base_pipeline_successful_run(mock_upload: MagicMock) -> None:
 
     # Verify S3 URL formatting
     assert s3_url.startswith(
-        "s3://my-test-bucket/raw/RAW_DUMMY_TABLE/batch_date=2026-06-18/"
+        "s3://my-test-bucket/raw/dummy_table/batch_date=2026-06-18/"
     )
-    assert s3_url.endswith("/RAW_DUMMY_TABLE.parquet")
+    assert s3_url.endswith("/dummy_table.parquet")
 
     # Verify upload was called once
     mock_upload.assert_called_once()

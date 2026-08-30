@@ -73,6 +73,8 @@ module "redshift" {
   environment           = var.environment
   private_db_subnet_ids = module.vpc.private_db_subnet_ids
   redshift_sg_id        = module.vpc.redshift_sg_id
+  admin_username        = var.redshift_admin_username
+  admin_password        = var.redshift_admin_password
 }
 
 # Call Module EKS (EKS Cluster, Node Groups On-Demand + Spot, OIDC, IRSA Role)

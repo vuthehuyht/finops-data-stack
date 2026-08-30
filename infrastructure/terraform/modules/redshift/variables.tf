@@ -23,3 +23,13 @@ variable "monthly_cost_cap_usd" {
   description = "Monthly compute cost cap in USD for Redshift Serverless"
   default     = 10
 }
+variable "admin_username" {
+  type        = string
+  description = "Redshift Admin Username"
+}
+
+variable "admin_password" {
+  type        = string
+  sensitive   = true
+  description = "Redshift Admin Password"
+}

@@ -898,4 +898,3 @@ resource "aws_ec2_tag" "karpenter_sg_discovery" {
   key         = "karpenter.sh/discovery"
   value       = aws_eks_cluster.main.name
 }
-

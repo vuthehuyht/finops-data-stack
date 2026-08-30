@@ -15,6 +15,7 @@ import src.pipeline.dagster as dagster_lib
 from src.dagster.resources import S3BucketResource
 from src.ingest.pipeline.analyst_reports import AnalystReportsPipeline
 from src.ingest.pipeline.balance_sheet import BalanceSheetPipeline
+from src.ingest.pipeline.base import DEFAULT_TICKER_SYMBOLS
 from src.ingest.pipeline.cashflow_statement import CashflowStatementPipeline
 from src.ingest.pipeline.commodities_price import CommoditiesPricePipeline
 from src.ingest.pipeline.company_profile import CompanyProfilePipeline
@@ -128,7 +129,8 @@ def raw_stock_price_eod(
         logger=context.log,
     )
     s3_url = pipeline.run()
-    return _build_output(s3_url, config.batch_date, config.symbols)
+    actual_symbols = config.symbols or DEFAULT_TICKER_SYMBOLS
+    return _build_output(s3_url, config.batch_date, actual_symbols)
 
 
 @dagster_lib.asset(
@@ -152,7 +154,8 @@ def raw_index_price_eod(
         logger=context.log,
     )
     s3_url = pipeline.run()
-    return _build_output(s3_url, config.batch_date, config.symbols)
+    actual_symbols = config.symbols or DEFAULT_TICKER_SYMBOLS
+    return _build_output(s3_url, config.batch_date, actual_symbols)
 
 
 @dagster_lib.asset(
@@ -180,7 +183,8 @@ def raw_foreign_trading(
         logger=context.log,
     )
     s3_url = pipeline.run()
-    return _build_output(s3_url, config.batch_date, config.symbols)
+    actual_symbols = config.symbols or DEFAULT_TICKER_SYMBOLS
+    return _build_output(s3_url, config.batch_date, actual_symbols)
 
 
 @dagster_lib.asset(
@@ -208,7 +212,8 @@ def raw_proprietary_trading(
         logger=context.log,
     )
     s3_url = pipeline.run()
-    return _build_output(s3_url, config.batch_date, config.symbols)
+    actual_symbols = config.symbols or DEFAULT_TICKER_SYMBOLS
+    return _build_output(s3_url, config.batch_date, actual_symbols)
 
 
 @dagster_lib.asset(
@@ -236,7 +241,8 @@ def raw_balance_sheet(
         logger=context.log,
     )
     s3_url = pipeline.run()
-    return _build_output(s3_url, config.batch_date, config.symbols)
+    actual_symbols = config.symbols or DEFAULT_TICKER_SYMBOLS
+    return _build_output(s3_url, config.batch_date, actual_symbols)
 
 
 @dagster_lib.asset(
@@ -264,7 +270,8 @@ def raw_income_statement(
         logger=context.log,
     )
     s3_url = pipeline.run()
-    return _build_output(s3_url, config.batch_date, config.symbols)
+    actual_symbols = config.symbols or DEFAULT_TICKER_SYMBOLS
+    return _build_output(s3_url, config.batch_date, actual_symbols)
 
 
 @dagster_lib.asset(
@@ -292,7 +299,8 @@ def raw_cashflow_statement(
         logger=context.log,
     )
     s3_url = pipeline.run()
-    return _build_output(s3_url, config.batch_date, config.symbols)
+    actual_symbols = config.symbols or DEFAULT_TICKER_SYMBOLS
+    return _build_output(s3_url, config.batch_date, actual_symbols)
 
 
 @dagster_lib.asset(
@@ -320,7 +328,8 @@ def raw_company_profile(
         logger=context.log,
     )
     s3_url = pipeline.run()
-    return _build_output(s3_url, config.batch_date, config.symbols)
+    actual_symbols = config.symbols or DEFAULT_TICKER_SYMBOLS
+    return _build_output(s3_url, config.batch_date, actual_symbols)
 
 
 @dagster_lib.asset(
@@ -346,7 +355,8 @@ def raw_macro_indicators(
         logger=context.log,
     )
     s3_url = pipeline.run()
-    return _build_output(s3_url, config.batch_date, config.symbols)
+    actual_symbols = config.symbols or DEFAULT_TICKER_SYMBOLS
+    return _build_output(s3_url, config.batch_date, actual_symbols)
 
 
 @dagster_lib.asset(
@@ -370,7 +380,8 @@ def raw_interest_rates(
         logger=context.log,
     )
     s3_url = pipeline.run()
-    return _build_output(s3_url, config.batch_date, config.symbols)
+    actual_symbols = config.symbols or DEFAULT_TICKER_SYMBOLS
+    return _build_output(s3_url, config.batch_date, actual_symbols)
 
 
 @dagster_lib.asset(
@@ -394,7 +405,8 @@ def raw_exchange_rates(
         logger=context.log,
     )
     s3_url = pipeline.run()
-    return _build_output(s3_url, config.batch_date, config.symbols)
+    actual_symbols = config.symbols or DEFAULT_TICKER_SYMBOLS
+    return _build_output(s3_url, config.batch_date, actual_symbols)
 
 
 @dagster_lib.asset(
@@ -420,7 +432,8 @@ def raw_commodities_price(
         logger=context.log,
     )
     s3_url = pipeline.run()
-    return _build_output(s3_url, config.batch_date, config.symbols)
+    actual_symbols = config.symbols or DEFAULT_TICKER_SYMBOLS
+    return _build_output(s3_url, config.batch_date, actual_symbols)
 
 
 @dagster_lib.asset(
@@ -448,7 +461,8 @@ def raw_news_articles(
         logger=context.log,
     )
     s3_url = pipeline.run()
-    return _build_output(s3_url, config.batch_date, config.symbols)
+    actual_symbols = config.symbols or DEFAULT_TICKER_SYMBOLS
+    return _build_output(s3_url, config.batch_date, actual_symbols)
 
 
 @dagster_lib.asset(
@@ -476,7 +490,8 @@ def raw_corporate_events(
         logger=context.log,
     )
     s3_url = pipeline.run()
-    return _build_output(s3_url, config.batch_date, config.symbols)
+    actual_symbols = config.symbols or DEFAULT_TICKER_SYMBOLS
+    return _build_output(s3_url, config.batch_date, actual_symbols)
 
 
 @dagster_lib.asset(
@@ -504,7 +519,8 @@ def raw_analyst_reports(
         logger=context.log,
     )
     s3_url = pipeline.run()
-    return _build_output(s3_url, config.batch_date, config.symbols)
+    actual_symbols = config.symbols or DEFAULT_TICKER_SYMBOLS
+    return _build_output(s3_url, config.batch_date, actual_symbols)
 
 
 _ALL_INGEST_ASSETS: list[dagster.AssetsDefinition] = [

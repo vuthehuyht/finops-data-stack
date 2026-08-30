@@ -167,10 +167,12 @@ def ml_daily_forecast(  # noqa: C901
             f"""
             SELECT * FROM {_FEATURE_TABLE}
             WHERE TRADING_DATE <= '{validated_date}'
-                AND TRADING_DATE > '{lower_bound}'
+            AND TRADING_DATE > '{lower_bound}'
             """,
             conn,
         )
+
+    df["trading_date"] = pd.to_datetime(df["trading_date"])
 
     tickers = sorted(
         df.loc[df["trading_date"] == pd.Timestamp(validated_date), "ticker"].unique()
