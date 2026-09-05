@@ -95,10 +95,19 @@ known-third-party = ["dagster"]
 # dbt-common pins deepdiff<8.0 but only uses the DeepDiff class (not Delta),
 # which remains API-compatible across the 7→8 boundary.
 # Also force dbt-common>=1.37.3 to fix path traversal vulnerability (#22).
+# Force tornado>=6.5.8 (transitive via ipykernel/jupyter_client) to fix
+# GHSA-mpf4-983q-p7j4, GHSA-8423-8fgw-73vq and GHSA-wwv5-g3v4-889x (#65-67).
+# Force mlflow>=3.16.0 (transitive via sagemaker-mlflow) to move past the
+# vulnerable range reported for GHSA-h7x2-h6g9-p789 (#64) — GitHub has not
+# published a first_patched_version for this advisory yet, and mlflow isn't
+# imported anywhere in src/ (the AI Gateway server code path it affects is
+# never run here), so this bump is best-effort until upstream ships a fix.
 override-dependencies = [
     "deepdiff>=8.0.0",
     "dbt-common>=1.37.3",
     "cryptography>=50.0.0",
+    "tornado>=6.5.8",
+    "mlflow>=3.16.0",
 ]
 
 [build-system]
