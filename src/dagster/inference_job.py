@@ -2,6 +2,7 @@
 
 import datetime
 import json
+import math
 import os
 import tempfile
 import time
@@ -188,11 +189,23 @@ def ml_daily_forecast(  # noqa: C901
         with open(local_input_path, "w", encoding="utf-8") as f_in:
             for ticker in tickers:
                 try:
-                    sequence, tabular = build_latest_window(df, ticker, WINDOW_SIZE)
+                    sequence, tabular_row, sector = build_latest_window(
+                        df, ticker, WINDOW_SIZE
+                    )
                     payload = {
                         "ticker": ticker,
                         "sequence": sequence.tolist(),
-                        "tabular": tabular.tolist(),
+                        # Raw {col: value} dict — serve.py::features featurizes
+                        # it with the champion's sector medians. NaN -> null.
+                        "tabular": {
+                            col: (
+                                None
+                                if pd.isna(tabular_row[col])
+                                else float(tabular_row[col])
+                            )
+                            for col in TABULAR_FEATURE_COLUMNS
+                        },
+                        "sector": sector,
                     }
                     f_in.write(json.dumps(payload) + "\n")
                     valid_tickers.append(ticker)
@@ -235,17 +248,24 @@ def ml_daily_forecast(  # noqa: C901
 
         # 6. Read results — output.jsonl.out is now self-contained
         # ({"ticker": ..., "predicted_return": ...} per line), no position
-        # matching against valid_tickers needed.
+        # matching against valid_tickers needed. predicted_return may be
+        # null / non-finite when the model saw missing features for a
+        # ticker; skip those rather than let them poison the Redshift load.
+        skipped_count = 0
         with open(local_output_path, encoding="utf-8") as f_out:
             for line_out in f_out:
                 if not line_out.strip():
                     continue
                 try:
                     prediction = json.loads(line_out)
+                    predicted_return = prediction["predicted_return"]
+                    if predicted_return is None or not math.isfinite(predicted_return):
+                        skipped_count += 1
+                        continue
                     results.append(
                         {
                             "ticker": prediction["ticker"],
-                            "predicted_return": prediction["predicted_return"],
+                            "predicted_return": predicted_return,
                         }
                     )
                 except Exception as exc:
@@ -269,6 +289,7 @@ def ml_daily_forecast(  # noqa: C901
             "trading_date": forecast_trading_date,
             "model_version": model_version,
             "success_count": len(results),
+            "skipped_count": skipped_count,
             "ticker_count": len(tickers),
         },
     )
