@@ -87,9 +87,16 @@ def build_tabular_features(
     return values, flags
 
 
-def sequence_features(window_df: pd.DataFrame) -> np.ndarray:
-    """Sequence branch input: NaN -> 0.0, float32."""
-    return window_df[SEQUENCE_FEATURE_COLUMNS].fillna(0.0).to_numpy(dtype=np.float32)
+def sequence_features(
+    window_df: pd.DataFrame, columns: list[str] | None = None
+) -> np.ndarray:
+    """Sequence branch input: NaN -> 0.0, float32.
+
+    ``columns`` defaults to ``SEQUENCE_FEATURE_COLUMNS``; callers slicing on
+    non-standard columns (tests) may override it.
+    """
+    cols = columns or SEQUENCE_FEATURE_COLUMNS
+    return window_df[cols].fillna(0.0).to_numpy(dtype=np.float32)
 
 
 def compute_training_medians(train_df: pd.DataFrame) -> dict[str, float]:

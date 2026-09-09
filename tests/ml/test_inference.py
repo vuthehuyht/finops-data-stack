@@ -39,12 +39,13 @@ def test_build_latest_window_returns_last_window_size_rows() -> None:
         {
             "ticker": ["AAA"] * 5 + ["BBB"] * 5,
             "trading_date": list(pd.date_range("2026-01-01", periods=5)) * 2,
+            "sector": ["bank"] * 5 + ["non_financial"] * 5,
             "SEQ_COL": [10, 20, 30, 40, 50, 100, 200, 300, 400, 500],
             "TAB_COL": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
         }
     )
 
-    sequence, tabular = build_latest_window(
+    sequence, tabular_row, sector = build_latest_window(
         df,
         "AAA",
         window_size=3,
@@ -53,7 +54,8 @@ def test_build_latest_window_returns_last_window_size_rows() -> None:
     )
 
     assert sequence.tolist() == [[30.0], [40.0], [50.0]]
-    assert tabular.tolist() == [5.0]
+    assert float(tabular_row["TAB_COL"]) == 5.0
+    assert sector == "bank"
 
 
 def test_build_latest_window_raises_when_insufficient_history() -> None:
@@ -63,6 +65,7 @@ def test_build_latest_window_raises_when_insufficient_history() -> None:
         {
             "ticker": ["AAA", "AAA"],
             "trading_date": pd.date_range("2026-01-01", periods=2),
+            "sector": ["bank", "bank"],
             "SEQ_COL": [10, 20],
             "TAB_COL": [1, 2],
         }
@@ -78,21 +81,46 @@ def test_build_latest_window_raises_when_insufficient_history() -> None:
         )
 
 
-def test_predict_from_payload_returns_float_prediction() -> None:
-    from src.ml.inference import predict_from_payload
-    from src.ml.model import FusionModel
+def _payload(sector: str = "non_financial") -> dict:
+    from src.ml.config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS
 
-    model = FusionModel(sequence_input_size=2, tabular_input_size=2)
-    model.eval()
-    payload = {
-        "sequence": [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]],
-        "tabular": [0.7, 0.8],
+    return {
+        "ticker": "ACB",
+        "sequence": [[0.0] * len(SEQUENCE_FEATURE_COLUMNS) for _ in range(30)],
+        "tabular": dict.fromkeys(TABULAR_FEATURE_COLUMNS, 1.0),
+        "sector": sector,
     }
 
-    result = predict_from_payload(model, payload)
 
-    assert isinstance(result, dict)
-    assert isinstance(result["predicted_return"], float)
+def test_predict_from_payload_returns_float_when_finite() -> None:
+    import torch
+
+    from src.ml import inference
+
+    class _ConstModel(torch.nn.Module):
+        def forward(self, sequence, tabular, sector_idx):
+            return torch.full((sequence.shape[0], 1), 0.0123)
+
+    out = inference.predict_from_payload(
+        (_ConstModel(), {}, ["non_financial"]), _payload()
+    )
+    assert out["predicted_return"] == pytest.approx(0.0123)
+    import json
+
+    assert "NaN" not in json.dumps({"ticker": "HPG", **out})
+
+
+def test_predict_from_payload_none_on_non_finite() -> None:
+    import torch
+
+    from src.ml import inference
+
+    class _NanModel(torch.nn.Module):
+        def forward(self, sequence, tabular, sector_idx):
+            return torch.full((sequence.shape[0], 1), float("nan"))
+
+    out = inference.predict_from_payload((_NanModel(), {}, ["bank"]), _payload("bank"))
+    assert out == {"predicted_return": None}
 
 
 def test_load_model_from_s3_success() -> None:
