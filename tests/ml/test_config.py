@@ -33,6 +33,29 @@ def test_window_size_default() -> None:
     assert WINDOW_SIZE == 30
 
 
+def test_sector_and_feature_constants() -> None:
+    from src.ml import config
+
+    assert config.SECTOR_VOCAB[-1] == "non_financial"
+    assert len(config.SECTOR_VOCAB) == len(set(config.SECTOR_VOCAB))
+    assert config.TABULAR_VECTOR_SIZE == 2 * len(config.TABULAR_FEATURE_COLUMNS)
+    assert config.FEATURE_SCHEMA_VERSION == 2
+    # every applicability key must be a real tabular feature
+    assert set(config.FEATURE_APPLICABILITY) <= set(config.TABULAR_FEATURE_COLUMNS)
+    # every listed sector must be in the vocab
+    for sectors in config.FEATURE_APPLICABILITY.values():
+        assert sectors <= set(config.SECTOR_VOCAB)
+    # the two known structural exceptions
+    assert config.FEATURE_APPLICABILITY["gross_margin"] == {
+        "real_estate",
+        "non_financial",
+    }
+    assert config.FEATURE_APPLICABILITY["debt_to_equity"] == {
+        "real_estate",
+        "non_financial",
+    }
+
+
 def test_model_dimension_constants() -> None:
     from src.ml.config import (
         DROPOUT_RATE,

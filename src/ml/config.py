@@ -43,3 +43,23 @@ LSTM_NUM_LAYERS = 1
 MLP_HIDDEN_SIZES = (32, 16)
 FUSION_HIDDEN_SIZE = 32
 DROPOUT_RATE = 0.4
+
+# ── Sector-aware feature handling ────────────────────────────────────────
+# Order is the nn.Embedding index: APPEND-ONLY, never reorder.
+SECTOR_VOCAB = ["bank", "securities", "insurance", "real_estate", "non_financial"]
+SECTOR_EMBEDDING_DIM = 4
+
+# The tabular model input is [values ++ applicability_flags].
+TABULAR_VECTOR_SIZE = 2 * len(TABULAR_FEATURE_COLUMNS)
+
+# feature -> sectors it is defined for. A feature absent from this dict
+# applies to EVERY sector. gross_margin / debt_to_equity are structurally
+# undefined for banks, securities and insurance (different statement shape).
+FEATURE_APPLICABILITY: dict[str, set[str]] = {
+    "gross_margin": {"real_estate", "non_financial"},
+    "debt_to_equity": {"real_estate", "non_financial"},
+}
+
+# Bumped whenever the feature vector layout or semantics change so a stale
+# champion artifact is rejected loudly instead of producing garbage.
+FEATURE_SCHEMA_VERSION = 2
