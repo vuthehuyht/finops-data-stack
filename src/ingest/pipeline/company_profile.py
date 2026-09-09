@@ -54,6 +54,10 @@ class CompanyProfilePipeline(BaseIngestPipeline):
                             "company_profile": "description",
                         }
                     )
+                    # VCI info() repeats some labels (e.g. "issue_share" appears
+                    # 4x, only the first is populated). Drop duplicates so schema
+                    # selection below stays a single column per name.
+                    df = df.loc[:, ~df.columns.duplicated()]
                     # Keep only columns defined in schema
                     available_cols = [
                         col for col in self.schema_columns if col in df.columns

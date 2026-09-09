@@ -45,6 +45,26 @@ def test_base_pipeline_standardize() -> None:
     assert "EXTRA_COL" not in standardized_df.columns
 
 
+def test_base_pipeline_standardize_dedupes_duplicate_columns() -> None:
+    """Verify repeated source column labels are collapsed to the first occurrence.
+
+    Some upstream APIs (e.g. vnstock VCI) return the same column label several
+    times. A duplicate label makes ``result_df[col]`` a DataFrame instead of a
+    Series, which breaks the ``.str`` truncation step in standardize().
+    """
+    pipeline = DummyIngestPipeline(batch_date="2026-06-18")
+    raw_df = pd.DataFrame(
+        [["TCB", 48.5, 99.0]],
+        columns=["symbol", "close", "close"],
+    )
+
+    standardized_df = pipeline.standardize(raw_df)
+
+    # Only one CLOSE column survives, keeping the first occurrence's value
+    assert list(standardized_df.columns).count("CLOSE") == 1
+    assert standardized_df["CLOSE"].iloc[0] == "48.5"
+
+
 def test_base_pipeline_standardize_missing_column() -> None:
     """Verify missing schema columns are filled with None and a warning is logged."""
     pipeline = DummyIngestPipeline(batch_date="2026-06-18")
