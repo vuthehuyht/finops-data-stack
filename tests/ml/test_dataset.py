@@ -60,14 +60,20 @@ def test_time_based_split_raises_when_val_before_train() -> None:
         pass
 
 
-def _make_feature_df(tickers: list[str], days: int) -> pd.DataFrame:
+def _make_feature_df(
+    tickers: list[str], days: int, sector: str = "non_financial"
+) -> pd.DataFrame:
     from src.ml.config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS
 
     rows = []
     for ticker in tickers:
         dates = pd.date_range(start="2026-01-01", periods=days, freq="D")
         for i, date in enumerate(dates):
-            row = {"ticker": ticker, "trading_date": date.strftime("%Y-%m-%d")}
+            row = {
+                "ticker": ticker,
+                "trading_date": date.strftime("%Y-%m-%d"),
+                "sector": sector,
+            }
             for col in SEQUENCE_FEATURE_COLUMNS:
                 row[col] = float(i)
             for col in TABULAR_FEATURE_COLUMNS:
@@ -98,16 +104,40 @@ def test_stock_sequence_dataset_skips_tickers_shorter_than_window() -> None:
 
 
 def test_stock_sequence_dataset_getitem_shapes() -> None:
-    from src.ml.config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS
+    import torch
+
+    from src.ml.config import (
+        SEQUENCE_FEATURE_COLUMNS,
+        TABULAR_VECTOR_SIZE,
+    )
     from src.ml.dataset import StockSequenceDataset
 
     df = _make_feature_df(["AAA"], days=30)
-    dataset = StockSequenceDataset(df, window_size=30)
+    dataset = StockSequenceDataset(df, window_size=30, medians={})
 
-    sequence, tabular, target = dataset[0]
+    sequence, tabular, sector_idx, target = dataset[0]
     assert sequence.shape == (30, len(SEQUENCE_FEATURE_COLUMNS))
-    assert tabular.shape == (len(TABULAR_FEATURE_COLUMNS),)
+    assert tabular.shape == (TABULAR_VECTOR_SIZE,)
+    assert sector_idx.dtype == torch.long and sector_idx.ndim == 0
     assert target.shape == ()
+
+
+def test_getitem_returns_four_tuple_with_sector() -> None:
+    import torch
+
+    from src.ml.config import (
+        SEQUENCE_FEATURE_COLUMNS,
+        TABULAR_VECTOR_SIZE,
+    )
+    from src.ml.dataset import StockSequenceDataset
+
+    df = _make_feature_df(["ACB"], days=32, sector="bank")
+    dataset = StockSequenceDataset(df, window_size=30, medians={})
+    sequence, tabular, sector_idx, target = dataset[0]
+    assert sequence.shape == (30, len(SEQUENCE_FEATURE_COLUMNS))
+    assert tabular.shape == (TABULAR_VECTOR_SIZE,)
+    assert sector_idx.dtype == torch.long and sector_idx.ndim == 0
+    assert target.ndim == 0
 
 
 def test_stock_sequence_dataset_getitem_values() -> None:
@@ -120,25 +150,24 @@ def test_stock_sequence_dataset_getitem_values() -> None:
     """
     import numpy as np
 
-    from src.ml.config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS
+    from src.ml.config import TABULAR_FEATURE_COLUMNS
     from src.ml.dataset import StockSequenceDataset
 
     df = _make_feature_df(["AAA"], days=30)
-    dataset = StockSequenceDataset(df, window_size=30)
+    dataset = StockSequenceDataset(df, window_size=30, medians={})
 
-    sequence, tabular, target = dataset[0]
+    sequence, tabular, _sector_idx, target = dataset[0]
 
     # Verify the last row (day 29 in the fixture, where fixture sets float(i)):
     # SEQUENCE_FEATURE_COLUMNS all equal 29.0 for the last day.
     assert np.allclose(sequence[-1].numpy(), 29.0)
 
-    # TABULAR_FEATURE_COLUMNS from last row:
-    # 29 * 0.1 = 2.9 for exclusive tabulars, 29.0 for overlaps.
-    expected_tabular = [
-        29.0 if col in SEQUENCE_FEATURE_COLUMNS else 2.9
-        for col in TABULAR_FEATURE_COLUMNS
-    ]
-    assert np.allclose(tabular.numpy(), expected_tabular)
+    # Tabular vector is [values(13) ++ applicability_flags(13)]. For the
+    # non_financial sector every column applies and is present, so values
+    # are the last row's 29 * 0.1 = 2.9 and every flag is 1.0.
+    n_tab = len(TABULAR_FEATURE_COLUMNS)
+    assert np.allclose(tabular.numpy()[:n_tab], 2.9)
+    assert np.allclose(tabular.numpy()[n_tab:], 1.0)
 
     # label_next_5d_return from last row: 29 * 0.01 = 0.29.
     assert np.isclose(float(target), 0.29)
