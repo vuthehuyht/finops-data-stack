@@ -61,7 +61,12 @@ def median_lookup(medians: Mapping[str, float], sector: str, col: str) -> float:
 
 
 def _is_missing(value: object) -> bool:
-    return value is None or (isinstance(value, float) and np.isnan(value))
+    # pd.isna handles Python float NaN, numpy float32/float64 NaN, pd.NA and
+    # NaT — isinstance(np.float32('nan'), float) is False, so a bare
+    # `isinstance(value, float)` check would let a float32 NaN through with
+    # its applicability flag set to 1.0 (the exact bug this module exists to
+    # prevent). `value` is always a scalar cell here.
+    return value is None or bool(pd.isna(value))
 
 
 def build_tabular_features(

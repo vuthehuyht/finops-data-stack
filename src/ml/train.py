@@ -37,11 +37,15 @@ except ImportError:
     # flat into /opt/ml/input/data/code/, so there is no `src` package there
     # — config.py/dataset.py/model.py/train.py are plain siblings.
     from config import (
+        FEATURE_SCHEMA_VERSION,
+        SECTOR_VOCAB,
         SEQUENCE_FEATURE_COLUMNS,
         TABULAR_FEATURE_COLUMNS,
+        TABULAR_VECTOR_SIZE,
         WINDOW_SIZE,
     )
     from dataset import StockSequenceDataset, time_based_split
+    from features import compute_training_medians
     from model import FusionModel
 
 

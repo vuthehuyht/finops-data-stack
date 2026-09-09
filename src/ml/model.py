@@ -27,6 +27,7 @@ except ImportError:
         LSTM_HIDDEN_SIZE,
         LSTM_NUM_LAYERS,
         MLP_HIDDEN_SIZES,
+        SECTOR_EMBEDDING_DIM,
     )
 
 

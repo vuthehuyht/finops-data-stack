@@ -21,8 +21,9 @@ except ImportError:
     # Sibling import: SageMaker script mode copies `source_dir`'s contents
     # flat into /opt/ml/input/data/code/, so there is no `src` package there
     # — config.py is a plain sibling of dataset.py in that directory.
+    import features  # noqa: I001
 
-    from config import (
+    from config import (  # noqa: I001
         SEQUENCE_FEATURE_COLUMNS,
         TABULAR_FEATURE_COLUMNS,
         TARGET_COLUMN,

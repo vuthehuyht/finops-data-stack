@@ -90,7 +90,8 @@ class MlInferenceGateConfig(dagster.Config):
     kinds={"python", "redshift"},
     deps=[_FACT_ML_FEATURE_SET_KEY],
     description=(
-        "Gate inference on FACT_ML_FEATURE_SET null rates for the latest trading date."
+        "Gate inference on per-ticker, sector-aware feature completeness for "
+        "FACT_ML_FEATURE_SET's latest trading date."
     ),
 )
 def ml_data_quality_gate(
@@ -98,7 +99,7 @@ def ml_data_quality_gate(
     config: MlInferenceGateConfig,
     redshift: RedshiftResource,
 ) -> dagster.Output[str]:
-    """Check the latest trading date's feature null rates; fail fast if unhealthy."""
+    """Check the latest trading date's sector-aware feature completeness; fail fast."""
     with redshift.get_connection() as conn:
         df = pd.read_sql(
             f"""

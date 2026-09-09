@@ -19,17 +19,15 @@ import numpy as np
 import pandas as pd
 
 if TYPE_CHECKING:
-    import torch
+    pass
 
 try:
     # Package-relative import: used when pytest imports this module as
     # `src.ml.inference` from the repo root, where the `src` package resolves.
     from src.ml import features
     from src.ml.config import (
-        SECTOR_VOCAB,
         SEQUENCE_FEATURE_COLUMNS,
         TABULAR_FEATURE_COLUMNS,
-        TABULAR_VECTOR_SIZE,
     )
 except ImportError:
     # Sibling import: SageMaker script mode copies `source_dir`'s contents
@@ -38,10 +36,8 @@ except ImportError:
     import features  # noqa: I001
 
     from config import (  # noqa: I001
-        SECTOR_VOCAB,
         SEQUENCE_FEATURE_COLUMNS,
         TABULAR_FEATURE_COLUMNS,
-        TABULAR_VECTOR_SIZE,
     )
 
 _DATE_COLUMN = "trading_date"
@@ -125,10 +121,11 @@ def check_sector_aware_completeness(
                 f"{rate:.2%} exceeds {null_rate_threshold:.2%}"
             )
 
+    has_sector = "sector" in df.columns
     incomplete = 0
     per_sector: dict[str, list[float]] = {}
     for _, row in df.iterrows():
-        sector = str(row["sector"]) if "sector" in df.columns else "non_financial"
+        sector = str(row["sector"]) if has_sector else "non_financial"
         applicable = [c for c in TABULAR_FEATURE_COLUMNS if features.applies(c, sector)]
         if not applicable:
             completeness = 1.0
@@ -238,43 +235,3 @@ def predict_from_payload(bundle: tuple, payload: dict) -> dict:
     if not math.isfinite(value):
         return {"predicted_return": None}
     return {"predicted_return": value}
-
-
-def load_model_from_s3(s3_client, bucket: str, key: str) -> "torch.nn.Module":
-    """Download model.tar.gz from S3, extract it, and load it.
-
-    Loads the weights into a FusionModel instance.
-    """
-    import os
-    import tarfile
-    import tempfile
-
-    import torch
-
-    try:
-        from src.ml.model import FusionModel
-    except ImportError:
-        from model import FusionModel
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tarball_path = os.path.join(tmpdir, "model.tar.gz")
-        s3_client.download_file(bucket, key, tarball_path)
-
-        with tarfile.open(tarball_path, "r:gz") as tar:
-            tar.extractall(path=tmpdir)
-
-        model_path = os.path.join(tmpdir, "model.pt")
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(
-                f"model.pt not found in tarball extracted from s3://{bucket}/{key}"
-            )
-
-        model = FusionModel(
-            sequence_input_size=len(SEQUENCE_FEATURE_COLUMNS),
-            tabular_input_size=TABULAR_VECTOR_SIZE,
-            num_sectors=len(SECTOR_VOCAB),
-        )
-        state_dict = torch.load(model_path, map_location="cpu", weights_only=True)
-        model.load_state_dict(state_dict)
-        model.eval()
-        return model

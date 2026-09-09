@@ -97,3 +97,59 @@ def test_train_serve_parity():
     v2, f2 = features.build_tabular_features(row_dict, "non_financial", medians)
     assert np.array_equal(v1, v2)
     assert np.array_equal(f1, f2)
+
+
+def test_numpy_float32_nan_is_treated_as_missing():
+    # isinstance(np.float32('nan'), float) is False — a bare float check
+    # would mark this "present" (flag 1.0) and leak NaN into the model.
+    medians = {"bank::roe": 0.3}
+    values, flags = features.build_tabular_features(
+        _row(roe=np.float32("nan")), "bank", medians
+    )
+    i = TABULAR_FEATURE_COLUMNS.index("roe")
+    assert values[i] == pytest.approx(0.3)
+    assert flags[i] == 0.0
+    assert not np.isnan(values).any()
+
+
+def test_train_and_inference_paths_produce_identical_vector():
+    """The window that StockSequenceDataset featurizes and the payload dict
+    that inference_job.py builds from the same last row must yield a
+    byte-identical 26-dim tabular vector."""
+    import pandas as pd
+    import torch
+
+    from src.ml.dataset import StockSequenceDataset
+
+    n = 32
+    data = {
+        "trading_date": pd.date_range("2025-01-01", periods=n, freq="D"),
+        "ticker": ["ACB"] * n,
+        "sector": ["bank"] * n,
+    }
+    for j, c in enumerate(SEQUENCE_FEATURE_COLUMNS):
+        data[c] = [float(j) + i * 0.01 for i in range(n)]
+    for j, c in enumerate(TABULAR_FEATURE_COLUMNS):
+        data[c] = [float(j) * 0.1 + i * 0.001 for i in range(n)]
+    # inject a NULL into an applicable column to exercise median imputation
+    data["roe"] = [None] * n
+    data["label_next_5d_return"] = [0.01] * n
+    df = pd.DataFrame(data)
+
+    medians = features.compute_training_medians(df)
+
+    ds = StockSequenceDataset(df, window_size=30, medians=medians)
+    # The last dataset window ends on the same row build_latest_window uses.
+    _seq_t, tabular_t, _sec_t, _tgt = ds[len(ds) - 1]
+
+    # Rebuild the payload dict exactly as src/dagster/inference_job.py does.
+    window = df.sort_values("trading_date").iloc[-30:]
+    last_row = window[TABULAR_FEATURE_COLUMNS].iloc[-1]
+    payload_tabular = {
+        col: (None if pd.isna(last_row[col]) else float(last_row[col]))
+        for col in TABULAR_FEATURE_COLUMNS
+    }
+    values, flags = features.build_tabular_features(payload_tabular, "bank", medians)
+    inference_vector = torch.tensor(list(values) + list(flags), dtype=torch.float32)
+
+    assert torch.equal(tabular_t, inference_vector)
