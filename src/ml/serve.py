@@ -20,36 +20,64 @@ import torch
 try:
     # Package-relative import: used when pytest imports this module as
     # `src.ml.serve` from the repo root, where the `src` package resolves.
-    from src.ml.config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS
+    from src.ml.config import (
+        FEATURE_SCHEMA_VERSION,
+        SEQUENCE_FEATURE_COLUMNS,
+        TABULAR_VECTOR_SIZE,
+    )
     from src.ml.inference import predict_from_payload
     from src.ml.model import FusionModel
 except ImportError:
     # Sibling import: SageMaker copies the bundled `code/` directory's
-    # contents flat, so there is no `src` package there — config.py/
-    # inference.py/model.py are plain siblings of serve.py in that directory.
-    from config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS
+    # contents flat, so config.py/inference.py/model.py are plain siblings
+    # of serve.py in that directory.
+    from config import (
+        FEATURE_SCHEMA_VERSION,
+        SEQUENCE_FEATURE_COLUMNS,
+        TABULAR_VECTOR_SIZE,
+    )
     from inference import predict_from_payload
     from model import FusionModel
 
 _CONTENT_TYPE_JSON = "application/json"
 
 
-def model_fn(model_dir: str) -> FusionModel:
-    """Load the trained FusionModel from `model_dir/model.pt`."""
+def model_fn(model_dir: str) -> tuple:
+    """Load `(model, medians, sector_vocab)` and verify the artifact schema.
+
+    Raises:
+        ValueError: If `metadata.json`'s `feature_schema_version` does not
+            match this code's `FEATURE_SCHEMA_VERSION` — a stale champion
+            artifact must be retrained before it can be served.
+    """
+    with open(os.path.join(model_dir, "metadata.json"), encoding="utf-8") as f:
+        metadata = json.load(f)
+
+    schema = metadata.get("feature_schema_version")
+    if schema != FEATURE_SCHEMA_VERSION:
+        raise ValueError(
+            f"Champion artifact feature_schema_version={schema} does not match "
+            f"code FEATURE_SCHEMA_VERSION={FEATURE_SCHEMA_VERSION}. Retrain "
+            "before serving."
+        )
+
+    sector_vocab = metadata["sector_vocab"]
+    medians = metadata.get("tabular_medians", {})
     model = FusionModel(
         sequence_input_size=len(SEQUENCE_FEATURE_COLUMNS),
-        tabular_input_size=len(TABULAR_FEATURE_COLUMNS),
+        tabular_input_size=TABULAR_VECTOR_SIZE,
+        num_sectors=len(sector_vocab),
     )
     state_dict = torch.load(
         os.path.join(model_dir, "model.pt"), map_location="cpu", weights_only=True
     )
     model.load_state_dict(state_dict)
     model.eval()
-    return model
+    return model, medians, sector_vocab
 
 
 def input_fn(request_body: bytes, content_type: str) -> dict:
-    """Parse the request body into the payload shape `predict_from_payload` expects.
+    """Parse the request body into the payload `predict_from_payload` expects.
 
     Raises:
         ValueError: If `content_type` is not `application/json`.
@@ -59,14 +87,14 @@ def input_fn(request_body: bytes, content_type: str) -> dict:
     return json.loads(request_body)
 
 
-def predict_fn(input_data: dict, model: FusionModel) -> dict:
-    """Run inference using the already-loaded model.
+def predict_fn(input_data: dict, bundle: tuple) -> dict:
+    """Run inference and echo `ticker` alongside the prediction.
 
-    Echoes `ticker` from the input alongside the prediction so the Batch
-    Transform output file is self-contained (no output-line-to-input-line
-    position matching needed downstream).
+    `predicted_return` is `None` (serialized as JSON `null`) when the model
+    output is non-finite, so the Batch Transform output never contains the
+    literal token `NaN`.
     """
-    prediction = predict_from_payload(model, input_data)
+    prediction = predict_from_payload(bundle, input_data)
     return {"ticker": input_data["ticker"], **prediction}
 
 
