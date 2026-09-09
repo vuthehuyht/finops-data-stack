@@ -126,6 +126,12 @@ class SageMakerResource(dagster.ConfigurableResource):
         client.create_transform_job(
             TransformJobName=job_name,
             ModelName=model_name,
+            # SplitType only marks record boundaries; BatchStrategy decides how
+            # many records go into one request body. The default MultiRecord
+            # packs many JSON Lines into a single body, which src/ml/serve.py::
+            # input_fn (a plain json.loads) cannot parse. SingleRecord forces
+            # exactly one JSON object per /invocations request, matching serve.py.
+            BatchStrategy="SingleRecord",
             TransformInput={
                 "DataSource": {
                     "S3DataSource": {
@@ -133,9 +139,7 @@ class SageMakerResource(dagster.ConfigurableResource):
                         "S3Uri": input_s3_uri,
                     }
                 },
-                # SplitType=Line sends each line as a separate request whose body
-                # is one JSON object, not the whole JSON Lines file -- keep this
-                # as application/json, matching src/ml/serve.py::input_fn.
+                # application/json matches src/ml/serve.py::input_fn.
                 "ContentType": "application/json",
                 "SplitType": "Line",
             },

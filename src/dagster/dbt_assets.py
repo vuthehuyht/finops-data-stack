@@ -18,6 +18,7 @@ from slack_sdk.web.client import WebClient
 import src.dagster.environment as environment
 import src.pipeline.dagster as dagster_lib
 from src.dagster import resources
+from src.dagster.retry_policies import DBT_RETRY
 from src.pipeline.dagster.k8s import kubernetes_cluster_name
 
 _PROJECT_ROOT = pathlib.Path(__file__).parent.parent.parent
@@ -430,4 +431,5 @@ def get_dbt_project_assets(
 dbt_build_job = dagster_lib.define_asset_job(
     name="dbt_build_job",
     selection=dagster.AssetSelection.assets(get_dbt_project_assets()),
+    op_retry_policy=DBT_RETRY,
 )

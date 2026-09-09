@@ -22,18 +22,30 @@ try:
     # Package-relative import: used when pytest imports this module as
     # `src.ml.train` from the repo root, where the `src` package resolves.
     from src.ml.config import (
+        FEATURE_SCHEMA_VERSION,
+        SECTOR_VOCAB,
         SEQUENCE_FEATURE_COLUMNS,
         TABULAR_FEATURE_COLUMNS,
+        TABULAR_VECTOR_SIZE,
         WINDOW_SIZE,
     )
     from src.ml.dataset import StockSequenceDataset, time_based_split
+    from src.ml.features import compute_training_medians
     from src.ml.model import FusionModel
 except ImportError:
     # Sibling import: SageMaker script mode copies `source_dir`'s contents
     # flat into /opt/ml/input/data/code/, so there is no `src` package there
     # — config.py/dataset.py/model.py/train.py are plain siblings.
-    from config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS, WINDOW_SIZE
+    from config import (
+        FEATURE_SCHEMA_VERSION,
+        SECTOR_VOCAB,
+        SEQUENCE_FEATURE_COLUMNS,
+        TABULAR_FEATURE_COLUMNS,
+        TABULAR_VECTOR_SIZE,
+        WINDOW_SIZE,
+    )
     from dataset import StockSequenceDataset, time_based_split
+    from features import compute_training_medians
     from model import FusionModel
 
 
@@ -41,7 +53,7 @@ except ImportError:
 # self-contained and directly servable by the SageMaker inference container
 # (SAGEMAKER_PROGRAM=serve.py, SAGEMAKER_SUBMIT_DIRECTORY=/opt/ml/model/code)
 # — no separate code-packaging step needed at promotion time.
-_SERVING_FILES = ("serve.py", "inference.py", "model.py", "config.py")
+_SERVING_FILES = ("serve.py", "inference.py", "model.py", "config.py", "features.py")
 
 
 def _bundle_serving_code(model_dir: str) -> None:
@@ -111,12 +123,13 @@ def _train_one_epoch(
 ) -> float:
     model.train()
     total_loss = 0.0
-    for sequence, tabular, target in loader:
+    for sequence, tabular, sector_idx, target in loader:
         sequence = sequence.to(device)
         tabular = tabular.to(device)
+        sector_idx = sector_idx.to(device)
         target = target.to(device)
         optimizer.zero_grad()
-        prediction = model(sequence, tabular).squeeze(-1)
+        prediction = model(sequence, tabular, sector_idx).squeeze(-1)
         loss = loss_fn(prediction, target)
         loss.backward()
         optimizer.step()
@@ -131,16 +144,51 @@ def _evaluate(
     model.eval()
     all_predictions = []
     all_targets = []
-    for sequence, tabular, target in loader:
+    for sequence, tabular, sector_idx, target in loader:
         sequence = sequence.to(device)
         tabular = tabular.to(device)
+        sector_idx = sector_idx.to(device)
         target = target.to(device)
-        prediction = model(sequence, tabular).squeeze(-1)
+        prediction = model(sequence, tabular, sector_idx).squeeze(-1)
         all_predictions.append(prediction)
         all_targets.append(target)
     return compute_regression_metrics(
         torch.cat(all_predictions), torch.cat(all_targets)
     )
+
+
+def build_metadata(
+    args: argparse.Namespace,
+    test_metrics: TrainingMetrics,
+    train_dataset: object,
+    val_dataset: object,
+    test_dataset: object,
+    medians: dict,
+) -> dict:
+    """Assemble the metadata.json payload written next to model.pt."""
+    return {
+        "trained_at": datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).isoformat(),
+        "hyperparameters": {
+            "window_size": args.window_size,
+            "epochs": args.epochs,
+            "batch_size": args.batch_size,
+            "learning_rate": args.learning_rate,
+            "train_end_date": args.train_end_date,
+            "val_end_date": args.val_end_date,
+        },
+        "feature_columns": {
+            "sequence": SEQUENCE_FEATURE_COLUMNS,
+            "tabular": TABULAR_FEATURE_COLUMNS,
+        },
+        "sector_vocab": SECTOR_VOCAB,
+        "tabular_medians": medians,
+        "tabular_input_size": TABULAR_VECTOR_SIZE,
+        "feature_schema_version": FEATURE_SCHEMA_VERSION,
+        "metrics": asdict(test_metrics),
+        "train_rows": len(train_dataset),
+        "val_rows": len(val_dataset),
+        "test_rows": len(test_dataset),
+    }
 
 
 def main() -> None:
@@ -150,9 +198,16 @@ def main() -> None:
         df, args.train_end_date, args.val_end_date
     )
 
-    train_dataset = StockSequenceDataset(train_df, window_size=args.window_size)
-    val_dataset = StockSequenceDataset(val_df, window_size=args.window_size)
-    test_dataset = StockSequenceDataset(test_df, window_size=args.window_size)
+    medians = compute_training_medians(train_df)
+    train_dataset = StockSequenceDataset(
+        train_df, window_size=args.window_size, medians=medians
+    )
+    val_dataset = StockSequenceDataset(
+        val_df, window_size=args.window_size, medians=medians
+    )
+    test_dataset = StockSequenceDataset(
+        test_df, window_size=args.window_size, medians=medians
+    )
 
     for split_name, dataset in (
         ("train", train_dataset),
@@ -175,7 +230,8 @@ def main() -> None:
 
     model = FusionModel(
         sequence_input_size=len(SEQUENCE_FEATURE_COLUMNS),
-        tabular_input_size=len(TABULAR_FEATURE_COLUMNS),
+        tabular_input_size=TABULAR_VECTOR_SIZE,
+        num_sectors=len(SECTOR_VOCAB),
     ).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
     loss_fn = torch.nn.HuberLoss()
@@ -210,25 +266,9 @@ def main() -> None:
     print(f"test_rmse={test_metrics.rmse:.6f} test_mae={test_metrics.mae:.6f}")
     _bundle_serving_code(args.model_dir)
 
-    metadata = {
-        "trained_at": datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).isoformat(),
-        "hyperparameters": {
-            "window_size": args.window_size,
-            "epochs": args.epochs,
-            "batch_size": args.batch_size,
-            "learning_rate": args.learning_rate,
-            "train_end_date": args.train_end_date,
-            "val_end_date": args.val_end_date,
-        },
-        "feature_columns": {
-            "sequence": SEQUENCE_FEATURE_COLUMNS,
-            "tabular": TABULAR_FEATURE_COLUMNS,
-        },
-        "metrics": asdict(test_metrics),
-        "train_rows": len(train_dataset),
-        "val_rows": len(val_dataset),
-        "test_rows": len(test_dataset),
-    }
+    metadata = build_metadata(
+        args, test_metrics, train_dataset, val_dataset, test_dataset, medians
+    )
     with open(
         os.path.join(args.model_dir, "metadata.json"), "w", encoding="utf-8"
     ) as f:

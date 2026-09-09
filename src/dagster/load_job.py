@@ -16,6 +16,7 @@ from dagster._core.definitions.unresolved_asset_job_definition import (
 
 import src.pipeline.dagster as dagster_lib
 from src.dagster.resources import LoadJobConfigResource, RedshiftResource
+from src.dagster.retry_policies import LOAD_RETRY
 from src.load.load import load_s3_to_redshift
 
 _TIMEZONE = "Asia/Ho_Chi_Minh"
@@ -256,6 +257,7 @@ def define_load_jobs() -> LoadJobBundle:
         job = dagster_lib.define_asset_job(
             job_name,
             selection=[asset],
+            op_retry_policy=LOAD_RETRY,
             k8s_config={
                 "container_config": {
                     "resources": {
@@ -335,6 +337,7 @@ def define_load_jobs() -> LoadJobBundle:
         "load_all_raw_data_job",
         selection=bundle.assets,
         config=load_all_config_mapping,
+        op_retry_policy=LOAD_RETRY,
         k8s_config={
             "container_config": {
                 "resources": {

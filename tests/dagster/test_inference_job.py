@@ -15,6 +15,16 @@ def test_ml_inference_gate_config_default_threshold() -> None:
 
     config = MlInferenceGateConfig()
     assert config.null_rate_threshold == 0.6
+    assert config.min_ticker_completeness == 0.7
+    assert config.max_incomplete_ticker_ratio == 0.3
+
+
+def test_inference_image_is_gpu_build() -> None:
+    from src.dagster.inference_job import _INFERENCE_IMAGE
+
+    # Batch Transform runs on ml.g4dn.xlarge (GPU); the serving image and
+    # serve.py device handling must match — see resources.py::run_batch_transform_job.
+    assert _INFERENCE_IMAGE.endswith(":2.2-gpu-py310")
 
 
 def test_define_inference_jobs_returns_bundle_with_three_assets() -> None:
@@ -142,11 +152,23 @@ def test_ml_publish_depends_on_forecast() -> None:
     assert forecast_key in publish_asset.dependency_keys
 
 
+def test_inference_asset_retry_policies() -> None:
+    """Forecast/publish get retries; the data quality gate must never be retried."""
+    from src.dagster.inference_job import define_inference_jobs
+    from src.dagster.retry_policies import LOAD_RETRY, SAGEMAKER_RETRY
+
+    bundle = define_inference_jobs()
+    by_name = {a.key.path[-1]: a.node_def.retry_policy for a in bundle.assets}
+    assert by_name["ML_DATA_QUALITY_GATE"] is None
+    assert by_name["ML_DAILY_FORECAST"] == SAGEMAKER_RETRY
+    assert by_name["ML_PUBLISH_FORECAST_RESULTS"] == LOAD_RETRY
+
+
 def test_ml_data_quality_gate_raises_on_null_rate_breach() -> None:
     from src.dagster.inference_job import MlInferenceGateConfig, ml_data_quality_gate
     from src.ml.config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS
 
-    row = {"trading_date": "2026-07-03", "ticker": "AAA"}
+    row = {"trading_date": "2026-07-03", "ticker": "AAA", "sector": "non_financial"}
     for column in SEQUENCE_FEATURE_COLUMNS + TABULAR_FEATURE_COLUMNS:
         row[column] = None
     df = pd.DataFrame([row])
@@ -157,7 +179,7 @@ def test_ml_data_quality_gate_raises_on_null_rate_breach() -> None:
     context = dagster.build_asset_context()
 
     with unittest.mock.patch("src.dagster.inference_job.pd.read_sql", return_value=df):
-        with pytest.raises(ValueError, match="Data quality gate failed"):
+        with pytest.raises(ValueError, match="sequence feature"):
             ml_data_quality_gate(context, MlInferenceGateConfig(), mock_redshift)
 
 
@@ -165,7 +187,7 @@ def test_ml_data_quality_gate_passes_and_returns_trading_date() -> None:
     from src.dagster.inference_job import MlInferenceGateConfig, ml_data_quality_gate
     from src.ml.config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS
 
-    row = {"trading_date": "2026-07-03", "ticker": "AAA"}
+    row = {"trading_date": "2026-07-03", "ticker": "AAA", "sector": "non_financial"}
     for column in SEQUENCE_FEATURE_COLUMNS + TABULAR_FEATURE_COLUMNS:
         row[column] = 1.0
     df = pd.DataFrame([row])
@@ -179,6 +201,9 @@ def test_ml_data_quality_gate_passes_and_returns_trading_date() -> None:
         result = ml_data_quality_gate(context, MlInferenceGateConfig(), mock_redshift)
 
     assert result.value == "2026-07-03"
+    assert result.metadata["sector_breakdown"].data == {
+        "non_financial": {"tickers": 1, "mean_null_rate": 0.0}
+    }
 
 
 def _build_ticker_block(ticker: str, end_date: str) -> pd.DataFrame:
@@ -192,7 +217,7 @@ def _build_ticker_block(ticker: str, end_date: str) -> pd.DataFrame:
     dates = pd.date_range(end=end_date, periods=WINDOW_SIZE)
     rows = []
     for date in dates:
-        row = {"ticker": ticker, "trading_date": date}
+        row = {"ticker": ticker, "trading_date": date, "sector": "non_financial"}
         for column in SEQUENCE_FEATURE_COLUMNS + TABULAR_FEATURE_COLUMNS:
             row[column] = 1.0
         rows.append(row)
@@ -230,6 +255,15 @@ def test_ml_daily_forecast_runs_batch_transform_successfully() -> None:
     mock_s3_client = unittest.mock.MagicMock()
     mock_s3.get_client.return_value = mock_s3_client
 
+    # Capture the JSONL payload before its TemporaryDirectory is cleaned up.
+    uploaded_lines: list[dict] = []
+
+    def mock_upload(local_path, bucket, key):
+        with open(local_path, encoding="utf-8") as f:
+            uploaded_lines.extend(json.loads(line) for line in f if line.strip())
+
+    mock_s3_client.upload_file.side_effect = mock_upload
+
     # serve.py now echoes ticker alongside predicted_return (Task 2).
     def mock_download(bucket, key, local_path):
         with open(local_path, "w", encoding="utf-8") as f:
@@ -256,6 +290,12 @@ def test_ml_daily_forecast_runs_batch_transform_successfully() -> None:
     assert len(result.value["results"]) == 2
     assert result.value["results"][0] == {"ticker": "AAA", "predicted_return": 0.05}
     assert result.value["results"][1] == {"ticker": "BBB", "predicted_return": -0.02}
+    assert result.metadata["skipped_count"].value == 0
+
+    # The JSONL payload written to S3 carries sector + a {col: value} dict.
+    assert set(uploaded_lines[0]) == {"ticker", "sequence", "tabular", "sector"}
+    assert isinstance(uploaded_lines[0]["tabular"], dict)
+    assert uploaded_lines[0]["sector"] == "non_financial"
     assert result.value["output_s3_uri"] == (
         "s3://finops-processed-bucket-dev/ml-inference-output/2026-07-03/input.jsonl.out"
     )
@@ -266,6 +306,56 @@ def test_ml_daily_forecast_runs_batch_transform_successfully() -> None:
         inference_image=unittest.mock.ANY,
     )
     mock_sagemaker.run_batch_transform_job.assert_called_once()
+
+
+def test_ml_daily_forecast_skips_non_finite_predictions() -> None:
+    from src.dagster.inference_job import ml_daily_forecast
+
+    df = pd.concat(
+        [
+            _build_ticker_block("AAA", "2026-07-03"),
+            _build_ticker_block("BBB", "2026-07-03"),
+        ],
+        ignore_index=True,
+    )
+
+    mock_redshift = unittest.mock.MagicMock()
+    mock_redshift.get_connection.return_value.__enter__.return_value = (
+        unittest.mock.MagicMock()
+    )
+    mock_ssm = unittest.mock.MagicMock()
+    mock_ssm.get_parameter.side_effect = lambda name: {
+        "/finops/model/active_version": "v1",
+    }.get(name)
+    mock_sagemaker = unittest.mock.MagicMock()
+    mock_sagemaker.model_artifacts_bucket = "finops-model-artifacts-dev"
+    mock_s3bucket = unittest.mock.MagicMock()
+    mock_s3bucket.processed_bucket = "finops-processed-bucket-dev"
+    mock_s3 = unittest.mock.MagicMock()
+    mock_s3_client = unittest.mock.MagicMock()
+    mock_s3.get_client.return_value = mock_s3_client
+
+    def mock_download(bucket, key, local_path):
+        with open(local_path, "w", encoding="utf-8") as f:
+            f.write(json.dumps({"ticker": "AAA", "predicted_return": 0.05}) + "\n")
+            f.write(json.dumps({"ticker": "BBB", "predicted_return": None}) + "\n")
+
+    mock_s3_client.download_file.side_effect = mock_download
+    context = dagster.build_asset_context()
+
+    with unittest.mock.patch("src.dagster.inference_job.pd.read_sql", return_value=df):
+        result = ml_daily_forecast(
+            context,
+            "2026-07-03",
+            mock_redshift,
+            mock_ssm,
+            mock_sagemaker,
+            mock_s3bucket,
+            mock_s3,
+        )
+
+    assert [r["ticker"] for r in result.value["results"]] == ["AAA"]
+    assert result.metadata["skipped_count"].value == 1
 
 
 def test_ml_daily_forecast_raises_when_no_valid_tickers() -> None:

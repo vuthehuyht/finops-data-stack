@@ -35,3 +35,11 @@ models:
       +schema: "{{ env_var('REDSHIFT_MART_SCHEMA', 'mart') }}"
       +group: MART
       +tags: ['mart']
+
+seeds:
+  transform:
+    sector_mapping:
+      +schema: "{{ env_var('REDSHIFT_MART_SCHEMA', 'mart') }}"
+      +column_types:
+        industry: varchar(256)
+        sector: varchar(32)

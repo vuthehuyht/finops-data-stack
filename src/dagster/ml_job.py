@@ -18,6 +18,7 @@ from src.dagster.resources import (
     SageMakerResource,
     SsmParameterResource,
 )
+from src.dagster.retry_policies import SAGEMAKER_RETRY
 from src.ml.data_export import unload_training_dataset
 from src.ml.evaluation import (
     compare_and_promote,
@@ -317,6 +318,8 @@ def define_ml_jobs() -> MlJobBundle:
             _TRAINING_JOB_ASSET_KEY,
             _MODEL_EVALUATION_ASSET_KEY,
         ],
+        # SageMaker training is expensive; retry at most once, infra failures only.
+        op_retry_policy=SAGEMAKER_RETRY,
         k8s_config={
             "pod_spec_config": {
                 "node_selector": {"karpenter.sh/capacity-type": "on-demand"}

@@ -3,6 +3,7 @@
     materialized='incremental',
     incremental_strategy='merge',
     unique_key=['TICKER', 'TRADING_DATE'],
+    on_schema_change='sync_all_columns',
     merge_exclude_columns=['DATACORE_CREATE_DATETIME', 'DATACORE_CREATE_PROGRAM', 'DATACORE_CREATE_BY']
   )
 }}
@@ -36,6 +37,9 @@ WITH BASE AS (
 SELECT
   B.TICKER::VARCHAR(256) AS TICKER,
   B.TRADING_DATE::DATE AS TRADING_DATE,
+
+  -- ── Company sector (drives sector-aware ML feature handling) ─────────────
+  COALESCE(SM.SECTOR, 'non_financial')::VARCHAR(32) AS SECTOR,
 
   -- ── Market Momentum features ─────────────────────────────────────────────
   MOM.PRICE_MOMENTUM_1M,
@@ -148,3 +152,7 @@ LEFT JOIN {{ ref('MART_INSIDER_PROPRIETARY_FLOWS') }} AS FLW
   ON
     B.TICKER = FLW.TICKER
     AND B.TRADING_DATE = FLW.TRADING_DATE
+LEFT JOIN {{ ref('STG_COMPANY_PROFILE') }} AS CP
+  ON B.TICKER = CP.TICKER
+LEFT JOIN {{ ref('sector_mapping') }} AS SM
+  ON CP.INDUSTRY = SM.INDUSTRY

@@ -39,12 +39,13 @@ def test_build_latest_window_returns_last_window_size_rows() -> None:
         {
             "ticker": ["AAA"] * 5 + ["BBB"] * 5,
             "trading_date": list(pd.date_range("2026-01-01", periods=5)) * 2,
+            "sector": ["bank"] * 5 + ["non_financial"] * 5,
             "SEQ_COL": [10, 20, 30, 40, 50, 100, 200, 300, 400, 500],
             "TAB_COL": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
         }
     )
 
-    sequence, tabular = build_latest_window(
+    sequence, tabular_row, sector = build_latest_window(
         df,
         "AAA",
         window_size=3,
@@ -53,7 +54,8 @@ def test_build_latest_window_returns_last_window_size_rows() -> None:
     )
 
     assert sequence.tolist() == [[30.0], [40.0], [50.0]]
-    assert tabular.tolist() == [5.0]
+    assert float(tabular_row["TAB_COL"]) == 5.0
+    assert sector == "bank"
 
 
 def test_build_latest_window_raises_when_insufficient_history() -> None:
@@ -63,6 +65,7 @@ def test_build_latest_window_raises_when_insufficient_history() -> None:
         {
             "ticker": ["AAA", "AAA"],
             "trading_date": pd.date_range("2026-01-01", periods=2),
+            "sector": ["bank", "bank"],
             "SEQ_COL": [10, 20],
             "TAB_COL": [1, 2],
         }
@@ -78,67 +81,115 @@ def test_build_latest_window_raises_when_insufficient_history() -> None:
         )
 
 
-def test_predict_from_payload_returns_float_prediction() -> None:
-    from src.ml.inference import predict_from_payload
-    from src.ml.model import FusionModel
+def _payload(sector: str = "non_financial") -> dict:
+    from src.ml.config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS
 
-    model = FusionModel(sequence_input_size=2, tabular_input_size=2)
-    model.eval()
-    payload = {
-        "sequence": [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]],
-        "tabular": [0.7, 0.8],
+    return {
+        "ticker": "ACB",
+        "sequence": [[0.0] * len(SEQUENCE_FEATURE_COLUMNS) for _ in range(30)],
+        "tabular": dict.fromkeys(TABULAR_FEATURE_COLUMNS, 1.0),
+        "sector": sector,
     }
 
-    result = predict_from_payload(model, payload)
 
-    assert isinstance(result, dict)
-    assert isinstance(result["predicted_return"], float)
+def test_predict_from_payload_returns_float_when_finite() -> None:
+    import torch
+
+    from src.ml import inference
+
+    class _ConstModel(torch.nn.Module):
+        def forward(self, sequence, tabular, sector_idx):
+            return torch.full((sequence.shape[0], 1), 0.0123)
+
+    out = inference.predict_from_payload(
+        (_ConstModel(), {}, ["non_financial"]), _payload()
+    )
+    assert out["predicted_return"] == pytest.approx(0.0123)
+    import json
+
+    assert "NaN" not in json.dumps({"ticker": "HPG", **out})
 
 
-def test_load_model_from_s3_success() -> None:
-    import io
-    import tarfile
-    import unittest.mock
+def test_predict_from_payload_none_on_non_finite() -> None:
+    import torch
 
-    from src.ml.inference import load_model_from_s3
+    from src.ml import inference
 
-    mock_s3_client = unittest.mock.MagicMock()
+    class _NanModel(torch.nn.Module):
+        def forward(self, sequence, tabular, sector_idx):
+            return torch.full((sequence.shape[0], 1), float("nan"))
 
-    buffer = io.BytesIO()
-    with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
-        content = b"fake state dict"
-        info = tarfile.TarInfo(name="model.pt")
-        info.size = len(content)
-        tar.addfile(info, io.BytesIO(content))
-    tarball_bytes = buffer.getvalue()
+    out = inference.predict_from_payload((_NanModel(), {}, ["bank"]), _payload("bank"))
+    assert out == {"predicted_return": None}
 
-    def download_file_side_effect(Bucket, Key, Filename):
-        with open(Filename, "wb") as f:
-            f.write(tarball_bytes)
 
-    mock_s3_client.download_file.side_effect = download_file_side_effect
+def _gate_df(rows):
+    from src.ml.config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS
 
-    fake_state_dict = {}
-    with (
-        unittest.mock.patch(
-            "torch.load", return_value=fake_state_dict
-        ) as mock_torch_load,
-        unittest.mock.patch("src.ml.model.FusionModel") as mock_fusion_model_class,
-    ):
-        mock_model = unittest.mock.MagicMock()
-        mock_fusion_model_class.return_value = mock_model
+    base_cols = SEQUENCE_FEATURE_COLUMNS + TABULAR_FEATURE_COLUMNS
+    records = []
+    for ticker, sector, overrides in rows:
+        rec = dict.fromkeys(base_cols, 1.0)
+        rec.update(overrides)
+        rec["ticker"] = ticker
+        rec["sector"] = sector
+        records.append(rec)
+    return pd.DataFrame(records)
 
-        model = load_model_from_s3(mock_s3_client, "my-bucket", "my-key")
 
-        assert model == mock_model
-        mock_s3_client.download_file.assert_called_once_with(
-            "my-bucket", "my-key", unittest.mock.ANY
+def test_gate_passes_when_bank_missing_only_structural_features() -> None:
+    from src.ml.inference import check_sector_aware_completeness
+
+    df = _gate_df(
+        [
+            ("ACB", "bank", {"gross_margin": None, "debt_to_equity": None}),
+            ("HPG", "non_financial", {}),
+        ]
+    )
+    out = check_sector_aware_completeness(
+        df,
+        null_rate_threshold=0.6,
+        min_ticker_completeness=0.7,
+        max_incomplete_ticker_ratio=0.3,
+    )
+    assert out["incomplete_ticker_ratio"] == 0.0
+    assert set(out["sector_breakdown"]) == {"bank", "non_financial"}
+
+
+def test_gate_fails_on_dirty_sequence_feature() -> None:
+    from src.ml.config import SEQUENCE_FEATURE_COLUMNS
+    from src.ml.inference import check_sector_aware_completeness
+
+    df = _gate_df(
+        [
+            ("ACB", "bank", {SEQUENCE_FEATURE_COLUMNS[0]: None}),
+            ("BID", "bank", {SEQUENCE_FEATURE_COLUMNS[0]: None}),
+        ]
+    )
+    with pytest.raises(ValueError, match="sequence feature"):
+        check_sector_aware_completeness(
+            df,
+            null_rate_threshold=0.6,
+            min_ticker_completeness=0.7,
+            max_incomplete_ticker_ratio=0.3,
         )
-        mock_torch_load.assert_called_once_with(
-            unittest.mock.ANY, map_location="cpu", weights_only=True
+
+
+def test_gate_fails_when_too_many_tickers_incomplete() -> None:
+    from src.ml.config import TABULAR_FEATURE_COLUMNS
+    from src.ml.inference import check_sector_aware_completeness
+
+    half = dict.fromkeys(
+        TABULAR_FEATURE_COLUMNS[: len(TABULAR_FEATURE_COLUMNS) // 2 + 2]
+    )
+    df = _gate_df([("ACB", "non_financial", half)])
+    with pytest.raises(ValueError, match="incomplete"):
+        check_sector_aware_completeness(
+            df,
+            null_rate_threshold=0.6,
+            min_ticker_completeness=0.7,
+            max_incomplete_ticker_ratio=0.3,
         )
-        mock_model.load_state_dict.assert_called_once_with(fake_state_dict)
-        mock_model.eval.assert_called_once()
 
 
 def test_next_trading_day_skips_to_next_weekday() -> None:

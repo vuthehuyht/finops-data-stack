@@ -19,17 +19,26 @@ import numpy as np
 import pandas as pd
 
 if TYPE_CHECKING:
-    import torch
+    pass
 
 try:
     # Package-relative import: used when pytest imports this module as
     # `src.ml.inference` from the repo root, where the `src` package resolves.
-    from src.ml.config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS
+    from src.ml import features
+    from src.ml.config import (
+        SEQUENCE_FEATURE_COLUMNS,
+        TABULAR_FEATURE_COLUMNS,
+    )
 except ImportError:
     # Sibling import: SageMaker script mode copies `source_dir`'s contents
     # flat into /opt/ml/input/data/code/, so there is no `src` package there
     # — config.py is a plain sibling of inference.py in that directory.
-    from config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS
+    import features  # noqa: I001
+
+    from config import (  # noqa: I001
+        SEQUENCE_FEATURE_COLUMNS,
+        TABULAR_FEATURE_COLUMNS,
+    )
 
 _DATE_COLUMN = "trading_date"
 _TICKER_COLUMN = "ticker"
@@ -78,13 +87,81 @@ def check_feature_null_rate(
     return null_rates
 
 
+def check_sector_aware_completeness(
+    df: pd.DataFrame,
+    *,
+    null_rate_threshold: float,
+    min_ticker_completeness: float,
+    max_incomplete_ticker_ratio: float,
+) -> dict:
+    """Per-ticker, sector-aware completeness check for the latest date.
+
+    - Sequence features must be clean: any column whose null rate exceeds
+      ``null_rate_threshold`` fails the gate (the sequence branch only ever
+      imputes 0.0).
+    - For each ticker, completeness = fraction of its APPLICABLE tabular
+      features that are non-null. A ticker below ``min_ticker_completeness``
+      is "incomplete". Fails if the incomplete ratio exceeds
+      ``max_incomplete_ticker_ratio``.
+
+    Returns a dict with ``sector_breakdown`` (ticker count + mean null rate
+    per sector) and ``incomplete_ticker_ratio``.
+
+    Raises:
+        ValueError: If ``df`` is empty or either threshold is breached.
+    """
+    if len(df) == 0:
+        raise ValueError("Data quality gate: no rows for the latest trading date")
+
+    for col in SEQUENCE_FEATURE_COLUMNS:
+        rate = float(df[col].isna().mean())
+        if rate > null_rate_threshold:
+            raise ValueError(
+                f"Data quality gate: sequence feature {col} null rate "
+                f"{rate:.2%} exceeds {null_rate_threshold:.2%}"
+            )
+
+    has_sector = "sector" in df.columns
+    incomplete = 0
+    per_sector: dict[str, list[float]] = {}
+    for _, row in df.iterrows():
+        sector = str(row["sector"]) if has_sector else "non_financial"
+        applicable = [c for c in TABULAR_FEATURE_COLUMNS if features.applies(c, sector)]
+        if not applicable:
+            completeness = 1.0
+        else:
+            present = sum(1 for c in applicable if not pd.isna(row[c]))
+            completeness = present / len(applicable)
+        per_sector.setdefault(sector, []).append(1.0 - completeness)
+        if completeness < min_ticker_completeness:
+            incomplete += 1
+
+    incomplete_ratio = incomplete / len(df)
+    if incomplete_ratio > max_incomplete_ticker_ratio:
+        raise ValueError(
+            f"Data quality gate: {incomplete_ratio:.2%} of tickers are "
+            f"incomplete (> {max_incomplete_ticker_ratio:.2%})"
+        )
+
+    return {
+        "sector_breakdown": {
+            sector: {
+                "tickers": len(rates),
+                "mean_null_rate": float(np.mean(rates)),
+            }
+            for sector, rates in per_sector.items()
+        },
+        "incomplete_ticker_ratio": incomplete_ratio,
+    }
+
+
 def build_latest_window(
     df: pd.DataFrame,
     ticker: str,
     window_size: int,
     sequence_columns: list[str] | None = None,
     tabular_columns: list[str] | None = None,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, pd.Series, str]:
     """Build the most recent `window_size`-day window for one ticker.
 
     Mirrors `StockSequenceDataset`'s per-window slicing (src/ml/dataset.py) but
@@ -98,9 +175,11 @@ def build_latest_window(
         tabular_columns: Defaults to TABULAR_FEATURE_COLUMNS.
 
     Returns:
-        `(sequence_array, tabular_array)`: sequence has shape
-        `(window_size, len(sequence_columns))`; tabular has shape
-        `(len(tabular_columns),)` — the last row's snapshot.
+        `(sequence_array, tabular_row, sector)`: sequence has shape
+        `(window_size, len(sequence_columns))` (NaN -> 0.0); `tabular_row`
+        is the last row's raw Series over `tabular_columns` (featurized by
+        the caller); `sector` is the ticker's sector string (defaults to
+        `"non_financial"` if the column is absent).
 
     Raises:
         ValueError: If fewer than `window_size` rows exist for `ticker`.
@@ -116,64 +195,49 @@ def build_latest_window(
         )
 
     window = ticker_df.iloc[-window_size:]
-    sequence = window[sequence_columns].to_numpy(dtype=np.float32)
-    tabular = window[tabular_columns].iloc[-1].to_numpy(dtype=np.float32)
-    return sequence, tabular
+    sequence = features.sequence_features(window, columns=sequence_columns)
+    tabular_row = window[tabular_columns].iloc[-1]
+    sector = (
+        str(ticker_df["sector"].iloc[-1])
+        if "sector" in ticker_df.columns
+        else "non_financial"
+    )
+    return sequence, tabular_row, sector
 
 
-def predict_from_payload(model: "torch.nn.Module", payload: dict) -> dict:
-    """Run a forward pass given a JSON-deserialized inference payload.
+def predict_from_payload(bundle: tuple, payload: dict) -> dict:
+    """Run one forward pass for a single ticker payload.
 
     Args:
-        model: A `FusionModel` instance in `eval()` mode.
-        payload: `{"sequence": [[...]], "tabular": [...]}`.
+        bundle: `(model, medians, sector_vocab)` — see
+            `src/ml/serve.py::model_fn`.
+        payload: `{"ticker", "sequence": [[...]], "tabular": {col: val},
+            "sector"}`.
 
     Returns:
-        `{"predicted_return": <float>}`.
+        `{"predicted_return": float | None}` — `None` when the model output
+        is non-finite, so the downstream Redshift COPY loads `NULL` rather
+        than choking on the literal `NaN`.
     """
+    import math
+
     import torch
 
-    sequence = torch.tensor([payload["sequence"]], dtype=torch.float32)
-    tabular = torch.tensor([payload["tabular"]], dtype=torch.float32)
+    model, medians, _sector_vocab = bundle
+    # Match model_fn, which moves the model to CUDA when the container has one.
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    sector = str(payload["sector"])
+    values, flags = features.build_tabular_features(payload["tabular"], sector, medians)
+    sequence = torch.tensor([payload["sequence"]], dtype=torch.float32, device=device)
+    tabular = torch.tensor(
+        [list(values) + list(flags)], dtype=torch.float32, device=device
+    )
+    sector_idx = torch.tensor(
+        [features.sector_index(sector)], dtype=torch.long, device=device
+    )
     with torch.no_grad():
-        prediction = model(sequence, tabular)
-    return {"predicted_return": prediction.item()}
-
-
-def load_model_from_s3(s3_client, bucket: str, key: str) -> "torch.nn.Module":
-    """Download model.tar.gz from S3, extract it, and load it.
-
-    Loads the weights into a FusionModel instance.
-    """
-    import os
-    import tarfile
-    import tempfile
-
-    import torch
-
-    try:
-        from src.ml.model import FusionModel
-    except ImportError:
-        from model import FusionModel
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tarball_path = os.path.join(tmpdir, "model.tar.gz")
-        s3_client.download_file(bucket, key, tarball_path)
-
-        with tarfile.open(tarball_path, "r:gz") as tar:
-            tar.extractall(path=tmpdir)
-
-        model_path = os.path.join(tmpdir, "model.pt")
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(
-                f"model.pt not found in tarball extracted from s3://{bucket}/{key}"
-            )
-
-        model = FusionModel(
-            sequence_input_size=len(SEQUENCE_FEATURE_COLUMNS),
-            tabular_input_size=len(TABULAR_FEATURE_COLUMNS),
-        )
-        state_dict = torch.load(model_path, map_location="cpu", weights_only=True)
-        model.load_state_dict(state_dict)
-        model.eval()
-        return model
+        prediction = model(sequence, tabular, sector_idx)
+    value = prediction.item()
+    if not math.isfinite(value):
+        return {"predicted_return": None}
+    return {"predicted_return": value}

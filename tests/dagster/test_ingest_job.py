@@ -116,6 +116,16 @@ def test_ingest_all_raw_data_job_exists() -> None:
     assert "ingest_all_raw_data_job" in job_names
 
 
+def test_define_ingest_jobs_all_jobs_have_ingest_retry_policy() -> None:
+    """Every ingest job (per-asset + ingest_all) must carry INGEST_RETRY."""
+    from src.dagster.ingest_job import define_ingest_jobs
+    from src.dagster.retry_policies import INGEST_RETRY
+
+    bundle = define_ingest_jobs()
+    for job in bundle.jobs:
+        assert job.op_retry_policy == INGEST_RETRY, job.name
+
+
 def test_ingest_all_config_mapping() -> None:
     from src.dagster.ingest_job import ingest_all_config_mapping
 

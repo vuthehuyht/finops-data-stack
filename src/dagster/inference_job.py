@@ -2,6 +2,7 @@
 
 import datetime
 import json
+import math
 import os
 import tempfile
 import time
@@ -21,8 +22,8 @@ from src.dagster.resources import (
     SageMakerResource,
     SsmParameterResource,
 )
+from src.dagster.retry_policies import LOAD_RETRY, SAGEMAKER_RETRY
 from src.ml.config import (
-    SEQUENCE_FEATURE_COLUMNS,
     TABULAR_FEATURE_COLUMNS,
     WINDOW_SIZE,
 )
@@ -30,14 +31,14 @@ from src.ml.evaluation import model_version_prefix
 from src.ml.forecast_publish import publish_forecast_results
 from src.ml.inference import (
     build_latest_window,
-    check_feature_null_rate,
+    check_sector_aware_completeness,
     next_trading_day,
 )
 
 _FEATURE_TABLE = "MART.FACT_ML_FEATURE_SET"
 _ACTIVE_VERSION_PARAM = "/finops/model/active_version"
 _INFERENCE_IMAGE = (
-    "763104351884.dkr.ecr.ap-southeast-1.amazonaws.com/pytorch-inference:2.2-cpu-py310"
+    "763104351884.dkr.ecr.ap-southeast-1.amazonaws.com/pytorch-inference:2.2-gpu-py310"
 )
 _LOOKBACK_DAYS = 90  # comfortably covers WINDOW_SIZE=30 trading days
 
@@ -68,7 +69,18 @@ class MlInferenceGateConfig(dagster.Config):
 
     null_rate_threshold: float = pydantic.Field(
         default=0.6,
-        description="Max acceptable null rate per feature column (0.0-1.0).",
+        description="Max acceptable null rate per sequence feature column (0.0-1.0).",
+    )
+    min_ticker_completeness: float = pydantic.Field(
+        default=0.7,
+        description=(
+            "Min fraction of a ticker's applicable tabular features that "
+            "must be non-null for the ticker to count as complete."
+        ),
+    )
+    max_incomplete_ticker_ratio: float = pydantic.Field(
+        default=0.3,
+        description="Max fraction of tickers allowed below min_ticker_completeness.",
     )
 
 
@@ -78,7 +90,8 @@ class MlInferenceGateConfig(dagster.Config):
     kinds={"python", "redshift"},
     deps=[_FACT_ML_FEATURE_SET_KEY],
     description=(
-        "Gate inference on FACT_ML_FEATURE_SET null rates for the latest trading date."
+        "Gate inference on per-ticker, sector-aware feature completeness for "
+        "FACT_ML_FEATURE_SET's latest trading date."
     ),
 )
 def ml_data_quality_gate(
@@ -86,7 +99,7 @@ def ml_data_quality_gate(
     config: MlInferenceGateConfig,
     redshift: RedshiftResource,
 ) -> dagster.Output[str]:
-    """Check the latest trading date's feature null rates; fail fast if unhealthy."""
+    """Check the latest trading date's sector-aware feature completeness; fail fast."""
     with redshift.get_connection() as conn:
         df = pd.read_sql(
             f"""
@@ -100,12 +113,12 @@ def ml_data_quality_gate(
         raise ValueError(f"{_FEATURE_TABLE} has no rows; cannot run inference.")
 
     trading_date = _validate_iso_date(df["trading_date"].iloc[0])
-    null_rates = check_feature_null_rate(
+    gate_result = check_sector_aware_completeness(
         df,
-        SEQUENCE_FEATURE_COLUMNS + TABULAR_FEATURE_COLUMNS,
-        config.null_rate_threshold,
+        null_rate_threshold=config.null_rate_threshold,
+        min_ticker_completeness=config.min_ticker_completeness,
+        max_incomplete_ticker_ratio=config.max_incomplete_ticker_ratio,
     )
-    max_null_rate = max(null_rates.values()) if null_rates else 0.0
     context.log.info(
         "Data quality gate passed for %s (%s tickers).", trading_date, len(df)
     )
@@ -114,7 +127,10 @@ def ml_data_quality_gate(
         metadata={
             "trading_date": trading_date,
             "ticker_count": len(df),
-            "max_null_rate": max_null_rate,
+            "incomplete_ticker_ratio": gate_result["incomplete_ticker_ratio"],
+            "sector_breakdown": dagster.MetadataValue.json(
+                gate_result["sector_breakdown"]
+            ),
         },
     )
 
@@ -128,6 +144,7 @@ def ml_data_quality_gate(
         "Run SageMaker Batch Transform (Serverless Batch) to forecast "
         "LABEL_NEXT_5D_RETURN for each ticker."
     ),
+    retry_policy=SAGEMAKER_RETRY,
 )
 def ml_daily_forecast(  # noqa: C901
     context: dagster.AssetExecutionContext,
@@ -186,11 +203,23 @@ def ml_daily_forecast(  # noqa: C901
         with open(local_input_path, "w", encoding="utf-8") as f_in:
             for ticker in tickers:
                 try:
-                    sequence, tabular = build_latest_window(df, ticker, WINDOW_SIZE)
+                    sequence, tabular_row, sector = build_latest_window(
+                        df, ticker, WINDOW_SIZE
+                    )
                     payload = {
                         "ticker": ticker,
                         "sequence": sequence.tolist(),
-                        "tabular": tabular.tolist(),
+                        # Raw {col: value} dict — serve.py::features featurizes
+                        # it with the champion's sector medians. NaN -> null.
+                        "tabular": {
+                            col: (
+                                None
+                                if pd.isna(tabular_row[col])
+                                else float(tabular_row[col])
+                            )
+                            for col in TABULAR_FEATURE_COLUMNS
+                        },
+                        "sector": sector,
                     }
                     f_in.write(json.dumps(payload) + "\n")
                     valid_tickers.append(ticker)
@@ -233,17 +262,24 @@ def ml_daily_forecast(  # noqa: C901
 
         # 6. Read results — output.jsonl.out is now self-contained
         # ({"ticker": ..., "predicted_return": ...} per line), no position
-        # matching against valid_tickers needed.
+        # matching against valid_tickers needed. predicted_return may be
+        # null / non-finite when the model saw missing features for a
+        # ticker; skip those rather than let them poison the Redshift load.
+        skipped_count = 0
         with open(local_output_path, encoding="utf-8") as f_out:
             for line_out in f_out:
                 if not line_out.strip():
                     continue
                 try:
                     prediction = json.loads(line_out)
+                    predicted_return = prediction["predicted_return"]
+                    if predicted_return is None or not math.isfinite(predicted_return):
+                        skipped_count += 1
+                        continue
                     results.append(
                         {
                             "ticker": prediction["ticker"],
-                            "predicted_return": prediction["predicted_return"],
+                            "predicted_return": predicted_return,
                         }
                     )
                 except Exception as exc:
@@ -267,6 +303,7 @@ def ml_daily_forecast(  # noqa: C901
             "trading_date": forecast_trading_date,
             "model_version": model_version,
             "success_count": len(results),
+            "skipped_count": skipped_count,
             "ticker_count": len(tickers),
         },
     )
@@ -281,6 +318,7 @@ def ml_daily_forecast(  # noqa: C901
         "COPY Batch Transform forecast output into Redshift Gold "
         "(FCT_ML_FORECAST_RESULTS)."
     ),
+    retry_policy=LOAD_RETRY,
 )
 def ml_publish_forecast_results(
     context: dagster.AssetExecutionContext,
