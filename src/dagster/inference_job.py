@@ -38,7 +38,7 @@ from src.ml.inference import (
 _FEATURE_TABLE = "MART.FACT_ML_FEATURE_SET"
 _ACTIVE_VERSION_PARAM = "/finops/model/active_version"
 _INFERENCE_IMAGE = (
-    "763104351884.dkr.ecr.ap-southeast-1.amazonaws.com/pytorch-inference:2.2-cpu-py310"
+    "763104351884.dkr.ecr.ap-southeast-1.amazonaws.com/pytorch-inference:2.2-gpu-py310"
 )
 _LOOKBACK_DAYS = 90  # comfortably covers WINDOW_SIZE=30 trading days
 

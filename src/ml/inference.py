@@ -224,11 +224,17 @@ def predict_from_payload(bundle: tuple, payload: dict) -> dict:
     import torch
 
     model, medians, _sector_vocab = bundle
+    # Match model_fn, which moves the model to CUDA when the container has one.
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     sector = str(payload["sector"])
     values, flags = features.build_tabular_features(payload["tabular"], sector, medians)
-    sequence = torch.tensor([payload["sequence"]], dtype=torch.float32)
-    tabular = torch.tensor([list(values) + list(flags)], dtype=torch.float32)
-    sector_idx = torch.tensor([features.sector_index(sector)], dtype=torch.long)
+    sequence = torch.tensor([payload["sequence"]], dtype=torch.float32, device=device)
+    tabular = torch.tensor(
+        [list(values) + list(flags)], dtype=torch.float32, device=device
+    )
+    sector_idx = torch.tensor(
+        [features.sector_index(sector)], dtype=torch.long, device=device
+    )
     with torch.no_grad():
         prediction = model(sequence, tabular, sector_idx)
     value = prediction.item()

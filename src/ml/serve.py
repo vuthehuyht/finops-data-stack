@@ -68,10 +68,15 @@ def model_fn(model_dir: str) -> tuple:
         tabular_input_size=TABULAR_VECTOR_SIZE,
         num_sectors=len(sector_vocab),
     )
+    # Load onto CPU first (works with or without a GPU), then move the model
+    # to CUDA when the serving container has one — the GPU inference image
+    # (_INFERENCE_IMAGE) runs on ml.g4dn.xlarge.
     state_dict = torch.load(
         os.path.join(model_dir, "model.pt"), map_location="cpu", weights_only=True
     )
     model.load_state_dict(state_dict)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model.to(device)
     model.eval()
     return model, medians, sector_vocab
 

@@ -19,6 +19,14 @@ def test_ml_inference_gate_config_default_threshold() -> None:
     assert config.max_incomplete_ticker_ratio == 0.3
 
 
+def test_inference_image_is_gpu_build() -> None:
+    from src.dagster.inference_job import _INFERENCE_IMAGE
+
+    # Batch Transform runs on ml.g4dn.xlarge (GPU); the serving image and
+    # serve.py device handling must match — see resources.py::run_batch_transform_job.
+    assert _INFERENCE_IMAGE.endswith(":2.2-gpu-py310")
+
+
 def test_define_inference_jobs_returns_bundle_with_three_assets() -> None:
     from src.dagster.inference_job import InferenceJobBundle, define_inference_jobs
 

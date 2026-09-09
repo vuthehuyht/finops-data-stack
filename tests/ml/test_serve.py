@@ -43,8 +43,10 @@ def test_model_fn_returns_bundle_and_loads_weights(tmp_path) -> None:
     assert model.training is False
     assert medians == {}
     assert sector_vocab == SECTOR_VOCAB
+    expected_device = "cuda" if torch.cuda.is_available() else "cpu"
+    assert next(model.parameters()).device.type == expected_device
     for name, param in saved.state_dict().items():
-        assert torch.equal(param, model.state_dict()[name])
+        assert torch.equal(param.to(expected_device), model.state_dict()[name])
 
 
 def test_model_fn_rejects_stale_schema(tmp_path) -> None:
