@@ -142,6 +142,18 @@ def test_ml_publish_depends_on_forecast() -> None:
     assert forecast_key in publish_asset.dependency_keys
 
 
+def test_inference_asset_retry_policies() -> None:
+    """Forecast/publish get retries; the data quality gate must never be retried."""
+    from src.dagster.inference_job import define_inference_jobs
+    from src.dagster.retry_policies import LOAD_RETRY, SAGEMAKER_RETRY
+
+    bundle = define_inference_jobs()
+    by_name = {a.key.path[-1]: a.node_def.retry_policy for a in bundle.assets}
+    assert by_name["ML_DATA_QUALITY_GATE"] is None
+    assert by_name["ML_DAILY_FORECAST"] == SAGEMAKER_RETRY
+    assert by_name["ML_PUBLISH_FORECAST_RESULTS"] == LOAD_RETRY
+
+
 def test_ml_data_quality_gate_raises_on_null_rate_breach() -> None:
     from src.dagster.inference_job import MlInferenceGateConfig, ml_data_quality_gate
     from src.ml.config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS

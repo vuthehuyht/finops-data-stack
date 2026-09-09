@@ -21,6 +21,7 @@ from src.dagster.resources import (
     SageMakerResource,
     SsmParameterResource,
 )
+from src.dagster.retry_policies import LOAD_RETRY, SAGEMAKER_RETRY
 from src.ml.config import (
     SEQUENCE_FEATURE_COLUMNS,
     TABULAR_FEATURE_COLUMNS,
@@ -128,6 +129,7 @@ def ml_data_quality_gate(
         "Run SageMaker Batch Transform (Serverless Batch) to forecast "
         "LABEL_NEXT_5D_RETURN for each ticker."
     ),
+    retry_policy=SAGEMAKER_RETRY,
 )
 def ml_daily_forecast(  # noqa: C901
     context: dagster.AssetExecutionContext,
@@ -281,6 +283,7 @@ def ml_daily_forecast(  # noqa: C901
         "COPY Batch Transform forecast output into Redshift Gold "
         "(FCT_ML_FORECAST_RESULTS)."
     ),
+    retry_policy=LOAD_RETRY,
 )
 def ml_publish_forecast_results(
     context: dagster.AssetExecutionContext,
