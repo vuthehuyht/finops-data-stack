@@ -63,3 +63,43 @@ def test_bundle_serving_code_copies_serve_and_dependencies(tmp_path) -> None:
     assert (code_dir / "inference.py").is_file()
     assert (code_dir / "model.py").is_file()
     assert (code_dir / "config.py").is_file()
+    assert (code_dir / "features.py").is_file()
+
+
+def test_serving_files_include_features_module() -> None:
+    from src.ml.train import _SERVING_FILES
+
+    assert "features.py" in _SERVING_FILES
+
+
+def test_build_metadata_has_sector_schema_keys() -> None:
+    import argparse
+
+    from src.ml.config import FEATURE_SCHEMA_VERSION, SECTOR_VOCAB, TABULAR_VECTOR_SIZE
+    from src.ml.train import TrainingMetrics, build_metadata
+
+    args = argparse.Namespace(
+        window_size=30,
+        epochs=1,
+        batch_size=8,
+        learning_rate=1e-3,
+        train_end_date="2025-06-01",
+        val_end_date="2025-07-01",
+    )
+
+    class _DS:
+        def __len__(self):
+            return 3
+
+    meta = build_metadata(
+        args,
+        TrainingMetrics(rmse=0.1, mae=0.05),
+        _DS(),
+        _DS(),
+        _DS(),
+        medians={"bank::roe": 0.1, "roe": 0.09},
+    )
+    assert meta["sector_vocab"] == SECTOR_VOCAB
+    assert meta["tabular_medians"] == {"bank::roe": 0.1, "roe": 0.09}
+    assert meta["tabular_input_size"] == TABULAR_VECTOR_SIZE
+    assert meta["feature_schema_version"] == FEATURE_SCHEMA_VERSION
