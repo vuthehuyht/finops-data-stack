@@ -169,6 +169,75 @@ def test_load_model_from_s3_success() -> None:
         mock_model.eval.assert_called_once()
 
 
+def _gate_df(rows):
+    from src.ml.config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS
+
+    base_cols = SEQUENCE_FEATURE_COLUMNS + TABULAR_FEATURE_COLUMNS
+    records = []
+    for ticker, sector, overrides in rows:
+        rec = dict.fromkeys(base_cols, 1.0)
+        rec.update(overrides)
+        rec["ticker"] = ticker
+        rec["sector"] = sector
+        records.append(rec)
+    return pd.DataFrame(records)
+
+
+def test_gate_passes_when_bank_missing_only_structural_features() -> None:
+    from src.ml.inference import check_sector_aware_completeness
+
+    df = _gate_df(
+        [
+            ("ACB", "bank", {"gross_margin": None, "debt_to_equity": None}),
+            ("HPG", "non_financial", {}),
+        ]
+    )
+    out = check_sector_aware_completeness(
+        df,
+        null_rate_threshold=0.6,
+        min_ticker_completeness=0.7,
+        max_incomplete_ticker_ratio=0.3,
+    )
+    assert out["incomplete_ticker_ratio"] == 0.0
+    assert set(out["sector_breakdown"]) == {"bank", "non_financial"}
+
+
+def test_gate_fails_on_dirty_sequence_feature() -> None:
+    from src.ml.config import SEQUENCE_FEATURE_COLUMNS
+    from src.ml.inference import check_sector_aware_completeness
+
+    df = _gate_df(
+        [
+            ("ACB", "bank", {SEQUENCE_FEATURE_COLUMNS[0]: None}),
+            ("BID", "bank", {SEQUENCE_FEATURE_COLUMNS[0]: None}),
+        ]
+    )
+    with pytest.raises(ValueError, match="sequence feature"):
+        check_sector_aware_completeness(
+            df,
+            null_rate_threshold=0.6,
+            min_ticker_completeness=0.7,
+            max_incomplete_ticker_ratio=0.3,
+        )
+
+
+def test_gate_fails_when_too_many_tickers_incomplete() -> None:
+    from src.ml.config import TABULAR_FEATURE_COLUMNS
+    from src.ml.inference import check_sector_aware_completeness
+
+    half = dict.fromkeys(
+        TABULAR_FEATURE_COLUMNS[: len(TABULAR_FEATURE_COLUMNS) // 2 + 2]
+    )
+    df = _gate_df([("ACB", "non_financial", half)])
+    with pytest.raises(ValueError, match="incomplete"):
+        check_sector_aware_completeness(
+            df,
+            null_rate_threshold=0.6,
+            min_ticker_completeness=0.7,
+            max_incomplete_ticker_ratio=0.3,
+        )
+
+
 def test_next_trading_day_skips_to_next_weekday() -> None:
     import datetime
 

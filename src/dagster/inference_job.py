@@ -24,7 +24,6 @@ from src.dagster.resources import (
 )
 from src.dagster.retry_policies import LOAD_RETRY, SAGEMAKER_RETRY
 from src.ml.config import (
-    SEQUENCE_FEATURE_COLUMNS,
     TABULAR_FEATURE_COLUMNS,
     WINDOW_SIZE,
 )
@@ -32,7 +31,7 @@ from src.ml.evaluation import model_version_prefix
 from src.ml.forecast_publish import publish_forecast_results
 from src.ml.inference import (
     build_latest_window,
-    check_feature_null_rate,
+    check_sector_aware_completeness,
     next_trading_day,
 )
 
@@ -70,7 +69,18 @@ class MlInferenceGateConfig(dagster.Config):
 
     null_rate_threshold: float = pydantic.Field(
         default=0.6,
-        description="Max acceptable null rate per feature column (0.0-1.0).",
+        description="Max acceptable null rate per sequence feature column (0.0-1.0).",
+    )
+    min_ticker_completeness: float = pydantic.Field(
+        default=0.7,
+        description=(
+            "Min fraction of a ticker's applicable tabular features that "
+            "must be non-null for the ticker to count as complete."
+        ),
+    )
+    max_incomplete_ticker_ratio: float = pydantic.Field(
+        default=0.3,
+        description="Max fraction of tickers allowed below min_ticker_completeness.",
     )
 
 
@@ -102,12 +112,12 @@ def ml_data_quality_gate(
         raise ValueError(f"{_FEATURE_TABLE} has no rows; cannot run inference.")
 
     trading_date = _validate_iso_date(df["trading_date"].iloc[0])
-    null_rates = check_feature_null_rate(
+    gate_result = check_sector_aware_completeness(
         df,
-        SEQUENCE_FEATURE_COLUMNS + TABULAR_FEATURE_COLUMNS,
-        config.null_rate_threshold,
+        null_rate_threshold=config.null_rate_threshold,
+        min_ticker_completeness=config.min_ticker_completeness,
+        max_incomplete_ticker_ratio=config.max_incomplete_ticker_ratio,
     )
-    max_null_rate = max(null_rates.values()) if null_rates else 0.0
     context.log.info(
         "Data quality gate passed for %s (%s tickers).", trading_date, len(df)
     )
@@ -116,7 +126,10 @@ def ml_data_quality_gate(
         metadata={
             "trading_date": trading_date,
             "ticker_count": len(df),
-            "max_null_rate": max_null_rate,
+            "incomplete_ticker_ratio": gate_result["incomplete_ticker_ratio"],
+            "sector_breakdown": dagster.MetadataValue.json(
+                gate_result["sector_breakdown"]
+            ),
         },
     )
 

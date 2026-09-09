@@ -41,10 +41,14 @@ def sector_index(sector: str) -> int:
         return SECTOR_VOCAB.index(_DEFAULT_SECTOR)
 
 
-def _applies(col: str, sector: str) -> bool:
+def applies(col: str, sector: str) -> bool:
     """True unless ``col`` has an explicit applicability set excluding ``sector``."""
     allowed = FEATURE_APPLICABILITY.get(col)
     return allowed is None or sector in allowed
+
+
+# Back-compat private alias — kept for existing internal call sites.
+_applies = applies
 
 
 def median_lookup(medians: Mapping[str, float], sector: str, col: str) -> float:

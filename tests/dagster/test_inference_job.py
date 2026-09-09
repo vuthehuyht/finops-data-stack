@@ -15,6 +15,8 @@ def test_ml_inference_gate_config_default_threshold() -> None:
 
     config = MlInferenceGateConfig()
     assert config.null_rate_threshold == 0.6
+    assert config.min_ticker_completeness == 0.7
+    assert config.max_incomplete_ticker_ratio == 0.3
 
 
 def test_define_inference_jobs_returns_bundle_with_three_assets() -> None:
@@ -158,7 +160,7 @@ def test_ml_data_quality_gate_raises_on_null_rate_breach() -> None:
     from src.dagster.inference_job import MlInferenceGateConfig, ml_data_quality_gate
     from src.ml.config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS
 
-    row = {"trading_date": "2026-07-03", "ticker": "AAA"}
+    row = {"trading_date": "2026-07-03", "ticker": "AAA", "sector": "non_financial"}
     for column in SEQUENCE_FEATURE_COLUMNS + TABULAR_FEATURE_COLUMNS:
         row[column] = None
     df = pd.DataFrame([row])
@@ -169,7 +171,7 @@ def test_ml_data_quality_gate_raises_on_null_rate_breach() -> None:
     context = dagster.build_asset_context()
 
     with unittest.mock.patch("src.dagster.inference_job.pd.read_sql", return_value=df):
-        with pytest.raises(ValueError, match="Data quality gate failed"):
+        with pytest.raises(ValueError, match="sequence feature"):
             ml_data_quality_gate(context, MlInferenceGateConfig(), mock_redshift)
 
 
@@ -177,7 +179,7 @@ def test_ml_data_quality_gate_passes_and_returns_trading_date() -> None:
     from src.dagster.inference_job import MlInferenceGateConfig, ml_data_quality_gate
     from src.ml.config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS
 
-    row = {"trading_date": "2026-07-03", "ticker": "AAA"}
+    row = {"trading_date": "2026-07-03", "ticker": "AAA", "sector": "non_financial"}
     for column in SEQUENCE_FEATURE_COLUMNS + TABULAR_FEATURE_COLUMNS:
         row[column] = 1.0
     df = pd.DataFrame([row])
@@ -191,6 +193,9 @@ def test_ml_data_quality_gate_passes_and_returns_trading_date() -> None:
         result = ml_data_quality_gate(context, MlInferenceGateConfig(), mock_redshift)
 
     assert result.value == "2026-07-03"
+    assert result.metadata["sector_breakdown"].data == {
+        "non_financial": {"tickers": 1, "mean_null_rate": 0.0}
+    }
 
 
 def _build_ticker_block(ticker: str, end_date: str) -> pd.DataFrame:

@@ -91,6 +91,73 @@ def check_feature_null_rate(
     return null_rates
 
 
+def check_sector_aware_completeness(
+    df: pd.DataFrame,
+    *,
+    null_rate_threshold: float,
+    min_ticker_completeness: float,
+    max_incomplete_ticker_ratio: float,
+) -> dict:
+    """Per-ticker, sector-aware completeness check for the latest date.
+
+    - Sequence features must be clean: any column whose null rate exceeds
+      ``null_rate_threshold`` fails the gate (the sequence branch only ever
+      imputes 0.0).
+    - For each ticker, completeness = fraction of its APPLICABLE tabular
+      features that are non-null. A ticker below ``min_ticker_completeness``
+      is "incomplete". Fails if the incomplete ratio exceeds
+      ``max_incomplete_ticker_ratio``.
+
+    Returns a dict with ``sector_breakdown`` (ticker count + mean null rate
+    per sector) and ``incomplete_ticker_ratio``.
+
+    Raises:
+        ValueError: If ``df`` is empty or either threshold is breached.
+    """
+    if len(df) == 0:
+        raise ValueError("Data quality gate: no rows for the latest trading date")
+
+    for col in SEQUENCE_FEATURE_COLUMNS:
+        rate = float(df[col].isna().mean())
+        if rate > null_rate_threshold:
+            raise ValueError(
+                f"Data quality gate: sequence feature {col} null rate "
+                f"{rate:.2%} exceeds {null_rate_threshold:.2%}"
+            )
+
+    incomplete = 0
+    per_sector: dict[str, list[float]] = {}
+    for _, row in df.iterrows():
+        sector = str(row["sector"]) if "sector" in df.columns else "non_financial"
+        applicable = [c for c in TABULAR_FEATURE_COLUMNS if features.applies(c, sector)]
+        if not applicable:
+            completeness = 1.0
+        else:
+            present = sum(1 for c in applicable if not pd.isna(row[c]))
+            completeness = present / len(applicable)
+        per_sector.setdefault(sector, []).append(1.0 - completeness)
+        if completeness < min_ticker_completeness:
+            incomplete += 1
+
+    incomplete_ratio = incomplete / len(df)
+    if incomplete_ratio > max_incomplete_ticker_ratio:
+        raise ValueError(
+            f"Data quality gate: {incomplete_ratio:.2%} of tickers are "
+            f"incomplete (> {max_incomplete_ticker_ratio:.2%})"
+        )
+
+    return {
+        "sector_breakdown": {
+            sector: {
+                "tickers": len(rates),
+                "mean_null_rate": float(np.mean(rates)),
+            }
+            for sector, rates in per_sector.items()
+        },
+        "incomplete_ticker_ratio": incomplete_ratio,
+    }
+
+
 def build_latest_window(
     df: pd.DataFrame,
     ticker: str,
