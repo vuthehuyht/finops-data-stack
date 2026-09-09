@@ -48,6 +48,44 @@ def test_company_profile_pipeline_fetch(
     assert result_df["description"].iloc[0] == "Techcombank profile info"
 
 
+@patch("src.ingest.pipeline.company_profile.Company")
+@patch("src.ingest.pipeline.company_profile.VnStockClient")
+def test_company_profile_pipeline_fetch_dedupes_duplicate_source_columns(
+    mock_client_class: MagicMock, mock_company_class: MagicMock
+) -> None:
+    """VCI info() repeats some labels (issue_share x4); fetch must collapse them."""
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
+    mock_client.call_api_with_retry.side_effect = lambda f: f()
+
+    mock_company = MagicMock()
+    mock_company_class.return_value = mock_company
+
+    mock_df = pd.DataFrame(
+        [["TCB", "Techcombank", "Banking", "HOSE", 1.7e9, None, 1.7e9, None, "info"]],
+        columns=[
+            "symbol",
+            "organ_name",
+            "sector",
+            "com_group_code",
+            "issue_share",
+            "issue_share",
+            "issue_share",
+            "issue_share",
+            "company_profile",
+        ],
+    )
+    mock_company.info.return_value = mock_df
+
+    pipeline = CompanyProfilePipeline(batch_date="2026-06-18", symbols=["TCB"])
+    result_df = pipeline.fetch()
+
+    # Duplicate issue_share -> outstanding_share must collapse to a single column
+    assert list(result_df.columns).count("outstanding_share") == 1
+    assert result_df["outstanding_share"].iloc[0] == 1.7e9
+    assert result_df.shape == (1, 6)
+
+
 # ---------------------------------------------------------------------------
 # CorporateEventsPipeline
 # ---------------------------------------------------------------------------

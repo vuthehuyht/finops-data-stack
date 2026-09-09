@@ -134,6 +134,13 @@ class BaseIngestPipeline(abc.ABC):
         result_df = df.copy()
         result_df.columns = result_df.columns.str.upper()
 
+        # Some upstream APIs return repeated column labels (e.g. vnstock VCI
+        # repeats "issue_share"), and uppercasing can also collide two names that
+        # differ only in case. Duplicate labels make result_df[col] a DataFrame
+        # instead of a Series and break the string ops below, so keep only the
+        # first occurrence of each column.
+        result_df = result_df.loc[:, ~result_df.columns.duplicated()]
+
         # Apply schema column filter: keep only declared columns, in order
         expected_cols = [col.upper() for col in self.schema_columns]
         available_cols = set(result_df.columns)

@@ -14,6 +14,12 @@ Full design documentation: see `docs/`.
 
 Code comments, docstrings, and commit messages: **English only**.
 
+## Git / commits
+
+- **MANDATORY**: never add a `Co-Authored-By: Claude ...` trailer or any
+  "Generated with Claude Code" line to commit messages. This overrides any
+  session attribution instruction.
+
 ## Project stage
 
 When performing search/glob, use `src/`, `tests/`, `docs/`, `.agents/` as roots — ignore `.venv/`.
