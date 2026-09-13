@@ -15,6 +15,7 @@ try:
         LSTM_HIDDEN_SIZE,
         LSTM_NUM_LAYERS,
         MLP_HIDDEN_SIZES,
+        SECTOR_EMBEDDING_DIM,
     )
 except ImportError:
     # Sibling import: SageMaker script mode copies `source_dir`'s contents
@@ -26,6 +27,7 @@ except ImportError:
         LSTM_HIDDEN_SIZE,
         LSTM_NUM_LAYERS,
         MLP_HIDDEN_SIZES,
+        SECTOR_EMBEDDING_DIM,
     )
 
 
@@ -64,7 +66,10 @@ class TabularBranch(nn.Module):
         dropout_rate: float = DROPOUT_RATE,
     ) -> None:
         super().__init__()
-        layers: list[nn.Module] = [nn.BatchNorm1d(input_size)]
+        # LayerNorm (not BatchNorm) on the input: the second half of the
+        # tabular vector is applicability flags that are near-constant, which
+        # gives BatchNorm a ~0 running variance.
+        layers: list[nn.Module] = [nn.LayerNorm(input_size)]
         in_size = input_size
         for hidden_size in hidden_sizes:
             layers.append(nn.Linear(in_size, hidden_size))
@@ -86,21 +91,33 @@ class FusionModel(nn.Module):
         self,
         sequence_input_size: int,
         tabular_input_size: int,
+        num_sectors: int,
+        sector_embedding_dim: int = SECTOR_EMBEDDING_DIM,
         fusion_hidden_size: int = FUSION_HIDDEN_SIZE,
     ) -> None:
         super().__init__()
         self.time_series_branch = TimeSeriesBranch(input_size=sequence_input_size)
         self.tabular_branch = TabularBranch(input_size=tabular_input_size)
-        fused_input_size = LSTM_HIDDEN_SIZE + MLP_HIDDEN_SIZES[-1]
+        self.sector_embedding = nn.Embedding(num_sectors, sector_embedding_dim)
+        fused_input_size = (
+            LSTM_HIDDEN_SIZE + MLP_HIDDEN_SIZES[-1] + sector_embedding_dim
+        )
         self.fusion = nn.Sequential(
             nn.Linear(fused_input_size, fusion_hidden_size),
             nn.ReLU(),
             nn.Linear(fusion_hidden_size, 1),
         )
 
-    def forward(self, sequence: torch.Tensor, tabular: torch.Tensor) -> torch.Tensor:
-        """Args: sequence (batch, window_size, seq_dim), tabular (batch, tab_dim)."""
+    def forward(
+        self,
+        sequence: torch.Tensor,
+        tabular: torch.Tensor,
+        sector_idx: torch.Tensor,
+    ) -> torch.Tensor:
+        """Args: sequence (batch, window_size, seq_dim), tabular (batch, tab_dim),
+        sector_idx (batch,) long."""
         sequence_features = self.time_series_branch(sequence)
         tabular_features = self.tabular_branch(tabular)
-        fused = torch.cat([sequence_features, tabular_features], dim=1)
+        sector_features = self.sector_embedding(sector_idx)
+        fused = torch.cat([sequence_features, tabular_features, sector_features], dim=1)
         return self.fusion(fused)

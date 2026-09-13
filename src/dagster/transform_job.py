@@ -28,6 +28,7 @@ from dagster._core.definitions.unresolved_asset_job_definition import (
 import src.pipeline.dagster as dagster_lib
 from src.dagster import dbt_assets
 from src.dagster.resources import DbtConfigResource
+from src.dagster.retry_policies import DBT_RETRY
 
 _TIMEZONE = "Asia/Ho_Chi_Minh"
 _FETCH_LIMIT = 30
@@ -220,10 +221,10 @@ def define_silver_jobs() -> SilverJobBundle:
 
         job_name = f"transform_{asset_key.to_python_identifier()}_job"
 
-        # Define job selecting this specific asset key from dbt assets graph
         job = dagster_lib.define_asset_job(
             job_name,
             selection=[asset_key],
+            op_retry_policy=DBT_RETRY,
             tags={
                 "limit_concurrent_job_runs_to_1": job_name,
                 "type": "transform",
@@ -483,10 +484,20 @@ def define_mart_jobs() -> MartJobBundle:
 
         job_name = f"transform_{asset_key.to_python_identifier()}_job"
 
-        # Define job selecting this specific asset key from dbt assets graph
+        spec = dbt_deps.specs_by_key[asset_key]
+        # Include unpartitioned dbt seeds used directly by this mart. Dagster
+        # otherwise warns that the selected asset has an unmaterialized
+        # upstream and may refuse the run. Dynamic/data upstreams remain
+        # dependencies only and are handled by mart_job_sensor.
+        static_upstreams = [
+            dep.asset_key
+            for dep in spec.deps
+            if dep.asset_key.path and not dep.asset_key.path[0].isupper()
+        ]
         job = dagster_lib.define_asset_job(
             job_name,
-            selection=[asset_key],
+            selection=[asset_key, *static_upstreams],
+            op_retry_policy=DBT_RETRY,
             tags={
                 "limit_concurrent_job_runs_to_1": job_name,
                 "type": "mart",
@@ -495,8 +506,15 @@ def define_mart_jobs() -> MartJobBundle:
         bundle.jobs.append(job)
 
         # Get upstream keys from dbt specs (mostly Silver tables)
-        spec = dbt_deps.specs_by_key[asset_key]
-        upstream_keys = [dep.asset_key for dep in spec.deps]
+        # dbt seeds/static reference data (for example the sector mapping)
+        # have unpartitioned, lower-case asset keys and do not emit a
+        # materialization for every daily batch. They are still part of the
+        # dbt selection, but must not block the partitioned mart sensor.
+        upstream_keys = [
+            dep.asset_key
+            for dep in spec.deps
+            if dep.asset_key.path and dep.asset_key.path[0].isupper()
+        ]
         asset_to_upstream[asset_key] = upstream_keys
 
         match param.trigger_type:

@@ -19,13 +19,25 @@ Mô hình được chia thành nhiều nhánh (branches) riêng biệt ở giai 
 ### 2.2. Nhánh 2: Fundamental & Macro Branch (Tabular Data)
 
 - **Input Data:** Snapshot 13 feature tại ngày dự báo (`src/ml/config.py::TABULAR_FEATURE_COLUMNS`), gồm nhóm định giá/hiệu quả tài chính (`pe_ratio`, `pb_ratio`, `roe`, `roa`, `revenue_growth_yoy`, `net_profit_growth_yoy`, `gross_margin`, `debt_to_equity`, `operating_cash_flow_to_net_income`) và nhóm dòng tiền khối ngoại/tự doanh (`foreign_buy_ratio_10d`, `net_foreign_flow_momentum_1m`, `prop_trading_net_val_5d`, `prop_vs_foreign_correlation_10d`). Hiện chưa có feature vĩ mô (GDP...) trong tập này.
-- **Kiến trúc:** `BatchNorm1d` trên input, sau đó **MLP** 2 lớp ẩn `(32, 16)` (`Linear → BatchNorm1d → ReLU → Dropout`, `dropout_rate=0.4`) (`src/ml/model.py::TabularBranch`).
+- **Vector đầu vào thực tế:** `[values(13) ++ applicability_flags(13)]` = **26 chiều** (`TABULAR_VECTOR_SIZE`). Xem §2.5 — feature không áp dụng cho sector của ticker bị mask về 0.0 với flag 0; feature áp dụng nhưng NULL được impute bằng sector-median với flag 0.
+- **Kiến trúc:** `LayerNorm` trên input (đổi từ `BatchNorm1d` vì nửa flag gần như hằng → `var ≈ 0`), sau đó **MLP** 2 lớp ẩn `(32, 16)` (`Linear → BatchNorm1d → ReLU → Dropout`, `dropout_rate=0.4`) (`src/ml/model.py::TabularBranch`).
 - **Mục tiêu:** Nắm bắt "sức khỏe" tài chính, định giá tương đối và dòng tiền khối ngoại/tự doanh của doanh nghiệp tại thời điểm hiện tại.
 
 ### 2.3. Lớp kết hợp (Fusion Layer)
 
-- Vector hidden state cuối của LSTM (64 chiều) và vector output của MLP (16 chiều) được nối lại (**Concatenation**, 80 chiều).
-- Đi qua `Linear(80 → 32) → ReLU → Linear(32 → 1)` để ra dự báo cuối cùng (`src/ml/model.py::FusionModel`).
+- Vector hidden state cuối của LSTM (64 chiều), vector output của MLP (16 chiều) và **sector embedding** (`nn.Embedding(num_sectors, 4)`, §2.5) được nối lại (**Concatenation**, 84 chiều).
+- Đi qua `Linear(84 → 32) → ReLU → Linear(32 → 1)` để ra dự báo cuối cùng (`src/ml/model.py::FusionModel`).
+
+### 2.5. Xử lý feature theo sector (Sector-Aware Features)
+
+- **Vấn đề:** một số ratio (`gross_margin`, `debt_to_equity`) không xác định theo cấu trúc BCTC cho ngân hàng/chứng khoán/bảo hiểm → NULL diện rộng. Nếu impute 0.0 (như trước) và inference không impute giống training thì model xuất `NaN` cho toàn bộ ticker có NULL.
+- **`SECTOR`:** cột mới trong `FACT_ML_FEATURE_SET`, map từ `STG_COMPANY_PROFILE.INDUSTRY` qua seed `sector_mapping.csv` → enum `bank | securities | insurance | real_estate | non_financial` (`SECTOR_VOCAB`, thứ tự = embedding index, append-only).
+- **`src/ml/features.py`:** module torch-free **dùng chung training + serving**. `build_tabular_features(row, sector, medians)` trả `(values[13], flags[13])`; `compute_training_medians(train_df)` tính sector-median trên **train split** rồi lưu vào `metadata.json` (`tabular_medians`) để inference tái lập chính xác. Đây là điểm loại bỏ train/serve skew theo cấu trúc.
+- **`FEATURE_APPLICABILITY`** (`src/ml/config.py`): map feature → tập sector áp dụng; feature vắng mặt ⇒ áp dụng mọi sector. `net_foreign_flow_momentum_1m` NULL là data-gap (không structural) nên vẫn "áp dụng mọi sector" và xử lý bằng median impute.
+- **`feature_schema_version = 2`** ghi trong `metadata.json`. `serve.py::model_fn` từ chối (raise) nếu champion artifact có version lệch code → không còn `NaN` bí ẩn, phải retrain trước khi serve.
+- **Data quality gate** (`check_sector_aware_completeness`): kiểm tra per-ticker trên feature **áp dụng được** cho sector đó (bỏ qua feature structurally-N/A), cộng ràng buộc sequence feature phải sạch.
+- **Inference validation:** trước khi gọi model, pipeline yêu cầu đủ 30 phiên thị trường gần nhất, kiểm tra ngày trùng/thiếu, loại giá trị NaN/Inf/overflow và yêu cầu ít nhất 70% tabular feature áp dụng được của mỗi ticker. Ticker không đạt được ghi vào metadata `skipped_tickers`; prediction output phải đạt tối thiểu 70% coverage mới được publish.
+- **Known data requirement:** các bảng BCTC hiện chưa có ngày công bố/available date. `BATCH_DATE` chỉ là ngày ingest và không được xem là ngày thị trường biết thông tin. Muốn loại bỏ look-ahead leakage của fundamental feature cần bổ sung `DISCLOSURE_DATE` (hoặc `AVAILABLE_AT`) ở raw/staging rồi join với điều kiện ngày đó không vượt quá `TRADING_DATE`.
 
 ### 2.4. Output Layer
 
@@ -37,8 +49,10 @@ Hiện tại chỉ triển khai bài toán **Regression**: 1 neuron xuất ra gi
 - **Huấn luyện (Training):** **AWS SageMaker Training Jobs** qua `ModelTrainer` (SageMaker SDK v3), instance `ml.g4dn.xlarge` (GPU), image PyTorch `2.6.0`/`py312` (`src/ml/training_job.py`).
 - **Dự báo (Inference):** **AWS SageMaker Batch Transform (Serverless Batch)**.
   - *Lợi ích:* Tự động khởi chạy máy chủ tính toán on-demand, đọc dữ liệu feature hàng loạt từ S3, thực hiện suy luận và lưu kết quả, sau đó tự động giải phóng tài nguyên. Tối ưu chi phí cho pipeline chạy Daily (chỉ tốn chi phí trên thời gian thực tế xử lý batch).
-  - *Cấu hình:* Instance `ml.g4dn.xlarge` (mặc định của `SageMakerResource.run_batch_transform_job`, `src/dagster/resources.py`), image serving PyTorch `2.2-cpu-py310` (`_INFERENCE_IMAGE`, `src/dagster/inference_job.py`).
-  - *Output format:* Mỗi dòng output tự chứa `{"ticker": ..., "predicted_return": ...}` (container serving echo lại `ticker` từ input) — cho phép `COPY` thẳng vào Redshift, không cần khớp theo thứ tự dòng input/output.
+  - *Cấu hình:* Instance `ml.g4dn.xlarge` (GPU, mặc định của `SageMakerResource.run_batch_transform_job`, `src/dagster/resources.py`), image serving PyTorch `2.2-gpu-py310` (`_INFERENCE_IMAGE`, `src/dagster/inference_job.py`). `serve.py::model_fn` chuyển model sang CUDA khi container có GPU; `predict_from_payload` đưa tensor input lên cùng device — đồng bộ với training (cũng GPU).
+  - *Chia record:* `SplitType=Line` + `BatchStrategy=SingleRecord` — mỗi request `/invocations` mang đúng **một** JSON object, khớp với `serve.py::input_fn` (chỉ `json.loads` một object). `BatchStrategy` mặc định là `MultiRecord` sẽ nhồi nhiều dòng JSON Lines vào một body và làm `input_fn` fail (`JSONDecodeError: Extra data`). Ở quy mô hiện tại (~vài trăm–1600 ticker/ngày, model nhỏ, job chạy Daily) chi phí của SingleRecord (~1600 request tuần tự, chênh vài chục giây) là không đáng kể, đổi lại code serving đơn giản và lỗi dữ liệu truy vết được theo từng record. Chỉ cân nhắc `MultiRecord` (kèm batch tensor thật trong `predict_fn` để tận dụng GPU) khi số ticker tăng lên hàng chục nghìn hoặc model nặng hơn nhiều.
+  - *Payload input:* Mỗi dòng JSONL là `{"ticker", "sequence": [[...]], "tabular": {col: value | null}, "sector"}` (`src/dagster/inference_job.py`). `serve.py` featurize `tabular` + `sector` bằng `src/ml/features.py` với sector-median lấy từ `metadata.json` của champion — xem §2.5.
+  - *Output format:* Mỗi dòng output tự chứa `{"ticker": ..., "predicted_return": ...}` (container serving echo lại `ticker` từ input) — cho phép `COPY` thẳng vào Redshift, không cần khớp theo thứ tự dòng input/output. `predicted_return` là JSON `null` (không bao giờ token `NaN`) khi model xuất giá trị non-finite; `ml_daily_forecast` bỏ qua các dòng này và đếm vào `skipped_count`.
   - *Ngày dự báo:* `TRADING_DATE` ghi vào `FCT_ML_FORECAST_RESULTS` là ngày giao dịch **kế tiếp** sau ngày có dữ liệu feature mới nhất (anchor date), vì nhãn `LABEL_NEXT_5D_RETURN` là lợi nhuận kỳ vọng tính từ ngày đó trở về sau.
 
 ## 4. Quy trình huấn luyện (Training Strategy)
@@ -67,7 +81,7 @@ Dữ liệu phục vụ vòng đời Machine Learning được phân tách chặ
   - Nguồn gốc: Redshift Data Mart (`FACT_ML_FEATURE_SET`) export (UNLOAD) thẳng sang S3 dưới dạng Parquet.
 - **Dữ liệu suy luận hàng ngày (Inference Data):**
   - **Input (JSON Lines):** `s3://finops-data-lake-processed/ml-inference-input/<trading_date>/input.jsonl`
-  - **Output (JSON Lines):** `s3://finops-data-lake-processed/ml-inference-output/<trading_date>/input.jsonl.out` (SageMaker Batch Transform ghi trực tiếp kết quả vào thư mục này).
+- **Output (JSON Lines):** SageMaker ghi output thô vào prefix riêng theo từng run; Dagster chỉ publish file đã kiểm tra vào `s3://finops-data-lake-processed/ml-inference-validated/<as_of_date>/<run_id>/predictions.jsonl`. Kết quả được lưu theo ngày chốt dữ liệu (`as_of_date`), với `horizon_sessions = 5`.
 - **Trọng số mô hình (Model Artifacts):**
   - Lưu tại: `s3://finops-model-artifacts/...`
   - Tuyệt đối không lưu trữ dữ liệu dạng bảng/tabular trong bucket này để đảm bảo phân tách rõ ràng giữa "Code/Model" và "Data".

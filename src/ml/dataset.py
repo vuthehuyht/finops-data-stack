@@ -1,5 +1,7 @@
 """Dataset utilities for ML training: sequence windowing and time-based splitting."""
 
+from collections.abc import Mapping
+
 import numpy as np
 import pandas as pd
 import torch
@@ -8,7 +10,9 @@ from torch.utils.data import Dataset
 try:
     # Package-relative import: used when pytest imports this module as
     # `src.ml.dataset` from the repo root, where the `src` package resolves.
+    from src.ml import features
     from src.ml.config import (
+        MIN_TICKER_COMPLETENESS,
         SEQUENCE_FEATURE_COLUMNS,
         TABULAR_FEATURE_COLUMNS,
         TARGET_COLUMN,
@@ -18,7 +22,10 @@ except ImportError:
     # Sibling import: SageMaker script mode copies `source_dir`'s contents
     # flat into /opt/ml/input/data/code/, so there is no `src` package there
     # — config.py is a plain sibling of dataset.py in that directory.
-    from config import (
+    import features  # noqa: I001
+
+    from config import (  # noqa: I001
+        MIN_TICKER_COMPLETENESS,
         SEQUENCE_FEATURE_COLUMNS,
         TABULAR_FEATURE_COLUMNS,
         TARGET_COLUMN,
@@ -89,21 +96,40 @@ class StockSequenceDataset(Dataset):
         self,
         df: pd.DataFrame,
         window_size: int = WINDOW_SIZE,
+        medians: Mapping[str, float] | None = None,
         sequence_columns: list[str] | None = None,
         tabular_columns: list[str] | None = None,
         target_column: str = TARGET_COLUMN,
     ) -> None:
         self._window_size = window_size
+        self._medians = medians or {}
         self._sequence_columns = sequence_columns or SEQUENCE_FEATURE_COLUMNS
         self._tabular_columns = tabular_columns or TABULAR_FEATURE_COLUMNS
         self._target_column = target_column
         self._windows = self._build_windows(df)
 
     def _build_windows(self, df: pd.DataFrame) -> list[pd.DataFrame]:
-        clean_df = df.dropna(subset=[self._target_column])
         windows: list[pd.DataFrame] = []
-        for _, ticker_df in clean_df.groupby(_TICKER_COLUMN):
-            windows.extend(_build_ticker_windows(ticker_df, self._window_size))
+        for _, ticker_df in df.groupby(_TICKER_COLUMN):
+            if (
+                ticker_df[_DATE_COLUMN].isna().any()
+                or ticker_df[_DATE_COLUMN].duplicated().any()
+            ):
+                raise ValueError("Missing or duplicate ticker dates in training data")
+            for window in _build_ticker_windows(ticker_df, self._window_size):
+                last = window.iloc[-1]
+                if not features.is_valid_number(last[self._target_column]):
+                    continue
+                if (
+                    features.tabular_completeness(last, str(last["sector"]))
+                    < MIN_TICKER_COMPLETENESS
+                ):
+                    continue
+                try:
+                    features.sequence_features(window, self._sequence_columns)
+                except ValueError:
+                    continue
+                windows.append(window)
         return windows
 
     def __len__(self) -> int:
@@ -111,18 +137,17 @@ class StockSequenceDataset(Dataset):
 
     def __getitem__(
         self, index: int
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         window = self._windows[index]
-        sequence = window[self._sequence_columns].fillna(0.0).to_numpy(dtype=np.float32)
-        tabular = (
-            window[self._tabular_columns]
-            .iloc[-1]
-            .fillna(0.0)
-            .to_numpy(dtype=np.float32)
-        )
+        last_row = window.iloc[-1]
+        sector = str(last_row["sector"])
+        sequence = features.sequence_features(window)
+        values, flags = features.build_tabular_features(last_row, sector, self._medians)
+        tabular = np.concatenate([values, flags])
         target = np.float32(window[self._target_column].iloc[-1])
         return (
             torch.from_numpy(sequence),
             torch.from_numpy(tabular),
+            torch.tensor(features.sector_index(sector), dtype=torch.long),
             torch.tensor(target),
         )

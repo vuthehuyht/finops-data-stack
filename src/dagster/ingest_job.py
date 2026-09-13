@@ -13,6 +13,7 @@ from dagster_aws.s3 import S3Resource
 
 import src.pipeline.dagster as dagster_lib
 from src.dagster.resources import S3BucketResource
+from src.dagster.retry_policies import INGEST_RETRY
 from src.ingest.pipeline.analyst_reports import AnalystReportsPipeline
 from src.ingest.pipeline.balance_sheet import BalanceSheetPipeline
 from src.ingest.pipeline.base import DEFAULT_TICKER_SYMBOLS
@@ -572,6 +573,7 @@ def define_ingest_jobs() -> IngestJobBundle:
         job = dagster_lib.define_asset_job(
             job_name,
             selection=[asset],
+            op_retry_policy=INGEST_RETRY,
             tags={
                 "limit_concurrent_job_runs_to_1": job_name,
                 "type": "ingest",
@@ -586,6 +588,7 @@ def define_ingest_jobs() -> IngestJobBundle:
         "ingest_all_raw_data_job",
         selection=bundle.assets,
         config=ingest_all_config_mapping,
+        op_retry_policy=INGEST_RETRY,
         tags={
             "limit_concurrent_job_runs_to_1": "ingest_all_raw_data_job",
             "type": "ingest",

@@ -9,6 +9,10 @@ Mục tiêu của tầng này là làm sạch dữ liệu thô (được lưu d�
 > **[UPDATE - Kiến trúc thực tế]**: Toàn bộ logic Transform & Feature Engineering (Silver + Gold layer) chạy bằng **dbt** trên Redshift (`src/transform/dbt/models/STG/` và `src/transform/dbt/models/MART/`), được orchestrate bởi Dagster (`src/dagster/dbt_assets.py`, `src/dagster/transform_job.py`). `scripts/dataset_builder.py` (Pandas thuần) chỉ là script hỗ trợ cho smoke test SageMaker (`scripts/sagemaker_smoke_test/`), **không phải** pipeline chính thức.
 > Danh sách feature đưa vào model được khai báo tường minh (không suy ra tự động từ schema `FACT_ML_FEATURE_SET`) tại `src/ml/config.py`, gồm **19 Core Features** (`WINDOW_SIZE = 30` ngày):
 >
+> Trong training và inference, sequence feature thiếu hoặc không hữu hạn không được nén/điền bằng 0; cửa sổ lỗi bị loại. Tabular feature thiếu được impute bằng median hữu hạn tính trên train split, kèm applicability flag. Các giá trị `NaN`, `Inf` và overflow đều được xem là thiếu.
+>
+> Các feature BCTC chỉ được dùng cho ngày sau khi thông tin thực sự khả dụng. Hiện schema chưa có `DISCLOSURE_DATE`/`AVAILABLE_AT`; cần bổ sung trường này trước khi dùng pipeline cho đánh giá tài chính lịch sử.
+>
 > - **6 Sequence Features (LSTM)**: `moving_average_20d`, `moving_average_50d`, `price_momentum_1m`, `price_momentum_3m`, `volatility_30d`, `relative_strength_vs_vnindex`.
 > - **13 Tabular Features (MLP)**: `pe_ratio`, `pb_ratio`, `roe`, `roa`, `revenue_growth_yoy`, `net_profit_growth_yoy`, `gross_margin`, `debt_to_equity`, `operating_cash_flow_to_net_income`, `foreign_buy_ratio_10d`, `net_foreign_flow_momentum_1m`, `prop_trading_net_val_5d`, `prop_vs_foreign_correlation_10d`.
 >

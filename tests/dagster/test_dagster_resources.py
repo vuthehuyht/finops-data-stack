@@ -223,6 +223,7 @@ def test_sagemaker_resource_run_batch_transform_job() -> None:
     mock_client.create_transform_job.assert_called_once_with(
         TransformJobName="my-job",
         ModelName="my-model",
+        BatchStrategy="SingleRecord",
         TransformInput={
             "DataSource": {
                 "S3DataSource": {

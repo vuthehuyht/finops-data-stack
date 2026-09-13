@@ -3,6 +3,7 @@
     materialized='incremental',
     incremental_strategy='merge',
     unique_key=['TICKER', 'TRADING_DATE'],
+    on_schema_change='sync_all_columns',
     merge_exclude_columns=['DATACORE_CREATE_DATETIME', 'DATACORE_CREATE_PROGRAM', 'DATACORE_CREATE_BY']
   )
 }}
@@ -17,6 +18,7 @@ WITH BASE AS (
   SELECT
     TICKER,
     TRADING_DATE,
+    BATCH_DATE,
     CLOSE,
     ADJUSTED_CLOSE,
     -- Future return labels using LEAD window functions
@@ -28,14 +30,14 @@ WITH BASE AS (
       ROWS BETWEEN 1 FOLLOWING AND 10 FOLLOWING
     ) AS MAX_CLOSE_NEXT_10D
   FROM {{ ref('STG_STOCK_PRICE_EOD') }}
-  {% if is_incremental() %}
-    WHERE BATCH_DATE = {{ current_batch_date() }}
-  {% endif %}
 )
 
 SELECT
   B.TICKER::VARCHAR(256) AS TICKER,
   B.TRADING_DATE::DATE AS TRADING_DATE,
+
+  -- ── Company sector (drives sector-aware ML feature handling) ─────────────
+  COALESCE(SM.SECTOR, 'non_financial')::VARCHAR(32) AS SECTOR,
 
   -- ── Market Momentum features ─────────────────────────────────────────────
   MOM.PRICE_MOMENTUM_1M,
@@ -100,7 +102,6 @@ SELECT
   FLW.PROP_TRADING_NET_VAL_5D,
   FLW.PROP_VS_FOREIGN_CORRELATION_10D,
 
-
   -- ── Target labels (use ONLY as ML targets, never as input features) ──────
   -- label_next_5d_return: return after 5 trading days
   CASE
@@ -148,3 +149,10 @@ LEFT JOIN {{ ref('MART_INSIDER_PROPRIETARY_FLOWS') }} AS FLW
   ON
     B.TICKER = FLW.TICKER
     AND B.TRADING_DATE = FLW.TRADING_DATE
+LEFT JOIN {{ ref('STG_COMPANY_PROFILE') }} AS CP
+  ON B.TICKER = CP.TICKER
+LEFT JOIN {{ ref('sector_mapping') }} AS SM
+  ON CP.INDUSTRY = SM.INDUSTRY
+{% if is_incremental() %}
+  WHERE B.BATCH_DATE = {{ current_batch_date() }}
+{% endif %}

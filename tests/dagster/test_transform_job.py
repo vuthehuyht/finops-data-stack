@@ -12,6 +12,7 @@ from dagster import (
 )
 
 import src.pipeline.dagster as dagster_lib
+from src.dagster.retry_policies import DBT_RETRY
 from src.dagster.transform_job import (
     _STAGING_JOB_DEFINITION_FILE,
     SilverJobBundle,
@@ -19,6 +20,7 @@ from src.dagster.transform_job import (
     _create_sensor_for_jobs,
     _get_upstream_bronze_key,
     _make_transform_schedule,
+    define_mart_jobs,
     define_silver_jobs,
     read_transform_job_parameter,
 )
@@ -33,6 +35,12 @@ def mock_dbt_dependency():
         mock_spec = MagicMock()
         mock_spec.deps = []
         specs[key] = mock_spec
+    fact_spec = MagicMock()
+    fact_spec.deps = [
+        MagicMock(asset_key=AssetKey(["MART", "MART_STOCK_MARKET_MOMENTUM"])),
+        MagicMock(asset_key=AssetKey(["mart", "sector_mapping"])),
+    ]
+    specs[AssetKey(["MART", "FACT_ML_FEATURE_SET"])] = fact_spec
 
     mock_dbt_deps = MagicMock()
     mock_dbt_deps.specs_by_key = specs
@@ -101,6 +109,18 @@ def test_define_silver_jobs_sensor_name() -> None:
     assert bundle.sensors[0].name == "stg_job_sensor"
 
 
+def test_fact_ml_feature_set_sensor_ignores_unpartitioned_seed() -> None:
+    bundle = define_mart_jobs()
+    fact_job = next(
+        job
+        for job in bundle.jobs
+        if job.name == "transform_MART__FACT_ML_FEATURE_SET_job"
+    )
+    assert fact_job is not None
+    monitored = bundle.sensors[0]._monitored_assets
+    assert AssetKey(["mart", "sector_mapping"]) not in monitored
+
+
 def test_transform_schedule_evaluates() -> None:
     @dagster_lib.asset(key=AssetKey(["STAGING", "TEST"]))
     def dummy_asset() -> None:
@@ -165,3 +185,13 @@ def test_transform_sensor_evaluates() -> None:
     run_request = results[0]
     assert run_request.job_name == "transform_STAGING__STG_TEST_job"
     assert run_request.run_key.startswith("transform_STAGING__STG_TEST_job_2026-06-17")
+
+
+def test_transform_jobs_have_dbt_retry_policy() -> None:
+    silver_bundle = define_silver_jobs()
+    for j in silver_bundle.jobs:
+        assert j.op_retry_policy == DBT_RETRY
+
+    mart_bundle = define_mart_jobs()
+    for j in mart_bundle.jobs:
+        assert j.op_retry_policy == DBT_RETRY

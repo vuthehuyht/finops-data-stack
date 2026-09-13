@@ -424,7 +424,12 @@ dagsterDaemon:
 
   runRetries:
     enabled: true
-    maxRetries: 0
+    # Retry a whole run once, but only when the run worker itself dies (pod
+    # OOM/evicted, node lost). Asset/op code failures are handled by per-asset
+    # RetryPolicy in src/dagster/retry_policies.py — retrying them at run level
+    # too would just re-run a deterministic failure (e.g. a data quality gate).
+    maxRetries: 1
+    retryOnAssetOrOpFailure: false
 
   sensors:
     useThreads: true

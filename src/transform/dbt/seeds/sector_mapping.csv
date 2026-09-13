@@ -1,0 +1,44 @@
+industry,sector
+Banks,bank
+Bank,bank
+Banking,bank
+Ngân hàng,bank
+Financial Services,securities
+Securities,securities
+Brokerage,securities
+Chứng khoán,securities
+Insurance,insurance
+Life Insurance,insurance
+Nonlife Insurance,insurance
+Bảo hiểm,insurance
+Real Estate,real_estate
+Real Estate Investment & Services,real_estate
+Real Estate Investment Trusts,real_estate
+Bất động sản,real_estate
+Food & Beverage,non_financial
+Food Producers,non_financial
+Beverages,non_financial
+Retail,non_financial
+Food & Staples Retailing,non_financial
+General Retailers,non_financial
+Basic Resources,non_financial
+Industrial Metals & Mining,non_financial
+Oil & Gas,non_financial
+Oil & Gas Producers,non_financial
+Utilities,non_financial
+Electricity,non_financial
+Gas Water & Multiutilities,non_financial
+Industrial Goods & Services,non_financial
+Construction & Materials,non_financial
+Travel & Leisure,non_financial
+Personal & Household Goods,non_financial
+Personal Goods,non_financial
+Household Goods & Home Construction,non_financial
+Technology,non_financial
+Software & Computer Services,non_financial
+Technology Hardware & Equipment,non_financial
+Health Care,non_financial
+Chemicals,non_financial
+Automobiles & Parts,non_financial
+Media,non_financial
+Telecommunications,non_financial

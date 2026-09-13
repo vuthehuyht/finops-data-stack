@@ -29,6 +29,17 @@ models:
         data_type: DATE
         data_tests:
           - not_null
+      - name: SECTOR
+        data_type: VARCHAR(32)
+        description: >
+          Company sector, derived from STG_COMPANY_PROFILE.INDUSTRY via the
+          sector_mapping seed. Drives sector-aware ML feature handling
+          (structurally-undefined financial ratios are masked per sector).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['bank', 'securities', 'insurance', 'real_estate', 'non_financial']
       # Market momentum
       - name: PRICE_MOMENTUM_1M
         data_type: NUMERIC(18, 6)

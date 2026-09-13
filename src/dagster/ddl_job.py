@@ -2,8 +2,10 @@
 
 import glob
 import os
+import pathlib
 
 import dagster
+import dagster_dbt
 
 import src.pipeline.dagster as dagster_lib
 from src.redshift import ddl_executor
@@ -18,6 +20,7 @@ from src.redshift import ddl_executor
         ),
         "schema_name_mart": dagster.Field(str, default_value="mart", is_required=False),
     },
+    out=dagster.Out(dagster.Nothing),
     k8s_config={
         "container_config": {
             "resources": {
@@ -71,6 +74,25 @@ def execute_ddl_op(context: dagster.OpExecutionContext) -> None:
                 raise e
 
 
+@dagster_lib.op(
+    name="seed_sector_mapping_op",
+    required_resource_keys={"dbt"},
+    ins={"ddl_complete": dagster.In(dagster.Nothing)},
+)
+def seed_sector_mapping_op(
+    context: dagster.OpExecutionContext,
+) -> None:
+    """Materialize static sector mapping after the warehouse DDL succeeds."""
+    dbt: dagster_dbt.DbtCliResource = context.resources.dbt
+    context.log.info("Materializing dbt seed sector_mapping...")
+    target_path = pathlib.Path(os.environ.get("DBT_TARGET_PATH", "/tmp/dbt-target"))
+    dbt.cli(
+        ["seed", "--select", "sector_mapping", "--no-use-colors"],
+        target_path=target_path,
+        context=context,
+    ).wait()
+
+
 @dagster_lib.job(
     config=dagster.RunConfig(
         ops={
@@ -86,4 +108,5 @@ def execute_ddl_op(context: dagster.OpExecutionContext) -> None:
 )
 def execute_ddl_job() -> None:
     """Execute DDL Job."""
-    execute_ddl_op()
+    ddl_complete = execute_ddl_op()
+    seed_sector_mapping_op(ddl_complete)
