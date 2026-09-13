@@ -18,6 +18,7 @@ WITH BASE AS (
   SELECT
     TICKER,
     TRADING_DATE,
+    BATCH_DATE,
     CLOSE,
     ADJUSTED_CLOSE,
     -- Future return labels using LEAD window functions
