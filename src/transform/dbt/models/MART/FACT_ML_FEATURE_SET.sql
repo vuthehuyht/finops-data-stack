@@ -29,9 +29,6 @@ WITH BASE AS (
       ROWS BETWEEN 1 FOLLOWING AND 10 FOLLOWING
     ) AS MAX_CLOSE_NEXT_10D
   FROM {{ ref('STG_STOCK_PRICE_EOD') }}
-  {% if is_incremental() %}
-    WHERE BATCH_DATE = {{ current_batch_date() }}
-  {% endif %}
 )
 
 SELECT
@@ -156,3 +153,6 @@ LEFT JOIN {{ ref('STG_COMPANY_PROFILE') }} AS CP
   ON B.TICKER = CP.TICKER
 LEFT JOIN {{ ref('sector_mapping') }} AS SM
   ON CP.INDUSTRY = SM.INDUSTRY
+{% if is_incremental() %}
+WHERE B.BATCH_DATE = {{ current_batch_date() }}
+{% endif %}

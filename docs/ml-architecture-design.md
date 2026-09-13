@@ -36,6 +36,8 @@ Mô hình được chia thành nhiều nhánh (branches) riêng biệt ở giai 
 - **`FEATURE_APPLICABILITY`** (`src/ml/config.py`): map feature → tập sector áp dụng; feature vắng mặt ⇒ áp dụng mọi sector. `net_foreign_flow_momentum_1m` NULL là data-gap (không structural) nên vẫn "áp dụng mọi sector" và xử lý bằng median impute.
 - **`feature_schema_version = 2`** ghi trong `metadata.json`. `serve.py::model_fn` từ chối (raise) nếu champion artifact có version lệch code → không còn `NaN` bí ẩn, phải retrain trước khi serve.
 - **Data quality gate** (`check_sector_aware_completeness`): kiểm tra per-ticker trên feature **áp dụng được** cho sector đó (bỏ qua feature structurally-N/A), cộng ràng buộc sequence feature phải sạch.
+- **Inference validation:** trước khi gọi model, pipeline yêu cầu đủ 30 phiên thị trường gần nhất, kiểm tra ngày trùng/thiếu, loại giá trị NaN/Inf/overflow và yêu cầu ít nhất 70% tabular feature áp dụng được của mỗi ticker. Ticker không đạt được ghi vào metadata `skipped_tickers`; prediction output phải đạt tối thiểu 70% coverage mới được publish.
+- **Known data requirement:** các bảng BCTC hiện chưa có ngày công bố/available date. `BATCH_DATE` chỉ là ngày ingest và không được xem là ngày thị trường biết thông tin. Muốn loại bỏ look-ahead leakage của fundamental feature cần bổ sung `DISCLOSURE_DATE` (hoặc `AVAILABLE_AT`) ở raw/staging rồi join với điều kiện ngày đó không vượt quá `TRADING_DATE`.
 
 ### 2.4. Output Layer
 
@@ -79,7 +81,7 @@ Dữ liệu phục vụ vòng đời Machine Learning được phân tách chặ
   - Nguồn gốc: Redshift Data Mart (`FACT_ML_FEATURE_SET`) export (UNLOAD) thẳng sang S3 dưới dạng Parquet.
 - **Dữ liệu suy luận hàng ngày (Inference Data):**
   - **Input (JSON Lines):** `s3://finops-data-lake-processed/ml-inference-input/<trading_date>/input.jsonl`
-  - **Output (JSON Lines):** `s3://finops-data-lake-processed/ml-inference-output/<trading_date>/input.jsonl.out` (SageMaker Batch Transform ghi trực tiếp kết quả vào thư mục này).
+- **Output (JSON Lines):** SageMaker ghi output thô vào prefix riêng theo từng run; Dagster chỉ publish file đã kiểm tra vào `s3://finops-data-lake-processed/ml-inference-validated/<as_of_date>/<run_id>/predictions.jsonl`. Kết quả được lưu theo ngày chốt dữ liệu (`as_of_date`), với `horizon_sessions = 5`.
 - **Trọng số mô hình (Model Artifacts):**
   - Lưu tại: `s3://finops-model-artifacts/...`
   - Tuyệt đối không lưu trữ dữ liệu dạng bảng/tabular trong bucket này để đảm bảo phân tách rõ ràng giữa "Code/Model" và "Data".
