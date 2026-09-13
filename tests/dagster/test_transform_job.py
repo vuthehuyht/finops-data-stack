@@ -19,6 +19,7 @@ from src.dagster.transform_job import (
     _create_sensor_for_jobs,
     _get_upstream_bronze_key,
     _make_transform_schedule,
+    define_mart_jobs,
     define_silver_jobs,
     read_transform_job_parameter,
 )
@@ -33,6 +34,12 @@ def mock_dbt_dependency():
         mock_spec = MagicMock()
         mock_spec.deps = []
         specs[key] = mock_spec
+    fact_spec = MagicMock()
+    fact_spec.deps = [
+        MagicMock(asset_key=AssetKey(["MART", "MART_STOCK_MARKET_MOMENTUM"])),
+        MagicMock(asset_key=AssetKey(["mart", "sector_mapping"])),
+    ]
+    specs[AssetKey(["MART", "FACT_ML_FEATURE_SET"])] = fact_spec
 
     mock_dbt_deps = MagicMock()
     mock_dbt_deps.specs_by_key = specs
@@ -99,6 +106,18 @@ def test_define_silver_jobs_asset_keys() -> None:
 def test_define_silver_jobs_sensor_name() -> None:
     bundle = define_silver_jobs()
     assert bundle.sensors[0].name == "stg_job_sensor"
+
+
+def test_fact_ml_feature_set_sensor_ignores_unpartitioned_seed() -> None:
+    bundle = define_mart_jobs()
+    fact_job = next(
+        job
+        for job in bundle.jobs
+        if job.name == "transform_MART__FACT_ML_FEATURE_SET_job"
+    )
+    assert fact_job is not None
+    monitored = bundle.sensors[0]._monitored_assets
+    assert AssetKey(["mart", "sector_mapping"]) not in monitored
 
 
 def test_transform_schedule_evaluates() -> None:

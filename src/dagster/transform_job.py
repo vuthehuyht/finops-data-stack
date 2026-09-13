@@ -496,7 +496,15 @@ def define_mart_jobs() -> MartJobBundle:
 
         # Get upstream keys from dbt specs (mostly Silver tables)
         spec = dbt_deps.specs_by_key[asset_key]
-        upstream_keys = [dep.asset_key for dep in spec.deps]
+        # dbt seeds/static reference data (for example the sector mapping)
+        # have unpartitioned, lower-case asset keys and do not emit a
+        # materialization for every daily batch. They are still part of the
+        # dbt selection, but must not block the partitioned mart sensor.
+        upstream_keys = [
+            dep.asset_key
+            for dep in spec.deps
+            if dep.asset_key.path and dep.asset_key.path[0].isupper()
+        ]
         asset_to_upstream[asset_key] = upstream_keys
 
         match param.trigger_type:
