@@ -28,6 +28,7 @@ from dagster._core.definitions.unresolved_asset_job_definition import (
 import src.pipeline.dagster as dagster_lib
 from src.dagster import dbt_assets
 from src.dagster.resources import DbtConfigResource
+from src.dagster.retry_policies import DBT_RETRY
 
 _TIMEZONE = "Asia/Ho_Chi_Minh"
 _FETCH_LIMIT = 30
@@ -223,6 +224,7 @@ def define_silver_jobs() -> SilverJobBundle:
         job = dagster_lib.define_asset_job(
             job_name,
             selection=[asset_key],
+            op_retry_policy=DBT_RETRY,
             tags={
                 "limit_concurrent_job_runs_to_1": job_name,
                 "type": "transform",
@@ -495,6 +497,7 @@ def define_mart_jobs() -> MartJobBundle:
         job = dagster_lib.define_asset_job(
             job_name,
             selection=[asset_key, *static_upstreams],
+            op_retry_policy=DBT_RETRY,
             tags={
                 "limit_concurrent_job_runs_to_1": job_name,
                 "type": "mart",

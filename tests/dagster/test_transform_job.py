@@ -12,6 +12,7 @@ from dagster import (
 )
 
 import src.pipeline.dagster as dagster_lib
+from src.dagster.retry_policies import DBT_RETRY
 from src.dagster.transform_job import (
     _STAGING_JOB_DEFINITION_FILE,
     SilverJobBundle,
@@ -184,3 +185,13 @@ def test_transform_sensor_evaluates() -> None:
     run_request = results[0]
     assert run_request.job_name == "transform_STAGING__STG_TEST_job"
     assert run_request.run_key.startswith("transform_STAGING__STG_TEST_job_2026-06-17")
+
+
+def test_transform_jobs_have_dbt_retry_policy() -> None:
+    silver_bundle = define_silver_jobs()
+    for j in silver_bundle.jobs:
+        assert j.op_retry_policy == DBT_RETRY
+
+    mart_bundle = define_mart_jobs()
+    for j in mart_bundle.jobs:
+        assert j.op_retry_policy == DBT_RETRY

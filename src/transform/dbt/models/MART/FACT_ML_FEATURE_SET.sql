@@ -102,7 +102,6 @@ SELECT
   FLW.PROP_TRADING_NET_VAL_5D,
   FLW.PROP_VS_FOREIGN_CORRELATION_10D,
 
-
   -- ── Target labels (use ONLY as ML targets, never as input features) ──────
   -- label_next_5d_return: return after 5 trading days
   CASE
@@ -154,6 +153,6 @@ LEFT JOIN {{ ref('STG_COMPANY_PROFILE') }} AS CP
   ON B.TICKER = CP.TICKER
 LEFT JOIN {{ ref('sector_mapping') }} AS SM
   ON CP.INDUSTRY = SM.INDUSTRY
-  {% if is_incremental() %}
-  WHERE B.BATCH_DATE = {{ current_batch_date() }}
-  {% endif %}
+{% if is_incremental() %}
+WHERE B.BATCH_DATE = {{ current_batch_date() }}
+{% endif %}

@@ -2,6 +2,7 @@
 
 import glob
 import os
+import pathlib
 
 import dagster
 import dagster_dbt
@@ -84,8 +85,10 @@ def seed_sector_mapping_op(
     """Materialize static sector mapping after the warehouse DDL succeeds."""
     dbt: dagster_dbt.DbtCliResource = context.resources.dbt
     context.log.info("Materializing dbt seed sector_mapping...")
+    target_path = pathlib.Path(os.environ.get("DBT_TARGET_PATH", "/tmp/dbt-target"))
     dbt.cli(
         ["seed", "--select", "sector_mapping", "--no-use-colors"],
+        target_path=target_path,
         context=context,
     ).wait()
 
