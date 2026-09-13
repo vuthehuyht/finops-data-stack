@@ -154,5 +154,5 @@ LEFT JOIN {{ ref('STG_COMPANY_PROFILE') }} AS CP
 LEFT JOIN {{ ref('sector_mapping') }} AS SM
   ON CP.INDUSTRY = SM.INDUSTRY
 {% if is_incremental() %}
-WHERE B.BATCH_DATE = {{ current_batch_date() }}
+  WHERE B.BATCH_DATE = {{ current_batch_date() }}
 {% endif %}
