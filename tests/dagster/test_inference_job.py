@@ -2,6 +2,7 @@
 
 import json
 import unittest.mock
+from pathlib import Path
 
 import dagster
 import pandas as pd
@@ -10,11 +11,160 @@ import pytest
 import src.pipeline.dagster as dagster_lib
 
 
+def _read_inference_sql(df):
+    def read(query, conn):
+        if "STG_INDEX_PRICE_EOD" in query:
+            return df[["trading_date"]].drop_duplicates().sort_values("trading_date")
+        if "STG_STOCK_PRICE_EOD" in query:
+            return df[["ticker"]].drop_duplicates()
+        if "SELECT MAX(TRADING_DATE)" in query:
+            return df.loc[df["trading_date"] == df["trading_date"].max()].copy()
+        return df.copy()
+
+    return read
+
+
+def _metadata():
+    from src.ml.config import (
+        FEATURE_SCHEMA_VERSION,
+        SECTOR_VOCAB,
+        SEQUENCE_FEATURE_COLUMNS,
+        TABULAR_FEATURE_COLUMNS,
+    )
+
+    return {
+        "feature_schema_version": FEATURE_SCHEMA_VERSION,
+        "sector_vocab": SECTOR_VOCAB,
+        "feature_columns": {
+            "sequence": SEQUENCE_FEATURE_COLUMNS,
+            "tabular": TABULAR_FEATURE_COLUMNS,
+        },
+        "hyperparameters": {"window_size": 30},
+    }
+
+
+def _run_forecast(df, predictions, monkeypatch):
+    from src.dagster.inference_job import ml_daily_forecast
+
+    redshift, ssm, sm, bucket, s3 = [unittest.mock.MagicMock() for _ in range(5)]
+    ssm.get_parameter.return_value = "v1"
+    sm.model_artifacts_bucket = "artifacts"
+    bucket.processed_bucket = "processed"
+    client = s3.get_client.return_value
+    client.get_object.return_value = {
+        "Body": unittest.mock.MagicMock(read=lambda: json.dumps(_metadata()).encode())
+    }
+    uploaded = {}
+    client.upload_file.side_effect = lambda path, bucket, key: uploaded.update(
+        {key: Path(path).read_text(encoding="utf-8")}
+    )
+    client.download_file.side_effect = lambda bucket, key, path: Path(path).write_text(
+        "\n".join(json.dumps(p) for p in predictions), encoding="utf-8"
+    )
+    monkeypatch.setattr(
+        "src.dagster.inference_job.pd.read_sql", _read_inference_sql(df)
+    )
+    result = ml_daily_forecast(
+        dagster.build_asset_context(), "2026-07-03", redshift, ssm, sm, bucket, s3
+    )
+    return result, uploaded
+
+
+def test_forecast_publishes_only_validated_output(monkeypatch):
+    df = pd.concat(
+        [_build_ticker_block(t, "2026-07-03") for t in ["AAA", "BBB", "CCC", "DDD"]]
+    )
+    predictions = [
+        {"ticker": t, "predicted_return": 0.05} for t in ["AAA", "BBB", "CCC"]
+    ]
+    result, uploaded = _run_forecast(
+        df, predictions + [{"ticker": "DDD", "predicted_return": None}], monkeypatch
+    )
+    key = result.value["output_s3_uri"].removeprefix("s3://processed/")
+    assert [json.loads(line) for line in uploaded[key].splitlines()] == predictions
+    assert result.value["trading_date"] == "2026-07-03"
+    assert result.value["horizon_sessions"] == 5
+    assert result.metadata["skipped_count"].value == 1
+
+
+def test_forecast_aborts_when_most_predictions_missing(monkeypatch):
+    df = pd.concat([_build_ticker_block(t, "2026-07-03") for t in ["AAA", "BBB"]])
+    with pytest.raises(ValueError, match="coverage"):
+        _run_forecast(df, [{"ticker": "AAA", "predicted_return": 0.05}], monkeypatch)
+
+
+@pytest.mark.parametrize("extra", ["AAA", "UNKNOWN"])
+def test_forecast_rejects_duplicate_or_unexpected_output_ticker(monkeypatch, extra):
+    df = _build_ticker_block("AAA", "2026-07-03")
+    with pytest.raises(ValueError, match="ticker"):
+        _run_forecast(
+            df,
+            [{"ticker": t, "predicted_return": 0.05} for t in ["AAA", extra]],
+            monkeypatch,
+        )
+
+
+def test_gate_rejects_stale_date(monkeypatch):
+    from src.dagster.inference_job import MlInferenceGateConfig, ml_data_quality_gate
+
+    df = _build_ticker_block("AAA", "2026-07-03")
+    monkeypatch.setattr(
+        "src.dagster.inference_job.pd.read_sql", _read_inference_sql(df)
+    )
+    with pytest.raises(ValueError, match="date|stale"):
+        ml_data_quality_gate(
+            dagster.build_asset_context(),
+            MlInferenceGateConfig(expected_trading_date="2026-07-06"),
+            unittest.mock.MagicMock(),
+        )
+
+
+def test_gate_rejects_partial_snapshot_against_source_universe(monkeypatch):
+    from src.dagster.inference_job import MlInferenceGateConfig, ml_data_quality_gate
+
+    df = _build_ticker_block("AAA", "2026-07-03")
+    read = _read_inference_sql(df)
+    monkeypatch.setattr(
+        "src.dagster.inference_job.pd.read_sql",
+        lambda q, c: (
+            pd.DataFrame({"ticker": ["AAA", "BBB"]})
+            if "STG_STOCK_PRICE_EOD" in q
+            else read(q, c)
+        ),
+    )
+    with pytest.raises(ValueError, match="coverage"):
+        ml_data_quality_gate(
+            dagster.build_asset_context(),
+            MlInferenceGateConfig(expected_trading_date="2026-07-03"),
+            unittest.mock.MagicMock(),
+        )
+
+
+def test_forecast_skips_incomplete_ticker_before_sagemaker(monkeypatch):
+    from src.ml.config import TABULAR_FEATURE_COLUMNS
+
+    blocks = [
+        _build_ticker_block(t, "2026-07-03") for t in ["AAA", "BBB", "CCC", "DDD"]
+    ]
+    blocks[-1].loc[29, TABULAR_FEATURE_COLUMNS] = None
+    predictions = [
+        {"ticker": t, "predicted_return": 0.1} for t in ["AAA", "BBB", "CCC"]
+    ]
+    result, uploaded = _run_forecast(pd.concat(blocks), predictions, monkeypatch)
+    inputs = next(v for k, v in uploaded.items() if k.startswith("ml-inference-input/"))
+    assert [json.loads(line)["ticker"] for line in inputs.splitlines()] == [
+        "AAA",
+        "BBB",
+        "CCC",
+    ]
+    assert "DDD" in result.metadata["skipped_tickers"].data
+
+
 def test_ml_inference_gate_config_default_threshold() -> None:
     from src.dagster.inference_job import MlInferenceGateConfig
 
     config = MlInferenceGateConfig()
-    assert config.null_rate_threshold == 0.6
+    assert config.null_rate_threshold == 0.3
     assert config.min_ticker_completeness == 0.7
     assert config.max_incomplete_ticker_ratio == 0.3
 
@@ -171,16 +321,25 @@ def test_ml_data_quality_gate_raises_on_null_rate_breach() -> None:
     row = {"trading_date": "2026-07-03", "ticker": "AAA", "sector": "non_financial"}
     for column in SEQUENCE_FEATURE_COLUMNS + TABULAR_FEATURE_COLUMNS:
         row[column] = None
-    df = pd.DataFrame([row])
+    df = _build_ticker_block("AAA", "2026-07-03")
+    for col, value in row.items():
+        if col not in ("ticker", "trading_date", "sector"):
+            df[col] = value
     mock_redshift = unittest.mock.MagicMock()
     mock_redshift.get_connection.return_value.__enter__.return_value = (
         unittest.mock.MagicMock()
     )
     context = dagster.build_asset_context()
 
-    with unittest.mock.patch("src.dagster.inference_job.pd.read_sql", return_value=df):
+    with unittest.mock.patch(
+        "src.dagster.inference_job.pd.read_sql", side_effect=_read_inference_sql(df)
+    ):
         with pytest.raises(ValueError, match="sequence feature"):
-            ml_data_quality_gate(context, MlInferenceGateConfig(), mock_redshift)
+            ml_data_quality_gate(
+                context,
+                MlInferenceGateConfig(expected_trading_date="2026-07-03"),
+                mock_redshift,
+            )
 
 
 def test_ml_data_quality_gate_passes_and_returns_trading_date() -> None:
@@ -190,15 +349,24 @@ def test_ml_data_quality_gate_passes_and_returns_trading_date() -> None:
     row = {"trading_date": "2026-07-03", "ticker": "AAA", "sector": "non_financial"}
     for column in SEQUENCE_FEATURE_COLUMNS + TABULAR_FEATURE_COLUMNS:
         row[column] = 1.0
-    df = pd.DataFrame([row])
+    df = _build_ticker_block("AAA", "2026-07-03")
+    for col, value in row.items():
+        if col not in ("ticker", "trading_date", "sector"):
+            df[col] = value
     mock_redshift = unittest.mock.MagicMock()
     mock_redshift.get_connection.return_value.__enter__.return_value = (
         unittest.mock.MagicMock()
     )
     context = dagster.build_asset_context()
 
-    with unittest.mock.patch("src.dagster.inference_job.pd.read_sql", return_value=df):
-        result = ml_data_quality_gate(context, MlInferenceGateConfig(), mock_redshift)
+    with unittest.mock.patch(
+        "src.dagster.inference_job.pd.read_sql", side_effect=_read_inference_sql(df)
+    ):
+        result = ml_data_quality_gate(
+            context,
+            MlInferenceGateConfig(expected_trading_date="2026-07-03"),
+            mock_redshift,
+        )
 
     assert result.value == "2026-07-03"
     assert result.metadata["sector_breakdown"].data == {
@@ -224,173 +392,20 @@ def _build_ticker_block(ticker: str, end_date: str) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def test_ml_daily_forecast_runs_batch_transform_successfully() -> None:
-    from src.dagster.inference_job import ml_daily_forecast
-
-    df = pd.concat(
-        [
-            _build_ticker_block("AAA", "2026-07-03"),
-            _build_ticker_block("BBB", "2026-07-03"),
-        ],
-        ignore_index=True,
-    )
-
-    mock_redshift = unittest.mock.MagicMock()
-    mock_redshift.get_connection.return_value.__enter__.return_value = (
-        unittest.mock.MagicMock()
-    )
-    mock_ssm = unittest.mock.MagicMock()
-    mock_ssm.get_parameter.side_effect = lambda name: {
-        "/finops/model/active_version": "v1",
-    }.get(name)
-
-    mock_sagemaker = unittest.mock.MagicMock()
-    mock_sagemaker.model_artifacts_bucket = "finops-model-artifacts-dev"
-
-    mock_s3bucket = unittest.mock.MagicMock()
-    mock_s3bucket.raw_bucket = "finops-raw-bucket-dev"
-    mock_s3bucket.processed_bucket = "finops-processed-bucket-dev"
-
-    mock_s3 = unittest.mock.MagicMock()
-    mock_s3_client = unittest.mock.MagicMock()
-    mock_s3.get_client.return_value = mock_s3_client
-
-    # Capture the JSONL payload before its TemporaryDirectory is cleaned up.
-    uploaded_lines: list[dict] = []
-
-    def mock_upload(local_path, bucket, key):
-        with open(local_path, encoding="utf-8") as f:
-            uploaded_lines.extend(json.loads(line) for line in f if line.strip())
-
-    mock_s3_client.upload_file.side_effect = mock_upload
-
-    # serve.py now echoes ticker alongside predicted_return (Task 2).
-    def mock_download(bucket, key, local_path):
-        with open(local_path, "w", encoding="utf-8") as f:
-            f.write(json.dumps({"ticker": "AAA", "predicted_return": 0.05}) + "\n")
-            f.write(json.dumps({"ticker": "BBB", "predicted_return": -0.02}) + "\n")
-
-    mock_s3_client.download_file.side_effect = mock_download
-
-    context = dagster.build_asset_context()
-
-    with unittest.mock.patch("src.dagster.inference_job.pd.read_sql", return_value=df):
-        result = ml_daily_forecast(
-            context,
-            "2026-07-03",  # Friday -> next_trading_day = Monday 2026-07-06
-            mock_redshift,
-            mock_ssm,
-            mock_sagemaker,
-            mock_s3bucket,
-            mock_s3,
-        )
-
-    assert result.value["trading_date"] == "2026-07-06"
+def test_ml_daily_forecast_runs_batch_transform_successfully(monkeypatch):
+    df = pd.concat([_build_ticker_block(t, "2026-07-03") for t in ["AAA", "BBB"]])
+    predictions = [
+        {"ticker": "AAA", "predicted_return": 0.05},
+        {"ticker": "BBB", "predicted_return": -0.02},
+    ]
+    result, uploaded = _run_forecast(df, predictions, monkeypatch)
+    assert result.value["results"] == predictions
     assert result.value["model_version"] == "v1"
-    assert len(result.value["results"]) == 2
-    assert result.value["results"][0] == {"ticker": "AAA", "predicted_return": 0.05}
-    assert result.value["results"][1] == {"ticker": "BBB", "predicted_return": -0.02}
-    assert result.metadata["skipped_count"].value == 0
-
-    # The JSONL payload written to S3 carries sector + a {col: value} dict.
-    assert set(uploaded_lines[0]) == {"ticker", "sequence", "tabular", "sector"}
-    assert isinstance(uploaded_lines[0]["tabular"], dict)
-    assert uploaded_lines[0]["sector"] == "non_financial"
-    assert result.value["output_s3_uri"] == (
-        "s3://finops-processed-bucket-dev/ml-inference-output/2026-07-03/input.jsonl.out"
-    )
-
-    mock_sagemaker.create_model_if_not_exists.assert_called_once_with(
-        model_name="v1",
-        model_data_s3_uri="s3://finops-model-artifacts-dev/finops-multimodal-regressor/v1/model.tar.gz",
-        inference_image=unittest.mock.ANY,
-    )
-    mock_sagemaker.run_batch_transform_job.assert_called_once()
-
-
-def test_ml_daily_forecast_skips_non_finite_predictions() -> None:
-    from src.dagster.inference_job import ml_daily_forecast
-
-    df = pd.concat(
-        [
-            _build_ticker_block("AAA", "2026-07-03"),
-            _build_ticker_block("BBB", "2026-07-03"),
-        ],
-        ignore_index=True,
-    )
-
-    mock_redshift = unittest.mock.MagicMock()
-    mock_redshift.get_connection.return_value.__enter__.return_value = (
-        unittest.mock.MagicMock()
-    )
-    mock_ssm = unittest.mock.MagicMock()
-    mock_ssm.get_parameter.side_effect = lambda name: {
-        "/finops/model/active_version": "v1",
-    }.get(name)
-    mock_sagemaker = unittest.mock.MagicMock()
-    mock_sagemaker.model_artifacts_bucket = "finops-model-artifacts-dev"
-    mock_s3bucket = unittest.mock.MagicMock()
-    mock_s3bucket.processed_bucket = "finops-processed-bucket-dev"
-    mock_s3 = unittest.mock.MagicMock()
-    mock_s3_client = unittest.mock.MagicMock()
-    mock_s3.get_client.return_value = mock_s3_client
-
-    def mock_download(bucket, key, local_path):
-        with open(local_path, "w", encoding="utf-8") as f:
-            f.write(json.dumps({"ticker": "AAA", "predicted_return": 0.05}) + "\n")
-            f.write(json.dumps({"ticker": "BBB", "predicted_return": None}) + "\n")
-
-    mock_s3_client.download_file.side_effect = mock_download
-    context = dagster.build_asset_context()
-
-    with unittest.mock.patch("src.dagster.inference_job.pd.read_sql", return_value=df):
-        result = ml_daily_forecast(
-            context,
-            "2026-07-03",
-            mock_redshift,
-            mock_ssm,
-            mock_sagemaker,
-            mock_s3bucket,
-            mock_s3,
-        )
-
-    assert [r["ticker"] for r in result.value["results"]] == ["AAA"]
-    assert result.metadata["skipped_count"].value == 1
-
-
-def test_ml_daily_forecast_raises_when_no_valid_tickers() -> None:
-    from src.dagster.inference_job import ml_daily_forecast
-
-    # Ticker rỗng
-    df = pd.DataFrame(columns=["ticker", "trading_date"])
-
-    mock_redshift = unittest.mock.MagicMock()
-    mock_redshift.get_connection.return_value.__enter__.return_value = (
-        unittest.mock.MagicMock()
-    )
-    mock_ssm = unittest.mock.MagicMock()
-    mock_ssm.get_parameter.side_effect = lambda name: {
-        "/finops/model/active_version": "v1",
-    }.get(name)
-
-    mock_sagemaker = unittest.mock.MagicMock()
-    mock_sagemaker.model_artifacts_bucket = "finops-model-artifacts-dev"
-    mock_s3bucket = unittest.mock.MagicMock()
-    mock_s3 = unittest.mock.MagicMock()
-
-    context = dagster.build_asset_context()
-
-    with unittest.mock.patch("src.dagster.inference_job.pd.read_sql", return_value=df):
-        with pytest.raises(ValueError, match="No tickers had valid features"):
-            ml_daily_forecast(
-                context,
-                "2026-07-03",
-                mock_redshift,
-                mock_ssm,
-                mock_sagemaker,
-                mock_s3bucket,
-                mock_s3,
-            )
+    input_key = next(k for k in uploaded if k.startswith("ml-inference-input/"))
+    payload = json.loads(uploaded[input_key].splitlines()[0])
+    assert set(payload) == {"ticker", "sequence", "tabular", "sector"}
+    assert len(payload["sequence"]) == 30
+    assert isinstance(payload["tabular"], dict)
 
 
 def test_ml_publish_forecast_results_copies_then_publishes() -> None:

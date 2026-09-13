@@ -21,10 +21,10 @@ try:
     # Package-relative import: used when pytest imports this module as
     # `src.ml.serve` from the repo root, where the `src` package resolves.
     from src.ml.config import (
-        FEATURE_SCHEMA_VERSION,
         SEQUENCE_FEATURE_COLUMNS,
         TABULAR_VECTOR_SIZE,
     )
+    from src.ml.features import validate_model_metadata
     from src.ml.inference import predict_from_payload
     from src.ml.model import FusionModel
 except ImportError:
@@ -32,10 +32,10 @@ except ImportError:
     # contents flat, so config.py/inference.py/model.py are plain siblings
     # of serve.py in that directory.
     from config import (
-        FEATURE_SCHEMA_VERSION,
         SEQUENCE_FEATURE_COLUMNS,
         TABULAR_VECTOR_SIZE,
     )
+    from features import validate_model_metadata
     from inference import predict_from_payload
     from model import FusionModel
 
@@ -53,13 +53,7 @@ def model_fn(model_dir: str) -> tuple:
     with open(os.path.join(model_dir, "metadata.json"), encoding="utf-8") as f:
         metadata = json.load(f)
 
-    schema = metadata.get("feature_schema_version")
-    if schema != FEATURE_SCHEMA_VERSION:
-        raise ValueError(
-            f"Champion artifact feature_schema_version={schema} does not match "
-            f"code FEATURE_SCHEMA_VERSION={FEATURE_SCHEMA_VERSION}. Retrain "
-            "before serving."
-        )
+    validate_model_metadata(metadata)
 
     sector_vocab = metadata["sector_vocab"]
     medians = metadata.get("tabular_medians", {})

@@ -217,3 +217,38 @@ def test_next_trading_day_from_saturday_skips_to_monday() -> None:
 
     # Saturday input (shouldn't occur given the ingest cron, but must not crash)
     assert next_trading_day(datetime.date(2026, 7, 4)) == datetime.date(2026, 7, 6)
+
+
+@pytest.mark.parametrize(
+    "defect", ["duplicate", "missing_session", "history_null", "tabular_null"]
+)
+def test_latest_window_rejects_unusable_ticker(defect):
+    from src.ml.config import SEQUENCE_FEATURE_COLUMNS, TABULAR_FEATURE_COLUMNS
+    from src.ml.inference import build_latest_window
+
+    df = _gate_df([("AAA", "non_financial", {})] * 4)
+    df["trading_date"] = pd.date_range("2026-07-01", periods=4)
+    if defect == "duplicate":
+        df.loc[1, "trading_date"] = df.loc[0, "trading_date"]
+    elif defect == "missing_session":
+        df = df.drop(index=1)
+    elif defect == "history_null":
+        df.loc[1, SEQUENCE_FEATURE_COLUMNS[0]] = None
+    else:
+        df.loc[3, TABULAR_FEATURE_COLUMNS] = None
+    with pytest.raises(ValueError):
+        build_latest_window(
+            df, "AAA", 3, expected_dates=pd.date_range("2026-07-02", periods=3)
+        )
+
+
+def test_payload_invalid_sequence_never_calls_model():
+    from src.ml.inference import predict_from_payload
+
+    def model(*args):
+        pytest.fail("invalid data reached model")
+
+    payload = _payload()
+    payload["sequence"][0][0] = float("inf")
+    with pytest.raises(ValueError, match="sequence"):
+        predict_from_payload((model, {}, []), payload)

@@ -6,6 +6,7 @@ input shape.
 """
 
 WINDOW_SIZE = 30
+MIN_TICKER_COMPLETENESS = 0.7
 
 MODEL_NAME = "finops-multimodal-regressor"
 
@@ -62,4 +63,4 @@ FEATURE_APPLICABILITY: dict[str, set[str]] = {
 
 # Bumped whenever the feature vector layout or semantics change so a stale
 # champion artifact is rejected loudly instead of producing garbage.
-FEATURE_SCHEMA_VERSION = 2
+FEATURE_SCHEMA_VERSION = 3

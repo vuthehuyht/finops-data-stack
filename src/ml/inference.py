@@ -26,8 +26,10 @@ try:
     # `src.ml.inference` from the repo root, where the `src` package resolves.
     from src.ml import features
     from src.ml.config import (
+        MIN_TICKER_COMPLETENESS,
         SEQUENCE_FEATURE_COLUMNS,
         TABULAR_FEATURE_COLUMNS,
+        WINDOW_SIZE,
     )
 except ImportError:
     # Sibling import: SageMaker script mode copies `source_dir`'s contents
@@ -36,8 +38,10 @@ except ImportError:
     import features  # noqa: I001
 
     from config import (  # noqa: I001
+        MIN_TICKER_COMPLETENESS,
         SEQUENCE_FEATURE_COLUMNS,
         TABULAR_FEATURE_COLUMNS,
+        WINDOW_SIZE,
     )
 
 _DATE_COLUMN = "trading_date"
@@ -114,7 +118,7 @@ def check_sector_aware_completeness(
         raise ValueError("Data quality gate: no rows for the latest trading date")
 
     for col in SEQUENCE_FEATURE_COLUMNS:
-        rate = float(df[col].isna().mean())
+        rate = float((~df[col].map(features.is_valid_number)).mean())
         if rate > null_rate_threshold:
             raise ValueError(
                 f"Data quality gate: sequence feature {col} null rate "
@@ -126,12 +130,7 @@ def check_sector_aware_completeness(
     per_sector: dict[str, list[float]] = {}
     for _, row in df.iterrows():
         sector = str(row["sector"]) if has_sector else "non_financial"
-        applicable = [c for c in TABULAR_FEATURE_COLUMNS if features.applies(c, sector)]
-        if not applicable:
-            completeness = 1.0
-        else:
-            present = sum(1 for c in applicable if not pd.isna(row[c]))
-            completeness = present / len(applicable)
+        completeness = features.tabular_completeness(row, sector)
         per_sector.setdefault(sector, []).append(1.0 - completeness)
         if completeness < min_ticker_completeness:
             incomplete += 1
@@ -161,6 +160,9 @@ def build_latest_window(
     window_size: int,
     sequence_columns: list[str] | None = None,
     tabular_columns: list[str] | None = None,
+    *,
+    expected_dates: pd.DatetimeIndex | None = None,
+    min_ticker_completeness: float = MIN_TICKER_COMPLETENESS,
 ) -> tuple[np.ndarray, pd.Series, str]:
     """Build the most recent `window_size`-day window for one ticker.
 
@@ -187,7 +189,14 @@ def build_latest_window(
     sequence_columns = sequence_columns or SEQUENCE_FEATURE_COLUMNS
     tabular_columns = tabular_columns or TABULAR_FEATURE_COLUMNS
 
-    ticker_df = df.loc[df[_TICKER_COLUMN] == ticker].sort_values(_DATE_COLUMN)
+    ticker_df = df.loc[df[_TICKER_COLUMN] == ticker].copy()
+    ticker_df[_DATE_COLUMN] = pd.to_datetime(ticker_df[_DATE_COLUMN])
+    ticker_df = ticker_df.sort_values(_DATE_COLUMN)
+    if (
+        ticker_df[_DATE_COLUMN].isna().any()
+        or ticker_df[_DATE_COLUMN].duplicated().any()
+    ):
+        raise ValueError(f"Ticker {ticker} has missing or duplicate dates")
     if len(ticker_df) < window_size:
         raise ValueError(
             f"Ticker {ticker} has {len(ticker_df)} rows, need >= {window_size} "
@@ -195,6 +204,10 @@ def build_latest_window(
         )
 
     window = ticker_df.iloc[-window_size:]
+    if expected_dates is not None and not pd.DatetimeIndex(window[_DATE_COLUMN]).equals(
+        pd.DatetimeIndex(expected_dates)
+    ):
+        raise ValueError(f"Ticker {ticker} has missing or stale trading sessions")
     sequence = features.sequence_features(window, columns=sequence_columns)
     tabular_row = window[tabular_columns].iloc[-1]
     sector = (
@@ -202,6 +215,11 @@ def build_latest_window(
         if "sector" in ticker_df.columns
         else "non_financial"
     )
+    if (
+        features.tabular_completeness(tabular_row, sector, tabular_columns)
+        < min_ticker_completeness
+    ):
+        raise ValueError(f"Ticker {ticker} has insufficient tabular completeness")
     return sequence, tabular_row, sector
 
 
@@ -227,6 +245,22 @@ def predict_from_payload(bundle: tuple, payload: dict) -> dict:
     # Match model_fn, which moves the model to CUDA when the container has one.
     device = "cuda" if torch.cuda.is_available() else "cpu"
     sector = str(payload["sector"])
+    raw_sequence = np.asarray(payload["sequence"], dtype=np.float64)
+    expected_shape = (
+        getattr(model, "window_size", WINDOW_SIZE),
+        len(SEQUENCE_FEATURE_COLUMNS),
+    )
+    if (
+        raw_sequence.shape != expected_shape
+        or not np.isfinite(raw_sequence).all()
+        or (np.abs(raw_sequence) > np.finfo(np.float32).max).any()
+    ):
+        raise ValueError("Invalid sequence shape or non-finite value")
+    if (
+        features.tabular_completeness(payload["tabular"], sector)
+        < MIN_TICKER_COMPLETENESS
+    ):
+        raise ValueError("Insufficient tabular completeness")
     values, flags = features.build_tabular_features(payload["tabular"], sector, medians)
     sequence = torch.tensor([payload["sequence"]], dtype=torch.float32, device=device)
     tabular = torch.tensor(

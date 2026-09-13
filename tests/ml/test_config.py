@@ -39,7 +39,7 @@ def test_sector_and_feature_constants() -> None:
     assert config.SECTOR_VOCAB[-1] == "non_financial"
     assert len(config.SECTOR_VOCAB) == len(set(config.SECTOR_VOCAB))
     assert config.TABULAR_VECTOR_SIZE == 2 * len(config.TABULAR_FEATURE_COLUMNS)
-    assert config.FEATURE_SCHEMA_VERSION == 2
+    assert config.FEATURE_SCHEMA_VERSION == 3
     # every applicability key must be a real tabular feature
     assert set(config.FEATURE_APPLICABILITY) <= set(config.TABULAR_FEATURE_COLUMNS)
     # every listed sector must be in the vocab

@@ -2,10 +2,9 @@
 
 import datetime
 import json
-import math
 import os
 import tempfile
-import time
+import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 
@@ -23,7 +22,9 @@ from src.dagster.resources import (
     SsmParameterResource,
 )
 from src.dagster.retry_policies import LOAD_RETRY, SAGEMAKER_RETRY
+from src.ml import features
 from src.ml.config import (
+    MIN_TICKER_COMPLETENESS,
     TABULAR_FEATURE_COLUMNS,
     WINDOW_SIZE,
 )
@@ -32,7 +33,6 @@ from src.ml.forecast_publish import publish_forecast_results
 from src.ml.inference import (
     build_latest_window,
     check_sector_aware_completeness,
-    next_trading_day,
 )
 
 _FEATURE_TABLE = "MART.FACT_ML_FEATURE_SET"
@@ -41,6 +41,7 @@ _INFERENCE_IMAGE = (
     "763104351884.dkr.ecr.ap-southeast-1.amazonaws.com/pytorch-inference:2.2-gpu-py310"
 )
 _LOOKBACK_DAYS = 90  # comfortably covers WINDOW_SIZE=30 trading days
+_MIN_FORECAST_COVERAGE = 0.7
 
 _DATA_QUALITY_GATE_ASSET_KEY = dagster_lib.asset_key(["ML", "ML_DATA_QUALITY_GATE"])
 _DAILY_FORECAST_ASSET_KEY = dagster_lib.asset_key(["ML", "ML_DAILY_FORECAST"])
@@ -67,12 +68,20 @@ class InferenceJobBundle:
 class MlInferenceGateConfig(dagster.Config):
     """Runtime config for the data quality gate asset."""
 
+    expected_trading_date: str = pydantic.Field(
+        default="auto",
+        description="Expected EOD date, or auto to use the mart's latest date.",
+    )
     null_rate_threshold: float = pydantic.Field(
-        default=0.6,
+        default=0.3,
+        ge=0,
+        le=1,
         description="Max acceptable null rate per sequence feature column (0.0-1.0).",
     )
     min_ticker_completeness: float = pydantic.Field(
-        default=0.7,
+        default=MIN_TICKER_COMPLETENESS,
+        ge=MIN_TICKER_COMPLETENESS,
+        le=1,
         description=(
             "Min fraction of a ticker's applicable tabular features that "
             "must be non-null for the ticker to count as complete."
@@ -80,8 +89,42 @@ class MlInferenceGateConfig(dagster.Config):
     )
     max_incomplete_ticker_ratio: float = pydantic.Field(
         default=0.3,
+        ge=0,
+        le=1,
         description="Max fraction of tickers allowed below min_ticker_completeness.",
     )
+
+
+def _load_market_context(conn, trading_date: str):
+    """Observed exchange sessions and recently traded universe, independent of mart."""
+    sessions = pd.read_sql(
+        f"SELECT DISTINCT TRADING_DATE FROM STG.STG_INDEX_PRICE_EOD "
+        f"WHERE INDEX_NAME = 'VNINDEX' AND TRADING_DATE <= '{trading_date}' "
+        f"ORDER BY TRADING_DATE DESC LIMIT {WINDOW_SIZE}",
+        conn,
+    )
+    dates = pd.DatetimeIndex(pd.to_datetime(sessions["trading_date"])).sort_values()
+    if len(dates) != WINDOW_SIZE or dates[-1] != pd.Timestamp(trading_date):
+        raise ValueError("Missing or stale market session date history")
+    # Include recent tickers even when today's ingestion omitted them.
+    universe = pd.read_sql(
+        f"SELECT DISTINCT TICKER FROM STG.STG_STOCK_PRICE_EOD "
+        f"WHERE TRADING_DATE BETWEEN '{dates[-5].date().isoformat()}' "
+        f"AND '{trading_date}'",
+        conn,
+    )
+    tickers = set(universe["ticker"].dropna())
+    if not tickers:
+        raise ValueError("No source tickers for inference coverage check")
+    return dates, tickers
+
+
+def _require_coverage(actual: set, expected: set, stage: str) -> None:
+    coverage = len(actual & expected) / len(expected) if expected else 0.0
+    if coverage < _MIN_FORECAST_COVERAGE:
+        raise ValueError(
+            f"{stage} coverage {coverage:.1%} below {_MIN_FORECAST_COVERAGE:.1%}"
+        )
 
 
 @dagster_lib.asset(
@@ -108,11 +151,26 @@ def ml_data_quality_gate(
             """,
             conn,
         )
-
-    if len(df) == 0:
-        raise ValueError(f"{_FEATURE_TABLE} has no rows; cannot run inference.")
+        if len(df) == 0:
+            raise ValueError(f"{_FEATURE_TABLE} has no rows; cannot run inference.")
+        expected_date = (
+            _validate_iso_date(config.expected_trading_date)
+            if config.expected_trading_date != "auto"
+            else _validate_iso_date(df["trading_date"].max())
+        )
+        _dates, expected_tickers = _load_market_context(conn, expected_date)
 
     trading_date = _validate_iso_date(df["trading_date"].iloc[0])
+    if (
+        trading_date != expected_date
+        or not (pd.to_datetime(df["trading_date"]) == pd.Timestamp(expected_date)).all()
+    ):
+        raise ValueError(
+            f"Stale feature date: expected {expected_date}, got {trading_date}"
+        )
+    if df["ticker"].isna().any() or df["ticker"].duplicated().any():
+        raise ValueError("Missing or duplicate ticker in latest feature snapshot")
+    _require_coverage(set(df["ticker"]), expected_tickers, "Feature snapshot")
     gate_result = check_sector_aware_completeness(
         df,
         null_rate_threshold=config.null_rate_threshold,
@@ -157,7 +215,7 @@ def ml_daily_forecast(  # noqa: C901
 ) -> dagster.Output[dict]:
     """Forecast every ticker on `trading_date` using SageMaker Batch Transform."""
     model_version = ssm.get_parameter(_ACTIVE_VERSION_PARAM)
-    if model_version is None:
+    if not model_version or model_version == "none":
         raise ValueError(f"SSM parameter {_ACTIVE_VERSION_PARAM} is not set.")
 
     # 1. Ensure the model is registered on SageMaker
@@ -165,6 +223,14 @@ def ml_daily_forecast(  # noqa: C901
         f"s3://{sagemaker.model_artifacts_bucket}/"
         f"{model_version_prefix(model_version)}model.tar.gz"
     )
+    s3_client = s3.get_client()
+    metadata = json.loads(
+        s3_client.get_object(
+            Bucket=sagemaker.model_artifacts_bucket,
+            Key=f"{model_version_prefix(model_version)}metadata.json",
+        )["Body"].read()
+    )
+    features.validate_model_metadata(metadata)
     try:
         sagemaker.create_model_if_not_exists(
             model_name=model_version,
@@ -188,14 +254,20 @@ def ml_daily_forecast(  # noqa: C901
             """,
             conn,
         )
+        expected_dates, expected_tickers = _load_market_context(conn, validated_date)
 
     df["trading_date"] = pd.to_datetime(df["trading_date"])
 
     tickers = sorted(
         df.loc[df["trading_date"] == pd.Timestamp(validated_date), "ticker"].unique()
     )
+    if not tickers:
+        raise ValueError("No tickers had valid features to forecast.")
+    _require_coverage(set(tickers), expected_tickers, "Feature snapshot")
 
     results = []
+    skipped = dict.fromkeys(expected_tickers - set(tickers), "missing_latest_features")
+    run_id = uuid.uuid4().hex
     with tempfile.TemporaryDirectory() as tmpdir:
         local_input_path = os.path.join(tmpdir, "input.jsonl")
 
@@ -204,7 +276,7 @@ def ml_daily_forecast(  # noqa: C901
             for ticker in tickers:
                 try:
                     sequence, tabular_row, sector = build_latest_window(
-                        df, ticker, WINDOW_SIZE
+                        df, ticker, WINDOW_SIZE, expected_dates=expected_dates
                     )
                     payload = {
                         "ticker": ticker,
@@ -214,33 +286,34 @@ def ml_daily_forecast(  # noqa: C901
                         "tabular": {
                             col: (
                                 None
-                                if pd.isna(tabular_row[col])
+                                if not features.is_valid_number(tabular_row[col])
                                 else float(tabular_row[col])
                             )
                             for col in TABULAR_FEATURE_COLUMNS
                         },
                         "sector": sector,
                     }
-                    f_in.write(json.dumps(payload) + "\n")
+                    f_in.write(json.dumps(payload, allow_nan=False) + "\n")
                     valid_tickers.append(ticker)
-                except Exception as exc:
+                except (ValueError, KeyError, TypeError) as exc:
+                    skipped[ticker] = str(exc)
                     context.log.warning(
                         "Skip preparing features for ticker %s: %s", ticker, exc
                     )
 
         if not valid_tickers:
             raise ValueError("No tickers had valid features to forecast.")
+        _require_coverage(set(valid_tickers), expected_tickers, "Eligible ticker")
 
         # 3. Upload JSONL file to S3
-        input_key = f"ml-inference-input/{validated_date}/input.jsonl"
-        s3_client = s3.get_client()
+        input_key = f"ml-inference-input/{validated_date}/{run_id}/input.jsonl"
         s3_client.upload_file(local_input_path, s3bucket.processed_bucket, input_key)
 
         # 4. Run Batch Transform Job
         input_s3_uri = f"s3://{s3bucket.processed_bucket}/{input_key}"
-        output_prefix = f"ml-inference-output/{validated_date}/"
+        output_prefix = f"ml-inference-output/{validated_date}/{run_id}/"
         output_s3_uri = f"s3://{s3bucket.processed_bucket}/{output_prefix}"
-        job_name = f"finops-forecast-{validated_date}-{int(time.time())}"
+        job_name = f"finops-forecast-{validated_date}-{run_id[:12]}"
 
         context.log.info("Starting SageMaker Batch Transform Job: %s", job_name)
         try:
@@ -265,46 +338,62 @@ def ml_daily_forecast(  # noqa: C901
         # matching against valid_tickers needed. predicted_return may be
         # null / non-finite when the model saw missing features for a
         # ticker; skip those rather than let them poison the Redshift load.
-        skipped_count = 0
+        seen = set()
         with open(local_output_path, encoding="utf-8") as f_out:
             for line_out in f_out:
                 if not line_out.strip():
                     continue
-                try:
-                    prediction = json.loads(line_out)
-                    predicted_return = prediction["predicted_return"]
-                    if predicted_return is None or not math.isfinite(predicted_return):
-                        skipped_count += 1
-                        continue
-                    results.append(
-                        {
-                            "ticker": prediction["ticker"],
-                            "predicted_return": predicted_return,
-                        }
-                    )
-                except Exception as exc:
-                    context.log.warning("Failed to parse a prediction line: %s", exc)
+                prediction = json.loads(line_out)
+                ticker = prediction["ticker"]
+                if ticker not in valid_tickers or ticker in seen:
+                    raise ValueError(f"Unexpected or duplicate output ticker: {ticker}")
+                seen.add(ticker)
+                predicted_return = prediction["predicted_return"]
+                if (
+                    not features.is_valid_number(predicted_return)
+                    or abs(predicted_return) >= 1e12
+                ):
+                    skipped[ticker] = "invalid_prediction"
+                    continue
+                results.append({"ticker": ticker, "predicted_return": predicted_return})
+        for ticker in set(valid_tickers) - seen:
+            skipped[ticker] = "missing_prediction"
+        _require_coverage(
+            {r["ticker"] for r in results}, expected_tickers, "Prediction"
+        )
+        # Publish exactly the validated set, never the raw transform output.
+        validated_key = (
+            f"ml-inference-validated/{validated_date}/{run_id}/predictions.jsonl"
+        )
+        validated_path = os.path.join(tmpdir, "validated.jsonl")
+        with open(validated_path, "w", encoding="utf-8") as output:
+            for result in results:
+                output.write(json.dumps(result, allow_nan=False) + "\n")
+        s3_client.upload_file(validated_path, s3bucket.processed_bucket, validated_key)
 
     if not results:
         raise ValueError(f"All {len(tickers)} tickers failed inference; aborting.")
 
-    anchor_date = datetime.date.fromisoformat(validated_date)
-    forecast_trading_date = next_trading_day(anchor_date).isoformat()
+    forecast_trading_date = validated_date
 
     context.log.info("Forecasted %s/%s tickers.", len(results), len(tickers))
     return dagster.Output(
         value={
             "trading_date": forecast_trading_date,
+            "as_of_date": validated_date,
+            "horizon_sessions": 5,
             "model_version": model_version,
             "results": results,
-            "output_s3_uri": f"{output_s3_uri}input.jsonl.out",
+            "output_s3_uri": f"s3://{s3bucket.processed_bucket}/{validated_key}",
         },
         metadata={
             "trading_date": forecast_trading_date,
+            "horizon_sessions": 5,
             "model_version": model_version,
             "success_count": len(results),
-            "skipped_count": skipped_count,
-            "ticker_count": len(tickers),
+            "skipped_count": len(skipped),
+            "skipped_tickers": dagster.MetadataValue.json(skipped),
+            "ticker_count": len(expected_tickers),
         },
     )
 

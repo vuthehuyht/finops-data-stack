@@ -28,6 +28,11 @@ def _write_artifact(tmp_path, *, schema=FEATURE_SCHEMA_VERSION):
                 "feature_schema_version": schema,
                 "tabular_medians": {},
                 "sector_vocab": SECTOR_VOCAB,
+                "feature_columns": {
+                    "sequence": SEQUENCE_FEATURE_COLUMNS,
+                    "tabular": TABULAR_FEATURE_COLUMNS,
+                },
+                "hyperparameters": {"window_size": 30},
             }
         )
     )
@@ -54,6 +59,24 @@ def test_model_fn_rejects_stale_schema(tmp_path) -> None:
 
     _write_artifact(tmp_path, schema=1)
     with pytest.raises(ValueError, match="feature_schema_version"):
+        model_fn(str(tmp_path))
+
+
+@pytest.mark.parametrize("defect", ["vocab_order", "medians", "window"])
+def test_model_fn_rejects_incompatible_metadata(tmp_path, defect):
+    from src.ml.serve import model_fn
+
+    _write_artifact(tmp_path)
+    path = tmp_path / "metadata.json"
+    metadata = json.loads(path.read_text())
+    if defect == "vocab_order":
+        metadata["sector_vocab"] = list(reversed(SECTOR_VOCAB))
+    elif defect == "window":
+        metadata["hyperparameters"]["window_size"] = 5
+    else:
+        metadata["tabular_medians"] = {"roe": float("inf")}
+    path.write_text(json.dumps(metadata))
+    with pytest.raises(ValueError):
         model_fn(str(tmp_path))
 
 

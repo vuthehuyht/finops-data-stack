@@ -187,3 +187,16 @@ def test_stock_sequence_dataset_drops_rows_with_null_target() -> None:
 
     # 31 rows -> 30 valid after dropping the last null-target row -> 1 window.
     assert len(dataset) == 1
+
+
+def test_training_skips_dirty_windows_without_compressing_time():
+    from src.ml.config import SEQUENCE_FEATURE_COLUMNS
+    from src.ml.dataset import StockSequenceDataset
+
+    df = _make_feature_df(["AAA"], days=32)
+    df.loc[0, SEQUENCE_FEATURE_COLUMNS[0]] = None
+    df.loc[1, "label_next_5d_return"] = None
+    dataset = StockSequenceDataset(df, window_size=30)
+    # Endpoints 30 and 31 remain valid; missing historical labels aren't inputs.
+    assert len(dataset) == 2
+    assert float(dataset[0][0][0, 0]) == 1.0

@@ -55,15 +55,28 @@ def test_median_lookup_fallback_chain():
     assert features.median_lookup({}, "bank", "roe") == 0.0
 
 
-def test_sequence_features_fills_nan_with_zero():
+def test_sequence_features_rejects_missing_observations():
     window = pd.DataFrame(
         {c: [1.0, float("nan"), 3.0] for c in SEQUENCE_FEATURE_COLUMNS}
     )
-    arr = features.sequence_features(window)
-    assert arr.shape == (3, len(SEQUENCE_FEATURE_COLUMNS))
-    assert arr.dtype == np.float32
-    assert not np.isnan(arr).any()
-    assert arr[1, 0] == 0.0
+    with pytest.raises(ValueError, match="sequence"):
+        features.sequence_features(window)
+
+
+@pytest.mark.parametrize("bad", [float("inf"), -float("inf"), 1e40])
+def test_invalid_tabular_values_use_finite_median(bad):
+    values, flags = features.build_tabular_features(
+        _row(roe=bad), "bank", {"bank::roe": bad, "roe": 0.2}
+    )
+    i = TABULAR_FEATURE_COLUMNS.index("roe")
+    assert values[i] == pytest.approx(0.2)
+    assert flags[i] == 0
+
+
+def test_training_medians_exclude_infinity_and_float32_overflow():
+    df = pd.DataFrame([_row(roe=x) for x in [0.1, 0.3, float("inf"), 1e40]])
+    df["sector"] = "bank"
+    assert features.compute_training_medians(df)["bank::roe"] == pytest.approx(0.2)
 
 
 def test_compute_training_medians_only_applicable_nonnull():

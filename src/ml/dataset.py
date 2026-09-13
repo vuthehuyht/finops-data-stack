@@ -12,6 +12,7 @@ try:
     # `src.ml.dataset` from the repo root, where the `src` package resolves.
     from src.ml import features
     from src.ml.config import (
+        MIN_TICKER_COMPLETENESS,
         SEQUENCE_FEATURE_COLUMNS,
         TABULAR_FEATURE_COLUMNS,
         TARGET_COLUMN,
@@ -24,6 +25,7 @@ except ImportError:
     import features  # noqa: I001
 
     from config import (  # noqa: I001
+        MIN_TICKER_COMPLETENESS,
         SEQUENCE_FEATURE_COLUMNS,
         TABULAR_FEATURE_COLUMNS,
         TARGET_COLUMN,
@@ -107,10 +109,27 @@ class StockSequenceDataset(Dataset):
         self._windows = self._build_windows(df)
 
     def _build_windows(self, df: pd.DataFrame) -> list[pd.DataFrame]:
-        clean_df = df.dropna(subset=[self._target_column])
         windows: list[pd.DataFrame] = []
-        for _, ticker_df in clean_df.groupby(_TICKER_COLUMN):
-            windows.extend(_build_ticker_windows(ticker_df, self._window_size))
+        for _, ticker_df in df.groupby(_TICKER_COLUMN):
+            if (
+                ticker_df[_DATE_COLUMN].isna().any()
+                or ticker_df[_DATE_COLUMN].duplicated().any()
+            ):
+                raise ValueError("Missing or duplicate ticker dates in training data")
+            for window in _build_ticker_windows(ticker_df, self._window_size):
+                last = window.iloc[-1]
+                if not features.is_valid_number(last[self._target_column]):
+                    continue
+                if (
+                    features.tabular_completeness(last, str(last["sector"]))
+                    < MIN_TICKER_COMPLETENESS
+                ):
+                    continue
+                try:
+                    features.sequence_features(window, self._sequence_columns)
+                except ValueError:
+                    continue
+                windows.append(window)
         return windows
 
     def __len__(self) -> int:
