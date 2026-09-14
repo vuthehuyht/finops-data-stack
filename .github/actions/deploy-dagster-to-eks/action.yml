@@ -137,9 +137,21 @@ runs:
     - name: Install/upgrade External Secrets Operator
       shell: bash
       run: |
-        helm repo add external-secrets https://charts.external-secrets.io
-        helm repo update external-secrets
-        helm upgrade --install external-secrets external-secrets/external-secrets \
+        ESO_CHART_VERSION="2.10.0"
+        ESO_CHART_FILE="/tmp/external-secrets-${ESO_CHART_VERSION}.tgz"
+        ESO_CHART_URL="https://github.com/external-secrets/external-secrets/releases/download/helm-chart-${ESO_CHART_VERSION}/external-secrets-${ESO_CHART_VERSION}.tgz"
+
+        echo "Downloading External Secrets Operator Helm chart v${ESO_CHART_VERSION}..."
+        if curl -fSL --retry 5 --retry-delay 5 --retry-all-errors "${ESO_CHART_URL}" -o "${ESO_CHART_FILE}"; then
+          CHART_SRC="${ESO_CHART_FILE}"
+        else
+          echo "Direct download failed, falling back to helm repo..."
+          helm repo add external-secrets https://charts.external-secrets.io
+          helm repo update external-secrets
+          CHART_SRC="external-secrets/external-secrets"
+        fi
+
+        helm upgrade --install external-secrets "${CHART_SRC}" \
           -n external-secrets \
           --set installCRDs=true \
           --wait --timeout 5m

@@ -34,6 +34,11 @@ from src.ingest.pipeline.stock_price_eod import StockPriceEodPipeline
 _TIMEZONE = "Asia/Ho_Chi_Minh"
 # 15:30 ICT on weekdays — after VN market closes at 15:00
 _INGEST_CRON = "30 15 * * 1-5"
+# 22:30 ICT on weekdays — after US market opens to capture intraday interest rates
+_INTEREST_RATES_CRON = "30 22 * * 1-5"
+_ASSET_CUSTOM_CRON: dict[str, str] = {
+    "INPUT__RAW_INTEREST_RATES": _INTEREST_RATES_CRON,
+}
 
 
 @dataclass
@@ -76,15 +81,16 @@ def _make_ingest_schedule(
     job: dagster.JobDefinition | UnresolvedAssetJobDefinition,
     job_name: str,
     asset_py_id: str,
+    cron_schedule: str = _INGEST_CRON,
 ) -> dagster.ScheduleDefinition:
-    """Create a daily schedule that runs an ingest job after VN market close."""
+    """Create a daily schedule that runs an ingest job."""
 
     @dagster.schedule(
         job=job,
-        cron_schedule=_INGEST_CRON,
+        cron_schedule=cron_schedule,
         execution_timezone=_TIMEZONE,
         name=f"{job_name}_schedule",
-        description=f"Daily VN market ingest schedule for {job_name}.",
+        description=f"Daily ingest schedule for {job_name}.",
     )
     def _schedule(
         context: dagster.ScheduleEvaluationContext,
@@ -580,8 +586,10 @@ def define_ingest_jobs() -> IngestJobBundle:
             },
         )
         bundle.jobs.append(job)
+        asset_py_id = asset.key.to_python_identifier()
+        cron = _ASSET_CUSTOM_CRON.get(asset_py_id, _INGEST_CRON)
         bundle.schedules.append(
-            _make_ingest_schedule(job, job_name, asset.key.to_python_identifier())
+            _make_ingest_schedule(job, job_name, asset_py_id, cron_schedule=cron)
         )
 
     ingest_all_job = dagster_lib.define_asset_job(
