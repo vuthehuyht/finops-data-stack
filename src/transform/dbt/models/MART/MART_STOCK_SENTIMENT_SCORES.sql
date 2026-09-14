@@ -56,8 +56,9 @@ ANALYST_LATEST AS (
     NULL::INTEGER AS ANALYST_BUY_COUNT,
     NULL::NUMERIC(38, 4) AS AVG_ANALYST_TARGET_PRICE
   FROM {{ ref('STG_ANALYST_REPORTS') }}
+  WHERE TICKER IS NOT NULL
   {% if is_incremental() %}
-    WHERE BATCH_DATE <= {{ current_batch_date() }}
+    AND BATCH_DATE <= {{ current_batch_date() }}
   {% endif %}
   GROUP BY 1, 2
 ),
