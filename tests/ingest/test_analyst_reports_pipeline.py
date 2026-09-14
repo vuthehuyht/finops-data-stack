@@ -6,7 +6,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.ingest.pipeline.analyst_reports import AnalystReportsPipeline
-from src.ingest.pipeline.base import DEFAULT_TICKER_SYMBOLS
 
 _BATCH_DATE = "2026-06-18"
 
@@ -99,11 +98,10 @@ def test_fetch_concatenates_reports_for_multiple_symbols(
 
 @patch.dict(os.environ, {"FIREANT_EMAIL": "u@test.com", "FIREANT_PASSWORD": "pass"})
 @patch("src.ingest.pipeline.analyst_reports.FireAntClient")
-def test_analyst_reports_defaults_to_vn30_when_no_symbols(
+def test_analyst_reports_fetches_all_market_when_no_symbols(
     mock_client_class: MagicMock,
 ) -> None:
-    # Ensure fetch uses DEFAULT_TICKER_SYMBOLS when no symbols are explicitly specified
-    """Verify fetch uses DEFAULT_TICKER_SYMBOLS when symbols=[]."""
+    """Verify fetch uses symbol='' to get all market reports when symbols is empty."""
     mock_client = MagicMock()
     mock_client_class.return_value = mock_client
     mock_client.get_reports.return_value = []
@@ -111,10 +109,9 @@ def test_analyst_reports_defaults_to_vn30_when_no_symbols(
     pipeline = AnalystReportsPipeline(batch_date="2026-06-18")
     pipeline.fetch()
 
-    called_symbols = [
-        call.kwargs["symbol"] for call in mock_client.get_reports.call_args_list
-    ]
-    assert called_symbols == DEFAULT_TICKER_SYMBOLS
+    mock_client.get_reports.assert_called_once_with(
+        symbol="", start_date="2026-06-18", end_date="2026-06-18"
+    )
 
 
 @patch("src.ingest.pipeline.analyst_reports.FireAntClient")

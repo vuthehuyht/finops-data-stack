@@ -83,12 +83,20 @@ def test_define_ingest_jobs_schedule_naming_convention() -> None:
 
 
 def test_define_ingest_jobs_schedule_cron_and_timezone() -> None:
-    from src.dagster.ingest_job import _INGEST_CRON, _TIMEZONE, define_ingest_jobs
+    from src.dagster.ingest_job import (
+        _INGEST_CRON,
+        _INTEREST_RATES_CRON,
+        _TIMEZONE,
+        define_ingest_jobs,
+    )
 
     bundle = define_ingest_jobs()
     for schedule in bundle.schedules:
-        assert schedule.cron_schedule == _INGEST_CRON
         assert schedule.execution_timezone == _TIMEZONE
+        if schedule.name == "ingest_INPUT__RAW_INTEREST_RATES_job_schedule":
+            assert schedule.cron_schedule == _INTEREST_RATES_CRON
+        else:
+            assert schedule.cron_schedule == _INGEST_CRON
 
 
 def test_define_ingest_jobs_returns_cached_instance() -> None:

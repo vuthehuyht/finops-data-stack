@@ -92,7 +92,7 @@ class PrometheusResource:
                     ),
                 )
             except Exception:
-                # Bỏ qua lỗi nếu hệ thống chưa cài Prometheus Pushgateway
+                # Ignore error if Prometheus Pushgateway is not installed/reachable
                 pass
         else:
             j = LOCAL_METRICS_STORAGE.get(job_name, {})
