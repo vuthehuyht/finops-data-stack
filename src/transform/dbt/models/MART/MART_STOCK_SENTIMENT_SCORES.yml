@@ -2,9 +2,9 @@ models:
   - name: MART_STOCK_SENTIMENT_SCORES
     description: >
       News volume, analyst coverage signals, and corporate event flags per ticker
-      per day. NLP-based sentiment scores (DAILY_NEWS_SENTIMENT_SCORE,
-      SENTIMENT_MOMENTUM_7D) are NULL until an NLP enrichment pipeline populates
-      them in the Silver layer. Granularity: Ticker + Date.
+      per day. News sentiment (DAILY_NEWS_SENTIMENT_SCORE, SENTIMENT_MOMENTUM_7D)
+      is joined from STG_NEWS_SENTIMENT and is NULL for days whose articles have
+      not been scored yet. Granularity: Ticker + Date.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -31,7 +31,9 @@ models:
         description: Number of news articles published for this ticker on this day
       - name: DAILY_NEWS_SENTIMENT_SCORE
         data_type: NUMERIC(18, 4)
-        description: Average NLP sentiment score (-1 to 1); NULL until NLP pipeline available
+        description: >
+          Average NLP sentiment score (-1 to 1) across the day's articles; NULL only
+          if none have been scored yet.
       - name: SENTIMENT_MOMENTUM_7D
         data_type: NUMERIC(18, 4)
         description: 7-day rolling average of daily sentiment score
@@ -43,9 +45,21 @@ models:
         description: Number of analyst reports published on this day
       - name: ANALYST_BUY_COUNT
         data_type: INTEGER
-        description: Number of BUY/OUTPERFORM/OVERWEIGHT recommendations on this day
+        description: >
+          Number of reports on this day whose text recommends BUY / MUA / KHẢ QUAN /
+          OUTPERFORM. Regex-based MVP extraction from the report description;
+          precision is not guaranteed.
       - name: AVG_ANALYST_TARGET_PRICE
         data_type: NUMERIC(18, 4)
+        description: >
+          Average target price (VND) extracted by regex from report descriptions
+          that state one as a thousands-separated number; NULL when no report
+          that day does. Regex-based MVP, precision is not guaranteed.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1000
+                max_value: 1000000
       - name: CORPORATE_EVENT_COUNT
         data_type: INTEGER
       - name: DIVIDEND_EVENT_COUNT
