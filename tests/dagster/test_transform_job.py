@@ -195,3 +195,21 @@ def test_transform_jobs_have_dbt_retry_policy() -> None:
     mart_bundle = define_mart_jobs()
     for j in mart_bundle.jobs:
         assert j.op_retry_policy == DBT_RETRY
+
+
+def test_mart_sensor_does_not_wait_for_optional_news_sentiment_upstream() -> None:
+    from dagster import AssetKey
+
+    from src.dagster.transform_job import _required_upstream_keys
+
+    mart = AssetKey(["MART", "MART_STOCK_SENTIMENT_SCORES"])
+    news = AssetKey(["STAGING", "STG_NEWS_ARTICLES"])
+    sentiment = AssetKey(["STAGING", "STG_NEWS_SENTIMENT"])
+
+    required = _required_upstream_keys(
+        "transform_MART__MART_STOCK_SENTIMENT_SCORES_job", {mart: [news, sentiment]}
+    )
+
+    # A failed or late NLP batch must not block the mart (and the price
+    # inference chain behind it).
+    assert required == {news}

@@ -331,6 +331,25 @@ def _make_mart_schedule(
     return _schedule
 
 
+# Upstreams the mart sensor monitors, and re-triggers a mart run for when they
+# materialize, but never waits for. STG_NEWS_SENTIMENT comes from an ML batch
+# job: if it fails or runs late, MART_STOCK_SENTIMENT_SCORES (and everything
+# downstream, including daily price inference) must still build; the sentiment
+# columns simply catch up on the re-run once the scores land.
+_OPTIONAL_MART_UPSTREAMS = frozenset({AssetKey(["STAGING", "STG_NEWS_SENTIMENT"])})
+
+
+def _required_upstream_keys(
+    job_name: str, asset_to_upstream: dict[AssetKey, list[AssetKey]]
+) -> set[AssetKey]:
+    """Upstream keys that must be materialized for the partition before a job runs."""
+    required: set[AssetKey] = set()
+    for asset_key, up_keys in asset_to_upstream.items():
+        if asset_key.to_python_identifier() in job_name:
+            required.update(k for k in up_keys if k not in _OPTIONAL_MART_UPSTREAMS)
+    return required
+
+
 def _create_sensor_for_mart_jobs(  # noqa: C901
     sensor_name: str,
     all_upstream_keys: list[AssetKey],
@@ -401,10 +420,9 @@ def _create_sensor_for_mart_jobs(  # noqa: C901
             for job in possible_jobs:
                 # Find all required upstream keys for this job
                 # from asset_to_upstream mapping
-                required_upstreams = set()
-                for asset_key, up_keys in asset_to_upstream.items():
-                    if asset_key.to_python_identifier() in job.name:
-                        required_upstreams.update(up_keys)
+                required_upstreams = _required_upstream_keys(
+                    job.name, asset_to_upstream
+                )
 
                 all_ready = True
                 for up_key in required_upstreams:
