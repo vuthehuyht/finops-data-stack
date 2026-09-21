@@ -1,9 +1,4 @@
-"""SageMaker Training Job launcher for the sentiment fine-tuning pipeline.
-
-Mirrors src/ml/training_job.py (same ModelTrainer v3 API and the same
-model_artifacts_bucket scoping rationale — see that module's docstring),
-pointed at src/nlp/train.py.
-"""
+"""SageMaker training job launcher for sentiment fine-tuning (mirrors src/ml)."""
 
 from dataclasses import dataclass
 
@@ -23,7 +18,7 @@ _REGION = "ap-southeast-1"
 
 @dataclass
 class TrainingJobResult:
-    """Outcome of a completed SageMaker training job."""
+    """Completed job name and model artifact URI."""
 
     job_name: str
     model_data_s3_uri: str
@@ -36,19 +31,10 @@ def launch_nlp_training_job(
     model_artifacts_bucket: str,
     sagemaker_session: object | None = None,
 ) -> TrainingJobResult:
-    """Launch the fine-tuning job and block until it finishes.
+    """Run the job and block until it finishes.
 
-    Args:
-        role_arn: IAM role ARN SageMaker assumes to run the job.
-        input_s3_uri: S3 prefix holding `train.csv`, `val.csv` and optionally
-            `eval_domain.csv` (the `train` channel).
-        hyperparameters: Hyperparameters forwarded to `src/nlp/train.py`.
-        model_artifacts_bucket: S3 bucket the execution role is scoped to; used
-            as the session default bucket and for the job output location.
-        sagemaker_session: Optional injected session for testing.
-
-    Returns:
-        TrainingJobResult with the completed job name and model artifact URI.
+    `input_s3_uri` is the `train` channel prefix. `model_artifacts_bucket` is the
+    session default bucket and the output location the role can access.
     """
     if sagemaker_session is None:
         sagemaker_session = Session(
@@ -80,7 +66,6 @@ def launch_nlp_training_job(
         input_data_config=[InputData(channel_name="train", data_source=input_s3_uri)],
         wait=True,
     )
-    # ModelTrainer.train() only exposes the completed job via this attribute.
     training_job = trainer._latest_training_job
     return TrainingJobResult(
         job_name=training_job.training_job_name,

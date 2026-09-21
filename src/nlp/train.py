@@ -1,14 +1,7 @@
-"""SageMaker script-mode entrypoint for fine-tuning the sentiment model.
+"""SageMaker script-mode entrypoint: fine-tune the sentiment model.
 
-Runs standalone inside the SageMaker training container — not imported by
-Dagster. Mirrors src/ml/train.py's structure (argparse -> load data -> train
--> save artifact + metadata.json). Uses a plain PyTorch loop instead of the
-HuggingFace Trainer to avoid pulling in `accelerate`/`scikit-learn`.
-
-The `train` channel must contain `train.csv` and `val.csv`, and may contain
-`eval_domain.csv` (a small hand-labeled financial-news sample). When present,
-its macro-F1 becomes the promotion score, because the public training data is
-general-domain.
+The `train` channel holds train.csv and val.csv, plus an optional
+eval_domain.csv (hand-labeled financial news) that drives promotion.
 """
 
 import argparse
@@ -20,30 +13,31 @@ import shutil
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+import torch
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
 try:
     from src.nlp.config import MAX_TOKEN_LENGTH, MODEL_ID, SENTIMENT_SCHEMA_VERSION
     from src.nlp.dataset import load_training_dataset
     from src.nlp.evaluation import macro_f1
-except ImportError:
-    # Sibling import: SageMaker script mode copies `source_dir` flat.
+except ImportError:  # SageMaker copies source_dir flat
     from config import MAX_TOKEN_LENGTH, MODEL_ID, SENTIMENT_SCHEMA_VERSION
     from dataset import load_training_dataset
     from evaluation import macro_f1
 
-# Copied into model_dir/code/ so every trained model.tar.gz is directly
-# servable by the SageMaker inference container (no packaging step later).
+# Bundled into the artifact so it is servable as-is.
 _SERVING_FILES = ("serve.py", "config.py", "sentiment_model.py", "requirements.txt")
 _SEED = 42
 
 
 def iter_batches(indices: list[int], batch_size: int):
-    """Yield consecutive slices of `indices` of at most `batch_size`."""
+    """Yield consecutive slices of at most `batch_size`."""
     for start in range(0, len(indices), batch_size):
         yield indices[start : start + batch_size]
 
 
 def bundle_serving_code(model_dir: str) -> None:
-    """Copy the serving entrypoint and its dependencies into `model_dir/code/`."""
+    """Copy the serving code into `model_dir/code/`."""
     source_dir = os.path.dirname(os.path.abspath(__file__))
     code_dir = os.path.join(model_dir, "code")
     os.makedirs(code_dir, exist_ok=True)
@@ -63,7 +57,7 @@ def build_metadata(
     train_rows: int,
     val_rows: int,
 ) -> dict:
-    """Assemble the metadata.json payload written next to the model weights."""
+    """Assemble metadata.json."""
     return {
         "model_version": model_version,
         "trained_at": datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).isoformat(),
@@ -106,8 +100,6 @@ def _encode(tokenizer, texts: list[str], device):
 
 
 def _predict(model, tokenizer, texts: list[str], batch_size: int, device) -> list[int]:
-    import torch
-
     model.eval()
     predictions: list[int] = []
     with torch.no_grad():
@@ -118,13 +110,8 @@ def _predict(model, tokenizer, texts: list[str], batch_size: int, device) -> lis
 
 
 def main() -> None:
-    import numpy as np
-    import torch
-    from transformers import AutoModelForSequenceClassification, AutoTokenizer
-
     args = _parse_args()
     random.seed(_SEED)
-    np.random.seed(_SEED)
     torch.manual_seed(_SEED)
 
     train_texts, train_labels = load_training_dataset(

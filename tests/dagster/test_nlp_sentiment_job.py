@@ -1,5 +1,6 @@
 """Tests for src.dagster.nlp_sentiment_job asset/job/sensor wiring and logic."""
 
+import re
 import unittest.mock
 from pathlib import Path
 
@@ -9,9 +10,14 @@ import pytest
 
 from src.dagster.nlp_sentiment_job import (
     NlpSentimentPrepConfig,
+    _staging_schema,
+    build_run_request,
     build_sentiment_payloads,
+    build_unscored_articles_query,
     define_nlp_sentiment_jobs,
+    materialization_partition,
     nlp_publish_sentiment_scores,
+    nlp_sentiment_batch_transform,
     nlp_sentiment_prep,
 )
 
@@ -166,8 +172,6 @@ def test_publish_rejects_malformed_batch_date() -> None:
 
 
 def _run_batch_transform(active_version):
-    from src.dagster.nlp_sentiment_job import nlp_sentiment_batch_transform
-
     sagemaker = unittest.mock.MagicMock(model_artifacts_bucket="artifacts")
     s3bucket = unittest.mock.MagicMock(processed_bucket="processed")
     ssm = unittest.mock.MagicMock()
@@ -219,8 +223,6 @@ def test_batch_transform_ignores_none_sentinel_version() -> None:
 
 
 def test_batch_transform_model_names_are_valid_for_sagemaker() -> None:
-    import re
-
     realistic_job = "finops-nlp-sentiment-finetune-2026-09-21-12-30-45-123"
     for version in (None, "finops-nlp-sentiment-finetune-2026", realistic_job):
         _, sagemaker = _run_batch_transform(version)
@@ -231,8 +233,6 @@ def test_batch_transform_model_names_are_valid_for_sagemaker() -> None:
 
 
 def test_unscored_query_is_capped_newest_first_and_uses_given_schema() -> None:
-    from src.dagster.nlp_sentiment_job import build_unscored_articles_query
-
     query = build_unscored_articles_query("staging", 250, None)
 
     assert "FROM staging.STG_NEWS_ARTICLES" in query
@@ -243,8 +243,6 @@ def test_unscored_query_is_capped_newest_first_and_uses_given_schema() -> None:
 
 
 def test_unscored_query_can_select_articles_scored_by_another_model() -> None:
-    from src.dagster.nlp_sentiment_job import build_unscored_articles_query
-
     query = build_unscored_articles_query("staging", 10, "job-2")
 
     assert "S.MODEL_VERSION <> 'job-2'" in query
@@ -259,15 +257,11 @@ def test_unscored_query_can_select_articles_scored_by_another_model() -> None:
     ],
 )
 def test_unscored_query_rejects_unsafe_arguments(schema, limit, label) -> None:
-    from src.dagster.nlp_sentiment_job import build_unscored_articles_query
-
     with pytest.raises(ValueError):
         build_unscored_articles_query(schema, limit, label)
 
 
 def test_prep_reads_staging_schema_from_environment(monkeypatch) -> None:
-    from src.dagster.nlp_sentiment_job import _staging_schema
-
     monkeypatch.delenv("REDSHIFT_STAGING_SCHEMA", raising=False)
     assert _staging_schema() == "staging"
 
@@ -315,8 +309,6 @@ def test_prep_rescoring_targets_the_serving_model_version() -> None:
 
 
 def test_batch_transform_passes_batch_date_through_when_nothing_to_score() -> None:
-    from src.dagster.nlp_sentiment_job import nlp_sentiment_batch_transform
-
     result = nlp_sentiment_batch_transform(
         dagster.build_asset_context(),
         {"article_count": 0, "batch_date": "2026-09-14"},
@@ -334,8 +326,6 @@ def _materialization(partition=None, **metadata):
 
 
 def test_materialization_partition_reads_native_partition_first() -> None:
-    from src.dagster.nlp_sentiment_job import materialization_partition
-
     mat = _materialization(
         partition="2026-09-10",
         conata_partition_key=dagster.MetadataValue.text("2026-09-01"),
@@ -344,8 +334,6 @@ def test_materialization_partition_reads_native_partition_first() -> None:
 
 
 def test_materialization_partition_falls_back_to_metadata() -> None:
-    from src.dagster.nlp_sentiment_job import materialization_partition
-
     conata = _materialization(
         conata_partition_key=dagster.MetadataValue.text("2026-09-11")
     )
@@ -358,8 +346,6 @@ def test_materialization_partition_falls_back_to_metadata() -> None:
 
 
 def test_run_request_scores_under_the_triggering_partition() -> None:
-    from src.dagster.nlp_sentiment_job import build_run_request
-
     request = build_run_request(42, "2026-09-11")
 
     assert request.run_key == "nlp_sentiment_42"
@@ -368,13 +354,9 @@ def test_run_request_scores_under_the_triggering_partition() -> None:
 
 
 def test_run_request_without_partition_keeps_default_config() -> None:
-    from src.dagster.nlp_sentiment_job import build_run_request
-
     assert build_run_request(7, None).run_config == {}
 
 
 def test_run_request_rejects_malformed_partition() -> None:
-    from src.dagster.nlp_sentiment_job import build_run_request
-
     with pytest.raises(ValueError):
         build_run_request(1, "not-a-date")

@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
+from src.nlp.training_job import launch_nlp_training_job
+
 
 def _mock_trainer(job_name: str, model_uri: str) -> MagicMock:
     training_job = MagicMock()
@@ -13,8 +15,6 @@ def _mock_trainer(job_name: str, model_uri: str) -> MagicMock:
 
 
 def test_launch_nlp_training_job_constructs_model_trainer_with_expected_args() -> None:
-    from src.nlp.training_job import launch_nlp_training_job
-
     mock_trainer = _mock_trainer(
         "finops-nlp-sentiment-finetune-20260921",
         "s3://sagemaker-bucket/job/output/model.tar.gz",
@@ -67,8 +67,6 @@ def test_launch_nlp_training_job_constructs_model_trainer_with_expected_args() -
 
 
 def test_launch_nlp_training_job_forwards_sagemaker_session() -> None:
-    from src.nlp.training_job import launch_nlp_training_job
-
     session = MagicMock()
     mock_trainer = _mock_trainer("job", "s3://bucket/job/output/model.tar.gz")
 

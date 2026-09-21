@@ -1,13 +1,6 @@
-"""Dagster assets, job, and sensor for the NLP news sentiment pipeline.
+"""Dagster assets, job and sensor for news sentiment scoring.
 
-Chain (mirrors src/dagster/inference_job.py's gate -> run -> publish shape):
-nlp_sentiment_prep (unscored articles -> JSONL -> S3) ->
-nlp_sentiment_batch_transform (SageMaker Batch Transform) ->
-nlp_publish_sentiment_scores (COPY into RAW.RAW_NEWS_SENTIMENT).
-
-The publish asset is keyed RAW/NEWS_SENTIMENT and emits `conata_partition_key`
-metadata so the existing silver sensor (transform_job.py) builds
-STG_NEWS_SENTIMENT the same way it does for every other RAW table.
+prep (unscored articles -> S3) -> batch transform -> publish (RAW.RAW_NEWS_SENTIMENT).
 """
 
 import datetime
@@ -37,12 +30,9 @@ from src.load.load import load_s3_to_redshift
 from src.nlp.config import MODEL_ID
 from src.nlp.evaluation import ACTIVE_VERSION_PARAM, model_version_prefix
 
-# SageMaker model names allow only alphanumerics and hyphens (max 63 chars),
-# unlike S3 keys, so the "/" in the Hub id becomes "-" here.
+# SageMaker model names allow only alphanumerics and hyphens (max 63).
 _MODEL_NAME = f"nlp-sentiment-{MODEL_ID.replace('/', '-')}"[:63]
 _MODEL_ARTIFACT_KEY = f"nlp-sentiment/{MODEL_ID.replace('/', '_')}/model.tar.gz"
-# Batch inference on a base-size encoder does not need the GPU image the price
-# model uses.
 _TRANSFORM_IMAGE = (
     "763104351884.dkr.ecr.ap-southeast-1.amazonaws.com/pytorch-inference:2.2-cpu-py310"
 )
@@ -56,16 +46,17 @@ _NLP_SENTIMENT_PREP_KEY = dagster_lib.asset_key(["NLP", "NLP_SENTIMENT_PREP"])
 _NLP_BATCH_TRANSFORM_KEY = dagster_lib.asset_key(
     ["NLP", "NLP_SENTIMENT_BATCH_TRANSFORM"]
 )
-# Same key transform_job._get_upstream_bronze_key derives for stg_news_sentiment.
+# Key the silver sensor derives for stg_news_sentiment.
 _RAW_NEWS_SENTIMENT_KEY = dagster_lib.asset_key(["RAW", "NEWS_SENTIMENT"])
 
 
-def resolve_active_model(active_version: str | None) -> tuple[str, str]:
-    """Return `(model_name, artifact_key)` for the model that should score articles.
+def _validate_iso_date(value: str) -> str:
+    """Normalize to YYYY-MM-DD; raises ValueError otherwise."""
+    return datetime.date.fromisoformat(str(value)[:10]).isoformat()
 
-    A promoted fine-tuned version (SSM `ACTIVE_VERSION_PARAM`) wins; unset or
-    the "none" sentinel means the pretrained Phase A checkpoint.
-    """
+
+def resolve_active_model(active_version: str | None) -> tuple[str, str]:
+    """(model_name, artifact_key) of the promoted version, else the pretrained model."""
     if active_version and active_version != "none":
         return (
             f"nlp-{active_version}"[:63].rstrip("-"),
@@ -75,11 +66,7 @@ def resolve_active_model(active_version: str | None) -> tuple[str, str]:
 
 
 def _staging_schema() -> str:
-    """Staging schema name, from the same env var dbt uses (default: staging).
-
-    Raises:
-        ValueError: If the configured name is not a plain SQL identifier.
-    """
+    """Staging schema from the env var dbt uses; must be a plain identifier."""
     schema = os.getenv("REDSHIFT_STAGING_SCHEMA", "staging")
     if not _IDENTIFIER_PATTERN.match(schema):
         raise ValueError(f"Invalid staging schema name: {schema!r}")
@@ -87,7 +74,7 @@ def _staging_schema() -> str:
 
 
 def _serving_model_label(active_version: str | None) -> str:
-    """The `MODEL_VERSION` value rows scored by the current model carry."""
+    """MODEL_VERSION that rows scored by the serving model carry."""
     if active_version and active_version != "none":
         return active_version
     return MODEL_ID
@@ -96,17 +83,10 @@ def _serving_model_label(active_version: str | None) -> str:
 def build_unscored_articles_query(
     staging_schema: str, max_articles: int, stale_model_label: str | None
 ) -> str:
-    """SQL selecting articles that still need a sentiment score, newest first.
+    """SQL for articles needing a score, newest first, capped at `max_articles`.
 
-    Args:
-        staging_schema: Validated staging schema name.
-        max_articles: Cap per run, so the first run over a long history drains
-            over several runs instead of one huge Batch Transform.
-        stale_model_label: When set, articles scored by any other model
-            version are selected again (re-scoring after a promotion).
-
-    Raises:
-        ValueError: If an argument is not safe to embed in SQL.
+    With `stale_model_label`, articles scored by another model are included too.
+    Raises ValueError if an argument is unsafe to embed.
     """
     if not _IDENTIFIER_PATTERN.match(staging_schema):
         raise ValueError(f"Invalid staging schema name: {staging_schema!r}")
@@ -133,11 +113,7 @@ def build_unscored_articles_query(
 
 
 def materialization_partition(materialization) -> str | None:
-    """Partition (batch date) a materialization was produced for, if it says.
-
-    Mirrors how transform_job.py's sensors read it: the native partition,
-    else the `conata_partition_key` metadata, else dbt's `variables` metadata.
-    """
+    """Batch date from the native partition, else conata/dbt metadata."""
     if materialization.partition:
         return str(materialization.partition)
     metadata = materialization.metadata
@@ -152,10 +128,7 @@ def materialization_partition(materialization) -> str | None:
 
 
 def build_run_request(storage_id: int, partition: str | None) -> dagster.RunRequest:
-    """RunRequest that scores under the triggering partition's batch date.
-
-    Without a partition the prep asset falls back to today's ICT date.
-    """
+    """RunRequest scoring under `partition`; prep falls back to today when None."""
     run_config = None
     if partition:
         run_config = dagster.RunConfig(
@@ -170,14 +143,9 @@ def build_run_request(storage_id: int, partition: str | None) -> dagster.RunRequ
     )
 
 
-def _validate_iso_date(value: str) -> str:
-    """Round-trip through date.fromisoformat to guard against SQL injection."""
-    return datetime.date.fromisoformat(str(value)[:10]).isoformat()
-
-
 @dataclass
 class NlpSentimentJobBundle:
-    """Return value of define_nlp_sentiment_jobs() — consumed by workspace.py."""
+    """Assets, jobs and sensors for workspace.py."""
 
     assets: list[dagster.AssetsDefinition] = field(default_factory=list)
     jobs: list[dagster.JobDefinition] = field(default_factory=list)
@@ -190,9 +158,8 @@ class NlpSentimentPrepConfig(dagster.Config):
     batch_date: str = pydantic.Field(
         default="auto",
         description=(
-            "Partition date (YYYY-MM-DD) the scores are published under. The "
-            "sensor sets it to the STG_NEWS_ARTICLES partition that triggered "
-            "the run so downstream mart sensors see a matching partition."
+            "Partition date (YYYY-MM-DD) to publish under; the sensor passes "
+            "the triggering STG_NEWS_ARTICLES partition."
         ),
     )
     max_articles: int = pydantic.Field(
@@ -202,20 +169,12 @@ class NlpSentimentPrepConfig(dagster.Config):
     )
     rescore_stale: bool = pydantic.Field(
         default=False,
-        description=(
-            "Also re-score articles scored by a different model version than "
-            "the one currently serving (use after promoting a fine-tuned model)."
-        ),
+        description="Also re-score articles scored by a different model version.",
     )
 
 
 def build_sentiment_payloads(df: pd.DataFrame) -> list[dict]:
-    """Turn unscored article rows into `{"article_id", "text"}` payloads.
-
-    Title, summary and content are concatenated so the model sees whatever
-    text exists; articles with no usable text at all are dropped rather than
-    scored as noise.
-    """
+    """Join title/summary/content into {"article_id", "text"}; drop empty ones."""
     payloads = []
     for row in df.itertuples():
         text = " ".join(
@@ -233,10 +192,7 @@ def build_sentiment_payloads(df: pd.DataFrame) -> list[dict]:
     group_name="NLP",
     kinds={"python", "redshift", "s3"},
     deps=[_STG_NEWS_ARTICLES_KEY],
-    description=(
-        "Gather news articles not yet in STG_NEWS_SENTIMENT and stage them as "
-        "JSONL on S3."
-    ),
+    description="Stage unscored news articles as JSONL on S3.",
     retry_policy=INGEST_RETRY,
 )
 def nlp_sentiment_prep(
@@ -247,7 +203,7 @@ def nlp_sentiment_prep(
     s3bucket: S3BucketResource,
     s3: S3Resource,
 ) -> dagster.Output[dict]:
-    """Pull unscored articles and write them as JSONL to S3."""
+    """Write unscored articles to S3 as JSONL."""
     batch_date = (
         pd.Timestamp.now(tz=_TIMEZONE).date().isoformat()
         if config.batch_date == "auto"
@@ -268,7 +224,7 @@ def nlp_sentiment_prep(
     payloads = build_sentiment_payloads(df)
     if not payloads:
         context.log.info("No unscored articles with text; nothing to score.")
-        # Keep batch_date so later assets still publish a partition marker.
+        # Keep batch_date: publish still emits the partition marker.
         return dagster.Output(
             value={"article_count": 0, "batch_date": batch_date},
             metadata={"article_count": 0, "batch_date": batch_date},
@@ -317,7 +273,7 @@ def nlp_sentiment_batch_transform(
     s3bucket: S3BucketResource,
     s3: S3Resource,
 ) -> dagster.Output[dict]:
-    """Run Batch Transform over prep_result's input and return the output URI."""
+    """Run Batch Transform and return the output URI."""
     if prep_result["article_count"] == 0:
         context.log.info("Nothing to score; skipping Batch Transform.")
         return dagster.Output(
@@ -348,7 +304,7 @@ def nlp_sentiment_batch_transform(
         instance_type=_TRANSFORM_INSTANCE_TYPE,
     )
 
-    # Batch Transform names its output after the input file plus ".out".
+    # Output is named after the input file plus ".out".
     output_key = f"{output_prefix}input.jsonl.out"
     s3.get_client().head_object(Bucket=s3bucket.processed_bucket, Key=output_key)
 
@@ -380,16 +336,10 @@ def nlp_publish_sentiment_scores(
     redshift: RedshiftResource,
     load_config: LoadJobConfigResource,
 ) -> dagster.Output[int]:
-    """Load scores through the generic loader so `_CONATA_*` columns get written.
-
-    `latest_source()` in STG_NEWS_SENTIMENT dedups on `_CONATA_LOADED_AT` and
-    filters incrementally on `_CONATA_PARTITION_KEY`, so a hand-rolled COPY
-    would break the dbt layer.
-    """
+    """COPY scores via the generic loader (writes the `_CONATA_*` columns dbt needs)."""
     batch_date = _validate_iso_date(transform_result["batch_date"])
     if transform_result["article_count"] == 0:
-        # Still emit the partition marker: mart sensors wait for every upstream
-        # to report the batch date, and an empty day is a valid outcome.
+        # Emit the partition marker even for an empty day.
         context.log.info("No scores to publish for %s.", batch_date)
         return dagster.Output(
             value=0,
@@ -419,14 +369,14 @@ def nlp_publish_sentiment_scores(
             "row_count": rows_loaded,
             "s3_url": transform_result["output_s3_uri"],
             "batch_date": batch_date,
-            # Read by the silver sensor to pick the dbt partition.
+            # Read by the silver sensor.
             "conata_partition_key": batch_date,
         },
     )
 
 
 def define_nlp_sentiment_jobs() -> NlpSentimentJobBundle:
-    """Define the NLP sentiment assets, job, and triggering sensor."""
+    """Define the sentiment assets, job and sensor."""
     assets: list[dagster.AssetsDefinition] = [
         nlp_sentiment_prep,
         nlp_sentiment_batch_transform,
@@ -454,12 +404,12 @@ def define_nlp_sentiment_jobs() -> NlpSentimentJobBundle:
     def nlp_sentiment_sensor(
         context: dagster.MultiAssetSensorEvaluationContext,
     ) -> Iterator[dagster.RunRequest]:
-        for key, asset_event, _materialization in dagster_lib.fetch_materializations(
+        for key, asset_event, materialization in dagster_lib.fetch_materializations(
             context, fetch_limit_for_each_asset=1
         ):
             context.advance_cursor({key: asset_event})
             yield build_run_request(
-                asset_event.storage_id, materialization_partition(_materialization)
+                asset_event.storage_id, materialization_partition(materialization)
             )
 
     return NlpSentimentJobBundle(

@@ -1,24 +1,16 @@
-"""Loads the labeled dataset for Phase C fine-tuning.
-
-Expects a CSV with `text` and `label` columns, `label` in
-{"negative", "neutral", "positive"}. The public dataset's own label scheme is
-mapped to this shape once, offline, not at training time.
-"""
+"""Labeled CSV loader (`text,label`) for fine-tuning."""
 
 import csv
 
-# Integer ids follow the pretrained checkpoint's config.json id2label
-# ({0: NEG, 1: POS, 2: NEU}) so fine-tuning keeps the classifier head aligned
-# and serve.py can keep mapping classes through id2label.
+# Ids follow the checkpoint's id2label so the classifier head stays aligned.
 LABEL_TO_ID = {"negative": 0, "positive": 1, "neutral": 2}
 
 
 def load_training_dataset(path: str) -> tuple[list[str], list[int]]:
-    """Load `(texts, labels)` from a `text,label` CSV.
+    """Load (texts, label ids).
 
     Raises:
-        ValueError: If a row's `label` isn't one of the three known classes,
-            or the file has no rows.
+        ValueError: On an unknown label or an empty file.
     """
     texts: list[str] = []
     labels: list[int] = []

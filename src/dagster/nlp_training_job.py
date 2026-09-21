@@ -1,9 +1,4 @@
-"""Dagster assets and job for fine-tuning the news sentiment model (Phase C).
-
-Mirrors src/dagster/ml_job.py (train -> evaluate/promote) but is launched
-manually only: training needs an S3 prefix holding the labeled CSVs, which
-has no sensible default to schedule against.
-"""
+"""Dagster assets and manual job: fine-tune, evaluate, promote."""
 
 import json
 from dataclasses import dataclass, field
@@ -33,7 +28,7 @@ _MODEL_EVALUATION_ASSET_KEY = dagster_lib.asset_key(["NLP", "NLP_MODEL_EVALUATIO
 
 @dataclass
 class NlpTrainingJobBundle:
-    """Return value of define_nlp_training_jobs() — consumed by workspace.py."""
+    """Assets and jobs for workspace.py."""
 
     assets: list[dagster.AssetsDefinition] = field(default_factory=list)
     jobs: list[dagster.JobDefinition] = field(default_factory=list)
@@ -43,10 +38,7 @@ class NlpTrainingJobConfig(dagster.Config):
     """Runtime config for the fine-tuning job."""
 
     input_s3_uri: str = pydantic.Field(
-        description=(
-            "S3 prefix holding train.csv, val.csv and optionally eval_domain.csv "
-            "(hand-labeled financial news; strongly recommended)."
-        )
+        description="S3 prefix with train.csv, val.csv and optional eval_domain.csv."
     )
     epochs: int = pydantic.Field(default=3)
     batch_size: int = pydantic.Field(default=16)
@@ -59,10 +51,8 @@ class NlpEvaluationConfig(dagster.Config):
     baseline_score: float | None = pydantic.Field(
         default=None,
         description=(
-            "Macro-F1 of the currently serving pretrained model on the SAME "
-            "evaluation set as the challenger. Used as the bar to beat while no "
-            "fine-tuned champion exists; without it the first fine-tuned model "
-            "is promoted unconditionally."
+            "Pretrained model's macro-F1 on the same eval set; the bar to beat "
+            "while no champion exists (unset: first model always promotes)."
         ),
     )
 
@@ -71,14 +61,14 @@ class NlpEvaluationConfig(dagster.Config):
     key=_TRAINING_JOB_ASSET_KEY,
     group_name="NLP",
     kinds={"python", "sagemaker"},
-    description="Launch a SageMaker Training Job that fine-tunes the sentiment model.",
+    description="Fine-tune the sentiment model on SageMaker.",
 )
 def nlp_training_job(
     context: dagster.AssetExecutionContext,
     config: NlpTrainingJobConfig,
     sagemaker: SageMakerResource,
 ) -> dagster.Output[dict[str, str]]:
-    """Launch and block on the fine-tuning job."""
+    """Run the fine-tuning job."""
     result = launch_nlp_training_job(
         role_arn=sagemaker.execution_role_arn,
         input_s3_uri=config.input_s3_uri,
@@ -111,10 +101,7 @@ def nlp_training_job(
     group_name="NLP",
     kinds={"python", "s3", "ssm"},
     ins={"training_job_result": dagster.AssetIn(key=_TRAINING_JOB_ASSET_KEY)},
-    description=(
-        "Version the fine-tuned model on S3 and promote it to active if it "
-        "strictly beats the current champion (or the pretrained baseline)."
-    ),
+    description="Version the model on S3; promote it if it beats the champion.",
 )
 def nlp_model_evaluation(
     context: dagster.AssetExecutionContext,
@@ -124,7 +111,7 @@ def nlp_model_evaluation(
     sagemaker: SageMakerResource,
     ssm: SsmParameterResource,
 ) -> dagster.Output[bool]:
-    """Version the model artifact and decide champion/challenger promotion."""
+    """Version the artifact and decide promotion."""
     version = training_job_result["job_name"]
     source_bucket, source_key = split_s3_url(training_job_result["model_data_s3_uri"])
 
@@ -134,8 +121,7 @@ def nlp_model_evaluation(
     ].read()
     challenger_metadata = extract_metadata_from_tarball(tarball_bytes)
     if challenger_metadata.get("model_version") != version:
-        # Scored rows carry the model_version baked into the artifact; a
-        # mismatch with the promoted version breaks stale-score detection.
+        # Rows carry the artifact's model_version; a mismatch breaks rescoring.
         context.log.warning(
             "Artifact metadata model_version %r differs from job name %r.",
             challenger_metadata.get("model_version"),
@@ -188,7 +174,7 @@ def nlp_model_evaluation(
                 challenger_score, promotion_score(champion_metadata)
             )
     else:
-        # No fine-tuned champion: the pretrained model is what is serving.
+        # No champion: the pretrained model is serving.
         if config.baseline_score is None:
             context.log.warning(
                 "No baseline_score configured; promoting the first fine-tuned "
@@ -219,11 +205,11 @@ def nlp_model_evaluation(
 
 
 def define_nlp_training_jobs() -> NlpTrainingJobBundle:
-    """Define the NLP fine-tuning assets and the manually launched job."""
+    """Define the fine-tuning assets and manual job."""
     job = dagster_lib.define_asset_job(
         "nlp_finetune_job",
         selection=[_TRAINING_JOB_ASSET_KEY, _MODEL_EVALUATION_ASSET_KEY],
-        # SageMaker training is expensive; retry at most once, infra failures only.
+        # Training is expensive: retry once at most.
         op_retry_policy=SAGEMAKER_RETRY,
         k8s_config={
             "pod_spec_config": {
