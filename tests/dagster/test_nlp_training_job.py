@@ -34,7 +34,7 @@ def test_define_nlp_training_jobs_registers_assets_and_manual_job() -> None:
     assert keys == {"NLP/NLP_TRAINING_JOB", "NLP/NLP_MODEL_EVALUATION"}
     assert [job.name for job in bundle.jobs] == ["nlp_finetune_job"]
     # Training needs a user-provided dataset prefix, so it is launched manually.
-    assert not hasattr(bundle, "schedules") or not bundle.schedules
+    assert not hasattr(bundle, "schedules")
 
 
 def test_training_job_forwards_hyperparameters_and_input_uri() -> None:

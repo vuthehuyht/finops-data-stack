@@ -61,6 +61,7 @@ def _prep_with_articles(df: pd.DataFrame, tmp_path: Path):
             context,
             NlpSentimentPrepConfig(batch_date="2026-09-14"),
             redshift,
+            unittest.mock.MagicMock(),
             s3bucket,
             s3,
         )
@@ -91,7 +92,8 @@ def test_prep_returns_zero_when_nothing_to_score(tmp_path: Path) -> None:
 
     result, uploaded = _prep_with_articles(empty, tmp_path)
 
-    assert result.value == {"article_count": 0}
+    # batch_date is kept so the publish step can still emit a partition marker.
+    assert result.value == {"article_count": 0, "batch_date": "2026-09-14"}
     assert uploaded == {}
 
 
@@ -104,11 +106,17 @@ def test_publish_skips_load_when_nothing_scored() -> None:
         "src.dagster.nlp_sentiment_job.load_s3_to_redshift"
     ) as load:
         result = nlp_publish_sentiment_scores(
-            context, {"article_count": 0}, redshift, load_config
+            context,
+            {"article_count": 0, "batch_date": "2026-09-14"},
+            redshift,
+            load_config,
         )
 
     load.assert_not_called()
     assert result.metadata["row_count"].value == 0
+    # An empty day must still report its partition, or mart sensors that wait
+    # on every upstream never fire for it.
+    assert result.metadata["conata_partition_key"].text == "2026-09-14"
 
 
 def test_publish_loads_scores_and_emits_partition_key() -> None:
@@ -220,3 +228,153 @@ def test_batch_transform_model_names_are_valid_for_sagemaker() -> None:
         # SageMaker model names allow only alphanumerics and hyphens, max 63.
         assert re.fullmatch(r"[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?", name), name
         assert len(name) <= 63
+
+
+def test_unscored_query_is_capped_newest_first_and_uses_given_schema() -> None:
+    from src.dagster.nlp_sentiment_job import build_unscored_articles_query
+
+    query = build_unscored_articles_query("staging", 250, None)
+
+    assert "FROM staging.STG_NEWS_ARTICLES" in query
+    assert "LEFT JOIN staging.STG_NEWS_SENTIMENT" in query
+    assert "ORDER BY A.PUBLISH_TIME DESC" in query
+    assert "LIMIT 250" in query
+    assert "MODEL_VERSION" not in query
+
+
+def test_unscored_query_can_select_articles_scored_by_another_model() -> None:
+    from src.dagster.nlp_sentiment_job import build_unscored_articles_query
+
+    query = build_unscored_articles_query("staging", 10, "job-2")
+
+    assert "S.MODEL_VERSION <> 'job-2'" in query
+
+
+@pytest.mark.parametrize(
+    ("schema", "limit", "label"),
+    [
+        ("staging; DROP TABLE x", 10, None),
+        ("staging", 0, None),
+        ("staging", 10, "x'; DROP TABLE y;--"),
+    ],
+)
+def test_unscored_query_rejects_unsafe_arguments(schema, limit, label) -> None:
+    from src.dagster.nlp_sentiment_job import build_unscored_articles_query
+
+    with pytest.raises(ValueError):
+        build_unscored_articles_query(schema, limit, label)
+
+
+def test_prep_reads_staging_schema_from_environment(monkeypatch) -> None:
+    from src.dagster.nlp_sentiment_job import _staging_schema
+
+    monkeypatch.delenv("REDSHIFT_STAGING_SCHEMA", raising=False)
+    assert _staging_schema() == "staging"
+
+    monkeypatch.setenv("REDSHIFT_STAGING_SCHEMA", "CI_STG_42")
+    assert _staging_schema() == "CI_STG_42"
+
+    monkeypatch.setenv("REDSHIFT_STAGING_SCHEMA", "bad name;")
+    with pytest.raises(ValueError, match="Invalid staging schema"):
+        _staging_schema()
+
+
+def test_prep_queries_the_configured_schema(monkeypatch) -> None:
+    monkeypatch.setenv("REDSHIFT_STAGING_SCHEMA", "CI_STG_7")
+    df = pd.DataFrame(columns=["article_id", "title", "summary", "content"])
+    with unittest.mock.patch("pandas.read_sql", return_value=df) as read_sql:
+        nlp_sentiment_prep(
+            dagster.build_asset_context(),
+            NlpSentimentPrepConfig(batch_date="2026-09-14", max_articles=100),
+            unittest.mock.MagicMock(),
+            unittest.mock.MagicMock(),
+            unittest.mock.MagicMock(processed_bucket="processed"),
+            unittest.mock.MagicMock(),
+        )
+
+    query = read_sql.call_args.args[0]
+    assert "CI_STG_7.STG_NEWS_ARTICLES" in query
+    assert "LIMIT 100" in query
+
+
+def test_prep_rescoring_targets_the_serving_model_version() -> None:
+    ssm = unittest.mock.MagicMock()
+    ssm.get_parameter.return_value = "job-9"
+    df = pd.DataFrame(columns=["article_id", "title", "summary", "content"])
+    with unittest.mock.patch("pandas.read_sql", return_value=df) as read_sql:
+        nlp_sentiment_prep(
+            dagster.build_asset_context(),
+            NlpSentimentPrepConfig(batch_date="2026-09-14", rescore_stale=True),
+            unittest.mock.MagicMock(),
+            ssm,
+            unittest.mock.MagicMock(processed_bucket="processed"),
+            unittest.mock.MagicMock(),
+        )
+
+    assert "S.MODEL_VERSION <> 'job-9'" in read_sql.call_args.args[0]
+
+
+def test_batch_transform_passes_batch_date_through_when_nothing_to_score() -> None:
+    from src.dagster.nlp_sentiment_job import nlp_sentiment_batch_transform
+
+    result = nlp_sentiment_batch_transform(
+        dagster.build_asset_context(),
+        {"article_count": 0, "batch_date": "2026-09-14"},
+        unittest.mock.MagicMock(),
+        unittest.mock.MagicMock(),
+        unittest.mock.MagicMock(),
+        unittest.mock.MagicMock(),
+    )
+
+    assert result.value == {"article_count": 0, "batch_date": "2026-09-14"}
+
+
+def _materialization(partition=None, **metadata):
+    return unittest.mock.MagicMock(partition=partition, metadata=metadata)
+
+
+def test_materialization_partition_reads_native_partition_first() -> None:
+    from src.dagster.nlp_sentiment_job import materialization_partition
+
+    mat = _materialization(
+        partition="2026-09-10",
+        conata_partition_key=dagster.MetadataValue.text("2026-09-01"),
+    )
+    assert materialization_partition(mat) == "2026-09-10"
+
+
+def test_materialization_partition_falls_back_to_metadata() -> None:
+    from src.dagster.nlp_sentiment_job import materialization_partition
+
+    conata = _materialization(
+        conata_partition_key=dagster.MetadataValue.text("2026-09-11")
+    )
+    dbt_vars = _materialization(
+        variables=dagster.MetadataValue.json({"partition_key": "2026-09-12"})
+    )
+    assert materialization_partition(conata) == "2026-09-11"
+    assert materialization_partition(dbt_vars) == "2026-09-12"
+    assert materialization_partition(_materialization()) is None
+
+
+def test_run_request_scores_under_the_triggering_partition() -> None:
+    from src.dagster.nlp_sentiment_job import build_run_request
+
+    request = build_run_request(42, "2026-09-11")
+
+    assert request.run_key == "nlp_sentiment_42"
+    op_config = request.run_config["ops"][nlp_sentiment_prep.op.name]["config"]
+    assert op_config["batch_date"] == "2026-09-11"
+
+
+def test_run_request_without_partition_keeps_default_config() -> None:
+    from src.dagster.nlp_sentiment_job import build_run_request
+
+    assert build_run_request(7, None).run_config == {}
+
+
+def test_run_request_rejects_malformed_partition() -> None:
+    from src.dagster.nlp_sentiment_job import build_run_request
+
+    with pytest.raises(ValueError):
+        build_run_request(1, "not-a-date")

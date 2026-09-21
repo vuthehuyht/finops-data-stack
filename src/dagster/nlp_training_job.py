@@ -115,7 +115,6 @@ def nlp_training_job(
         "Version the fine-tuned model on S3 and promote it to active if it "
         "strictly beats the current champion (or the pretrained baseline)."
     ),
-    retry_policy=SAGEMAKER_RETRY,
 )
 def nlp_model_evaluation(
     context: dagster.AssetExecutionContext,
@@ -134,6 +133,14 @@ def nlp_model_evaluation(
         "Body"
     ].read()
     challenger_metadata = extract_metadata_from_tarball(tarball_bytes)
+    if challenger_metadata.get("model_version") != version:
+        # Scored rows carry the model_version baked into the artifact; a
+        # mismatch with the promoted version breaks stale-score detection.
+        context.log.warning(
+            "Artifact metadata model_version %r differs from job name %r.",
+            challenger_metadata.get("model_version"),
+            version,
+        )
 
     target_bucket = sagemaker.model_artifacts_bucket
     version_prefix = model_version_prefix(version)
