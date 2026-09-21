@@ -35,7 +35,7 @@ jobs:
       - name: Install uv & Sync Dependencies
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
-          uv sync --frozen
+          uv sync --frozen --all-groups
 
       # Setup Reviewdog binary
       - name: Setup Reviewdog
