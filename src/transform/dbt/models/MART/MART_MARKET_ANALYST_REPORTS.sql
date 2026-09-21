@@ -20,7 +20,8 @@ SELECT
   FILE_NAME::VARCHAR(256) AS FILE_NAME,
   {{ datacore_common_metadata() }}
 FROM {{ ref('STG_ANALYST_REPORTS') }}
-WHERE TICKER IS NULL
-{% if is_incremental() %}
-  AND BATCH_DATE <= {{ current_batch_date() }}
-{% endif %}
+WHERE
+  TICKER IS NULL
+  {% if is_incremental() %}
+    AND BATCH_DATE <= {{ current_batch_date() }}
+  {% endif %}
