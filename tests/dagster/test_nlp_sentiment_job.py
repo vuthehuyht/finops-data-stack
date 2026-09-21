@@ -155,3 +155,68 @@ def test_publish_rejects_malformed_batch_date() -> None:
             redshift,
             load_config,
         )
+
+
+def _run_batch_transform(active_version):
+    from src.dagster.nlp_sentiment_job import nlp_sentiment_batch_transform
+
+    sagemaker = unittest.mock.MagicMock(model_artifacts_bucket="artifacts")
+    s3bucket = unittest.mock.MagicMock(processed_bucket="processed")
+    ssm = unittest.mock.MagicMock()
+    ssm.get_parameter.return_value = active_version
+    prep_result = {
+        "article_count": 2,
+        "input_s3_uri": "s3://processed/nlp-sentiment-input/2026-09-14/r/input.jsonl",
+        "batch_date": "2026-09-14",
+        "run_id": "abcdef0123456789",
+    }
+    result = nlp_sentiment_batch_transform(
+        dagster.build_asset_context(),
+        prep_result,
+        sagemaker,
+        ssm,
+        s3bucket,
+        unittest.mock.MagicMock(),
+    )
+    return result, sagemaker
+
+
+def test_batch_transform_uses_pretrained_model_without_active_version() -> None:
+    result, sagemaker = _run_batch_transform(None)
+
+    kwargs = sagemaker.create_model_if_not_exists.call_args.kwargs
+    assert kwargs["model_data_s3_uri"] == (
+        "s3://artifacts/nlp-sentiment/wonrax_phobert-base-vietnamese-sentiment/"
+        "model.tar.gz"
+    )
+    assert result.value["output_s3_uri"].endswith("/input.jsonl.out")
+
+
+def test_batch_transform_uses_promoted_version_when_set() -> None:
+    _, sagemaker = _run_batch_transform("finops-nlp-sentiment-finetune-2026")
+
+    kwargs = sagemaker.create_model_if_not_exists.call_args.kwargs
+    assert kwargs["model_name"] == "nlp-finops-nlp-sentiment-finetune-2026"
+    assert kwargs["model_data_s3_uri"] == (
+        "s3://artifacts/nlp-sentiment/versions/finops-nlp-sentiment-finetune-2026/"
+        "model.tar.gz"
+    )
+
+
+def test_batch_transform_ignores_none_sentinel_version() -> None:
+    _, sagemaker = _run_batch_transform("none")
+
+    kwargs = sagemaker.create_model_if_not_exists.call_args.kwargs
+    assert "/versions/" not in kwargs["model_data_s3_uri"]
+
+
+def test_batch_transform_model_names_are_valid_for_sagemaker() -> None:
+    import re
+
+    realistic_job = "finops-nlp-sentiment-finetune-2026-09-21-12-30-45-123"
+    for version in (None, "finops-nlp-sentiment-finetune-2026", realistic_job):
+        _, sagemaker = _run_batch_transform(version)
+        name = sagemaker.create_model_if_not_exists.call_args.kwargs["model_name"]
+        # SageMaker model names allow only alphanumerics and hyphens, max 63.
+        assert re.fullmatch(r"[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?", name), name
+        assert len(name) <= 63

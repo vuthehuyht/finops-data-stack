@@ -28,12 +28,16 @@ from src.dagster.resources import (
     RedshiftResource,
     S3BucketResource,
     SageMakerResource,
+    SsmParameterResource,
 )
 from src.dagster.retry_policies import INGEST_RETRY, LOAD_RETRY, SAGEMAKER_RETRY
 from src.load.load import load_s3_to_redshift
 from src.nlp.config import MODEL_ID
+from src.nlp.evaluation import ACTIVE_VERSION_PARAM, model_version_prefix
 
-_MODEL_NAME = f"nlp-sentiment-{MODEL_ID.replace('/', '_')}"
+# SageMaker model names allow only alphanumerics and hyphens (max 63 chars),
+# unlike S3 keys, so the "/" in the Hub id becomes "-" here.
+_MODEL_NAME = f"nlp-sentiment-{MODEL_ID.replace('/', '-')}"[:63]
 _MODEL_ARTIFACT_KEY = f"nlp-sentiment/{MODEL_ID.replace('/', '_')}/model.tar.gz"
 # Batch inference on a base-size encoder does not need the GPU image the price
 # model uses.
@@ -50,6 +54,20 @@ _NLP_BATCH_TRANSFORM_KEY = dagster_lib.asset_key(
 )
 # Same key transform_job._get_upstream_bronze_key derives for stg_news_sentiment.
 _RAW_NEWS_SENTIMENT_KEY = dagster_lib.asset_key(["RAW", "NEWS_SENTIMENT"])
+
+
+def resolve_active_model(active_version: str | None) -> tuple[str, str]:
+    """Return `(model_name, artifact_key)` for the model that should score articles.
+
+    A promoted fine-tuned version (SSM `ACTIVE_VERSION_PARAM`) wins; unset or
+    the "none" sentinel means the pretrained Phase A checkpoint.
+    """
+    if active_version and active_version != "none":
+        return (
+            f"nlp-{active_version}"[:63].rstrip("-"),
+            f"{model_version_prefix(active_version)}model.tar.gz",
+        )
+    return _MODEL_NAME, _MODEL_ARTIFACT_KEY
 
 
 def _validate_iso_date(value: str) -> str:
@@ -172,6 +190,7 @@ def nlp_sentiment_batch_transform(
     context: dagster.AssetExecutionContext,
     prep_result: dict,
     sagemaker: SageMakerResource,
+    ssm: SsmParameterResource,
     s3bucket: S3BucketResource,
     s3: S3Resource,
 ) -> dagster.Output[dict]:
@@ -180,9 +199,12 @@ def nlp_sentiment_batch_transform(
         context.log.info("Nothing to score; skipping Batch Transform.")
         return dagster.Output(value={"article_count": 0}, metadata={"article_count": 0})
 
+    model_name, artifact_key = resolve_active_model(
+        ssm.get_parameter(ACTIVE_VERSION_PARAM)
+    )
     sagemaker.create_model_if_not_exists(
-        model_name=_MODEL_NAME,
-        model_data_s3_uri=f"s3://{sagemaker.model_artifacts_bucket}/{_MODEL_ARTIFACT_KEY}",
+        model_name=model_name,
+        model_data_s3_uri=f"s3://{sagemaker.model_artifacts_bucket}/{artifact_key}",
         inference_image=_TRANSFORM_IMAGE,
     )
 
@@ -194,7 +216,7 @@ def nlp_sentiment_batch_transform(
     context.log.info("Starting SageMaker Batch Transform Job: %s", job_name)
     sagemaker.run_batch_transform_job(
         job_name=job_name,
-        model_name=_MODEL_NAME,
+        model_name=model_name,
         input_s3_uri=prep_result["input_s3_uri"],
         output_s3_uri=f"s3://{s3bucket.processed_bucket}/{output_prefix}",
         instance_type=_TRANSFORM_INSTANCE_TYPE,
