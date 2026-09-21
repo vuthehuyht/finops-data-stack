@@ -1,8 +1,14 @@
 """Tests for src.nlp.sentiment_model."""
 
+import json
+
 import pytest
 
-from src.nlp.sentiment_model import probs_to_class_scores, scores_to_sentiment
+from src.nlp.sentiment_model import (
+    load_model_metadata,
+    probs_to_class_scores,
+    scores_to_sentiment,
+)
 
 
 def test_scores_to_sentiment_positive_dominant() -> None:
@@ -57,3 +63,22 @@ def test_probs_to_class_scores_unknown_label_raises() -> None:
 def test_probs_to_class_scores_length_mismatch_raises() -> None:
     with pytest.raises(ValueError, match="does not match"):
         probs_to_class_scores([0.5, 0.5], {0: "NEG", 1: "POS", 2: "NEU"})
+
+
+def test_load_model_metadata_returns_empty_when_missing(tmp_path) -> None:
+    assert load_model_metadata(str(tmp_path)) == {}
+
+
+def test_load_model_metadata_reads_matching_schema_version(tmp_path) -> None:
+    metadata = {"model_version": "job-1", "sentiment_schema_version": 1}
+    (tmp_path / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
+
+    assert load_model_metadata(str(tmp_path)) == metadata
+
+
+def test_load_model_metadata_rejects_stale_schema_version(tmp_path) -> None:
+    metadata = {"sentiment_schema_version": 999}
+    (tmp_path / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="schema version"):
+        load_model_metadata(str(tmp_path))

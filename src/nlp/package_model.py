@@ -8,6 +8,7 @@ Usage:
 """
 
 import argparse
+import json
 import os
 import shutil
 import tarfile
@@ -16,7 +17,7 @@ import tempfile
 import boto3
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-from src.nlp.config import MODEL_ID
+from src.nlp.config import MODEL_ID, SENTIMENT_SCHEMA_VERSION
 
 _SERVING_FILES = ("serve.py", "config.py", "sentiment_model.py", "requirements.txt")
 
@@ -47,6 +48,15 @@ def package_and_upload(bucket: str, key_prefix: str) -> str:
         model = AutoModelForSequenceClassification.from_pretrained(MODEL_ID)
         tokenizer.save_pretrained(model_dir)
         model.save_pretrained(model_dir)
+
+        with open(os.path.join(model_dir, "metadata.json"), "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "model_version": MODEL_ID,
+                    "sentiment_schema_version": SENTIMENT_SCHEMA_VERSION,
+                },
+                f,
+            )
 
         code_dir = os.path.join(model_dir, "code")
         os.makedirs(code_dir)
