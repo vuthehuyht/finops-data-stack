@@ -12,8 +12,6 @@ from src.dagster import (
     ingest_job,
     load_job,
     ml_job,
-    nlp_sentiment_job,
-    nlp_training_job,
     resources,
     transform_job,
 )
@@ -42,8 +40,6 @@ def _create_definitions() -> dagster.Definitions:
     dbt = dbt_assets.get_dbt_project_assets()
     ml = ml_job.define_ml_jobs()
     inference = inference_job.define_inference_jobs()
-    nlp = nlp_sentiment_job.define_nlp_sentiment_jobs()
-    nlp_training = nlp_training_job.define_nlp_training_jobs()
 
     return dagster_lib.definitions(
         code_location_name="finops",
@@ -53,8 +49,6 @@ def _create_definitions() -> dagster.Definitions:
             dbt,
             *ml.assets,
             *inference.assets,
-            *nlp.assets,
-            *nlp_training.assets,
         ],
         jobs=[
             *ingest.jobs,
@@ -65,8 +59,6 @@ def _create_definitions() -> dagster.Definitions:
             ddl_job.execute_ddl_job,
             *ml.jobs,
             *inference.jobs,
-            *nlp.jobs,
-            *nlp_training.jobs,
         ],
         schedules=[
             *ingest.schedules,
@@ -77,7 +69,6 @@ def _create_definitions() -> dagster.Definitions:
             *silver.sensors,
             *mart.sensors,
             *inference.sensors,
-            *nlp.sensors,
         ],
         resources=_get_resources(),
     )

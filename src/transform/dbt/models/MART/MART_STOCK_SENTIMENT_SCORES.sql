@@ -8,20 +8,19 @@
 }}
 
 -- Aggregates news volume, analyst coverage, and corporate event flags per ticker per day.
--- News sentiment comes from STG_NEWS_SENTIMENT (NLP batch scoring, src/nlp/).
+-- NLP sentiment scores are a placeholder (NULL) until an NLP pipeline populates them
+-- in the Silver layer. The model is designed to accept them as soon as they exist.
 
 WITH NEWS_DAILY AS (
   SELECT
-    N.TICKER,
-    N.PUBLISH_TIME::DATE AS DATE,
+    TICKER,
+    PUBLISH_TIME::DATE AS DATE,
     COUNT(*) AS NEWS_COUNT,
-    -- NULL for a ticker/day whose articles have not been scored yet
-    AVG(S.SENTIMENT_SCORE) AS AVG_SENTIMENT_SCORE
-  FROM {{ ref('STG_NEWS_ARTICLES') }} AS N
-  LEFT JOIN {{ ref('STG_NEWS_SENTIMENT') }} AS S
-    ON N.ARTICLE_ID = S.ARTICLE_ID
+    -- Placeholder: sentiment score would come from NLP enrichment in STG layer
+    NULL::NUMERIC(38, 4) AS AVG_SENTIMENT_SCORE
+  FROM {{ ref('STG_NEWS_ARTICLES') }}
   {% if is_incremental() %}
-    WHERE N.BATCH_DATE <= {{ current_batch_date() }}
+    WHERE BATCH_DATE <= {{ current_batch_date() }}
   {% endif %}
   GROUP BY 1, 2
 ),
@@ -45,31 +44,22 @@ NEWS_WITH_VELOCITY AS (
   FROM NEWS_DAILY
 ),
 
-ANALYST_REPORTS_CLEAN AS (
-  -- FireAnt only exposes free-text title/description, not a structured
-  -- recommendation or target price, so both are extracted from DESCRIPTION
-  -- with regex heuristics (see macros/analyst_report_signals.sql).
-  SELECT
-    TICKER,
-    PUBLISH_DATE,
-    {{ clean_report_text('DESCRIPTION') }} AS REPORT_TEXT
-  FROM {{ ref('STG_ANALYST_REPORTS') }}
-  WHERE
-    TICKER IS NOT NULL
-    {% if is_incremental() %}
-      AND BATCH_DATE <= {{ current_batch_date() }}
-    {% endif %}
-),
-
 ANALYST_LATEST AS (
-  -- Analyst coverage and extracted signals per ticker per day.
+  -- Most recent analyst report per ticker per day.
+  -- FireAnt only exposes free-text title/description, not a structured
+  -- recommendation or target price, so those signals stay NULL placeholders
+  -- until an NLP pass extracts them from DESCRIPTION.
   SELECT
     TICKER,
     PUBLISH_DATE AS DATE,
     COUNT(*) AS ANALYST_REPORT_COUNT,
-    SUM(CASE WHEN {{ analyst_is_buy('REPORT_TEXT') }} THEN 1 ELSE 0 END)::INTEGER AS ANALYST_BUY_COUNT,
-    AVG({{ analyst_target_price('REPORT_TEXT') }}) AS AVG_ANALYST_TARGET_PRICE
-  FROM ANALYST_REPORTS_CLEAN
+    NULL::INTEGER AS ANALYST_BUY_COUNT,
+    NULL::NUMERIC(38, 4) AS AVG_ANALYST_TARGET_PRICE
+  FROM {{ ref('STG_ANALYST_REPORTS') }}
+  WHERE TICKER IS NOT NULL
+  {% if is_incremental() %}
+    AND BATCH_DATE <= {{ current_batch_date() }}
+  {% endif %}
   GROUP BY 1, 2
 ),
 

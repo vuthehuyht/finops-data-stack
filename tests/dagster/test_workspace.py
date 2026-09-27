@@ -78,8 +78,8 @@ def test_workspace_defs_created() -> None:
         assert src.dagster.workspace.defs is not None
 
 
-def test_workspace_has_16_raw_assets() -> None:
-    """workspace.py must include 15 Bronze load assets + the NLP-published RAW asset."""
+def test_workspace_has_15_raw_assets() -> None:
+    """workspace.py must include all 15 Bronze load assets."""
     with unittest.mock.patch.dict(
         os.environ,
         {
@@ -94,7 +94,7 @@ def test_workspace_has_16_raw_assets() -> None:
         reload(src.dagster.workspace)
         defs = src.dagster.workspace.defs
         bronze_keys = [k for k in defs.assets_defs_by_key.keys() if k.path[0] == "RAW"]
-        assert len(bronze_keys) == 16
+        assert len(bronze_keys) == 15
 
 
 def test_workspace_has_16_silver_assets() -> None:
@@ -141,9 +141,9 @@ def test_workspace_has_sensor_for_load_jobs() -> None:
 
 
 def test_workspace_has_transform_sensors() -> None:
-    """Silver, Mart, Load, ML daily inference and NLP sentiment are SENSOR-type.
+    """Silver, Mart, Load, and ML daily inference are SENSOR-type.
 
-    Must have exactly 5 sensors.
+    Must have exactly 4 sensors.
     """
     with unittest.mock.patch.dict(
         os.environ,
@@ -158,13 +158,12 @@ def test_workspace_has_transform_sensors() -> None:
 
         reload(src.dagster.workspace)
         defs = src.dagster.workspace.defs
-        assert len(defs.sensor_defs) == 5
+        assert len(defs.sensor_defs) == 4
         sensor_names = {s.name for s in defs.sensor_defs}
         assert "load_job_sensor" in sensor_names
         assert "stg_job_sensor" in sensor_names
         assert "mart_job_sensor" in sensor_names
         assert "ml_daily_inference_sensor" in sensor_names
-        assert "nlp_sentiment_sensor" in sensor_names
 
 
 def test_workspace_definitions_include_ml_jobs() -> None:

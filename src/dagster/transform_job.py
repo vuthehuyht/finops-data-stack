@@ -331,14 +331,6 @@ def _make_mart_schedule(
     return _schedule
 
 
-# Upstreams the mart sensor monitors, and re-triggers a mart run for when they
-# materialize, but never waits for. STG_NEWS_SENTIMENT comes from an ML batch
-# job: if it fails or runs late, MART_STOCK_SENTIMENT_SCORES (and everything
-# downstream, including daily price inference) must still build; the sentiment
-# columns simply catch up on the re-run once the scores land.
-_OPTIONAL_MART_UPSTREAMS = frozenset({AssetKey(["STAGING", "STG_NEWS_SENTIMENT"])})
-
-
 def _required_upstream_keys(
     job_name: str, asset_to_upstream: dict[AssetKey, list[AssetKey]]
 ) -> set[AssetKey]:
@@ -346,7 +338,7 @@ def _required_upstream_keys(
     required: set[AssetKey] = set()
     for asset_key, up_keys in asset_to_upstream.items():
         if asset_key.to_python_identifier() in job_name:
-            required.update(k for k in up_keys if k not in _OPTIONAL_MART_UPSTREAMS)
+            required.update(up_keys)
     return required
 
 
