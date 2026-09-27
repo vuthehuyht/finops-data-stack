@@ -40,43 +40,43 @@ setup:
 	@echo "Installing dependencies with uv..."
 	uv sync
 	@echo "Installing pre-commit hooks..."
-	uv run pip install pre-commit
-	uv run pre-commit install
+	uv run --frozen pip install pre-commit
+	uv run --frozen pre-commit install
 	@echo "Dependencies installed successfully."
-	@uv run python scripts/setup_dev.py
+	@uv run --frozen python scripts/setup_dev.py
 
 # Run Dagster development server
 dev:
 	@echo "Starting Dagster dev server..."
-	uv run dagster dev
+	uv run --frozen dagster dev
 
 # Run code linting check
 lint:
 	@echo "Running ruff check..."
-	uv run ruff check src/ tests/
+	uv run --frozen ruff check src/ tests/
 	@echo "Running ruff format check..."
-	uv run ruff format --check src/ tests/
+	uv run --frozen ruff format --check src/ tests/
 
 # Automatically format code
 format:
 	@echo "Formatting code with ruff..."
-	uv run ruff format src/ tests/
-	uv run ruff check --fix src/ tests/
+	uv run --frozen ruff format src/ tests/
+	uv run --frozen ruff check --fix src/ tests/
 
 # Run SQLFluff linter
 lint-sql:
 	@echo "Running sqlfluff lint..."
-	cd src/transform/dbt && uv run sqlfluff lint models
+	cd src/transform/dbt && uv run --frozen sqlfluff lint models
 
 # Automatically format SQL code
 format-sql:
 	@echo "Formatting SQL with sqlfluff..."
-	cd src/transform/dbt && uv run sqlfluff format models -f
+	cd src/transform/dbt && uv run --frozen sqlfluff format models -f
 
 # Run unit tests
 test:
 	@echo "Running tests with pytest..."
-	uv run pytest tests/
+	uv run --frozen pytest tests/
 
 # Spin up local development resources (Terraform)
 dev_local_up:
@@ -154,7 +154,7 @@ up down plan:
 
 # Clean cache and temporary files (Cross-platform support)
 clean:
-	@uv run python scripts/clean.py
+	@uv run --frozen python scripts/clean.py
 
 # Build and push Docker image to ECR
 build_push_image:

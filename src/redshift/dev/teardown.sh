@@ -14,7 +14,7 @@ for argument in "$@"; do
 done
 
 # Execute the teardown DDL script via uv run python
-uv run python ddl_executor.py \
+uv run --frozen python ddl_executor.py \
   --template_parameters="{
     \"schema_name_function\": \"${REDSHIFT_SCHEMA_FUNCTION:-DB_UTILS}\",
     \"schema_name_operation\": \"${REDSHIFT_SCHEMA_OPERATION:-OPERATION}\",

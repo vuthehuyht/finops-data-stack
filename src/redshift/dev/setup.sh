@@ -23,7 +23,7 @@ for argument in "$@"; do
 done
 
 # Execute the DDL script via uv run python
-uv run python ddl_executor.py \
+uv run --frozen python ddl_executor.py \
   --template_parameters="{
     \"schema_name_raw\": \"${REDSHIFT_SCHEMA_RAW:-RAW}\",
     \"schema_name_staging\": \"${REDSHIFT_STAGING_SCHEMA:-STAGING}\",
