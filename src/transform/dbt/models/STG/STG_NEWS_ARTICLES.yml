@@ -18,11 +18,11 @@
       - name: PUBLISH_TIME
         data_type: TIMESTAMP
       - name: TITLE
-        data_type: VARCHAR(256)
+        data_type: VARCHAR(1000)
       - name: SUMMARY
-        data_type: VARCHAR(256)
+        data_type: VARCHAR(8000)
       - name: CONTENT
-        data_type: VARCHAR(256)
+        data_type: VARCHAR(16000)
       - name: SOURCE
         data_type: VARCHAR(256)
       - name: URL

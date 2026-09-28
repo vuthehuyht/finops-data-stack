@@ -78,7 +78,7 @@ def test_workspace_defs_created() -> None:
         assert src.dagster.workspace.defs is not None
 
 
-def test_workspace_has_15_load_assets() -> None:
+def test_workspace_has_15_raw_assets() -> None:
     """workspace.py must include all 15 Bronze load assets."""
     with unittest.mock.patch.dict(
         os.environ,
@@ -97,8 +97,8 @@ def test_workspace_has_15_load_assets() -> None:
         assert len(bronze_keys) == 15
 
 
-def test_workspace_has_15_silver_assets() -> None:
-    """workspace.py must include all 15 Silver transform assets."""
+def test_workspace_has_16_silver_assets() -> None:
+    """workspace.py must include all 16 Silver transform assets."""
     with unittest.mock.patch.dict(
         os.environ,
         {
@@ -115,7 +115,7 @@ def test_workspace_has_15_silver_assets() -> None:
         silver_keys = [
             k for k in defs.assets_defs_by_key.keys() if k.path[0] == "STAGING"
         ]
-        assert len(silver_keys) == 15
+        assert len(silver_keys) == 16
 
 
 def test_workspace_has_sensor_for_load_jobs() -> None:

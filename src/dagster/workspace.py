@@ -43,7 +43,13 @@ def _create_definitions() -> dagster.Definitions:
 
     return dagster_lib.definitions(
         code_location_name="finops",
-        assets=[*ingest.assets, *load.assets, dbt, *ml.assets, *inference.assets],
+        assets=[
+            *ingest.assets,
+            *load.assets,
+            dbt,
+            *ml.assets,
+            *inference.assets,
+        ],
         jobs=[
             *ingest.jobs,
             *load.jobs,
@@ -58,7 +64,12 @@ def _create_definitions() -> dagster.Definitions:
             *ingest.schedules,
             *ml.schedules,
         ],
-        sensors=[*load.sensors, *silver.sensors, *mart.sensors, *inference.sensors],
+        sensors=[
+            *load.sensors,
+            *silver.sensors,
+            *mart.sensors,
+            *inference.sensors,
+        ],
         resources=_get_resources(),
     )
 

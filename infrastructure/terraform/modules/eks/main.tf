@@ -448,6 +448,12 @@ resource "aws_eks_access_policy_association" "github_actions_deploy_admin" {
   access_scope {
     type = "cluster"
   }
+
+  # principal_arn above comes from the IAM role, not from the access entry
+  # below, so Terraform sees no implicit dependency between them and may
+  # call AssociateAccessPolicy before the access entry has propagated,
+  # causing a 404 ResourceNotFoundException.
+  depends_on = [aws_eks_access_entry.github_actions_deploy]
 }
 
 # 8.4. Optional human-operator cluster-admin access (see variable description
@@ -467,6 +473,8 @@ resource "aws_eks_access_policy_association" "cluster_admins" {
   access_scope {
     type = "cluster"
   }
+
+  depends_on = [aws_eks_access_entry.cluster_admins]
 }
 
 # 9. IRSA: IAM Role for Karpenter Controller

@@ -331,6 +331,17 @@ def _make_mart_schedule(
     return _schedule
 
 
+def _required_upstream_keys(
+    job_name: str, asset_to_upstream: dict[AssetKey, list[AssetKey]]
+) -> set[AssetKey]:
+    """Upstream keys that must be materialized for the partition before a job runs."""
+    required: set[AssetKey] = set()
+    for asset_key, up_keys in asset_to_upstream.items():
+        if asset_key.to_python_identifier() in job_name:
+            required.update(up_keys)
+    return required
+
+
 def _create_sensor_for_mart_jobs(  # noqa: C901
     sensor_name: str,
     all_upstream_keys: list[AssetKey],
@@ -401,10 +412,9 @@ def _create_sensor_for_mart_jobs(  # noqa: C901
             for job in possible_jobs:
                 # Find all required upstream keys for this job
                 # from asset_to_upstream mapping
-                required_upstreams = set()
-                for asset_key, up_keys in asset_to_upstream.items():
-                    if asset_key.to_python_identifier() in job.name:
-                        required_upstreams.update(up_keys)
+                required_upstreams = _required_upstream_keys(
+                    job.name, asset_to_upstream
+                )
 
                 all_ready = True
                 for up_key in required_upstreams:

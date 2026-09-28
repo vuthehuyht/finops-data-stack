@@ -71,7 +71,7 @@ def test_get_upstream_bronze_key_all_models() -> None:
 
 def test_read_transform_job_parameter_count() -> None:
     params = list(read_transform_job_parameter(_STAGING_JOB_DEFINITION_FILE))
-    assert len(params) == 15
+    assert len(params) == 16
 
 
 def test_read_transform_job_parameter_first_row() -> None:
@@ -91,7 +91,7 @@ def test_read_transform_job_parameter_all_sensor() -> None:
 def test_define_silver_jobs_returns_bundle() -> None:
     bundle = define_silver_jobs()
     assert isinstance(bundle, SilverJobBundle)
-    assert len(bundle.jobs) == 15
+    assert len(bundle.jobs) == 16
     assert len(bundle.schedules) == 0  # all SENSOR, no schedules
     assert len(bundle.sensors) == 1  # one multi_asset_sensor
 
@@ -195,3 +195,18 @@ def test_transform_jobs_have_dbt_retry_policy() -> None:
     mart_bundle = define_mart_jobs()
     for j in mart_bundle.jobs:
         assert j.op_retry_policy == DBT_RETRY
+
+
+def test_required_upstream_keys_returns_all_upstreams_for_matching_job() -> None:
+    from dagster import AssetKey
+
+    from src.dagster.transform_job import _required_upstream_keys
+
+    mart = AssetKey(["MART", "MART_STOCK_SENTIMENT_SCORES"])
+    news = AssetKey(["STAGING", "STG_NEWS_ARTICLES"])
+
+    required = _required_upstream_keys(
+        "transform_MART__MART_STOCK_SENTIMENT_SCORES_job", {mart: [news]}
+    )
+
+    assert required == {news}

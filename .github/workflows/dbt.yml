@@ -97,13 +97,13 @@ jobs:
         working-directory: src/transform/dbt
         run: |
           rm -f package-lock.yml
-          uv run dbt deps --profiles-dir .
+          uv run --frozen dbt deps --profiles-dir .
 
       - name: Verify that all models in the dbt project are buildable
         working-directory: src/transform/dbt
         id: dbt_build
         run: |
-          uv run dbt build --profiles-dir . --vars "${VARS}" \
+          uv run --frozen dbt build --profiles-dir . --vars "${VARS}" \
             --full-refresh --exclude-resource-type unit_test | tee dbt_build_output.log
 
       - name: Check compiled query on failure
@@ -126,14 +126,14 @@ jobs:
       - name: Verify that unit tests succeed
         working-directory: src/transform/dbt
         run: |
-          uv run dbt test --profiles-dir . --vars "${VARS}" \
+          uv run --frozen dbt test --profiles-dir . --vars "${VARS}" \
             --select 'test_type:unit'
 
       - name: Verify that all incremental models in the dbt project are buildable
         working-directory: src/transform/dbt
         id: dbt_incremental_build
         run: |
-          uv run dbt build --profiles-dir . --vars "${VARS}" \
+          uv run --frozen dbt build --profiles-dir . --vars "${VARS}" \
             --select 'config.materialized:incremental' | tee dbt_incremental_output.log
 
       - name: Check compiled query on failure (incremental)
@@ -159,7 +159,7 @@ jobs:
           REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         working-directory: src/transform/dbt
         run: |
-          uv run sqlfluff lint --format=sarif models/ > /tmp/sqlfluff.sarif || true
+          uv run --frozen sqlfluff lint --format=sarif models/ > /tmp/sqlfluff.sarif || true
           reviewdog \
             -f=sarif \
             -reporter=github-pr-review \

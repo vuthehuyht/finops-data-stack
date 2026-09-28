@@ -48,7 +48,7 @@ jobs:
         env:
           REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          uv run ruff check --output-format=concise src/ tests/ | \
+          uv run --frozen ruff check --output-format=concise src/ tests/ | \
             reviewdog -efm="%f:%l:%c: %m" -name="ruff" -reporter=github-pr-review -filter-mode=diff_context -fail-on-error
 
       # Python static type check with mypy within uv virtualenv
@@ -56,7 +56,7 @@ jobs:
         env:
           REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          uv run mypy src/ | reviewdog -f=mypy -reporter=github-pr-review -filter-mode=diff_context -fail-on-error
+          uv run --frozen mypy src/ | reviewdog -f=mypy -reporter=github-pr-review -filter-mode=diff_context -fail-on-error
 
       # Yaml linting using official GHA Reviewdog Action
       - name: Yamllint with Reviewdog
@@ -96,7 +96,7 @@ jobs:
 
       # Ruff Format Suggester
       - name: Run Ruff Format check
-        run: uv run ruff format --check src/ tests/
+        run: uv run --frozen ruff format --check src/ tests/
 
       - name: Suggest formatting fixes
         if: failure()
@@ -110,9 +110,9 @@ jobs:
       - name: Generate dbt manifest
         working-directory: src/transform/dbt
         run: |
-          uv run dbt deps --profiles-dir . --log-path /tmp/dbt-logs
-          uv run dbt parse --profiles-dir . --log-path /tmp/dbt-logs
+          uv run --frozen dbt deps --profiles-dir . --log-path /tmp/dbt-logs
+          uv run --frozen dbt parse --profiles-dir . --log-path /tmp/dbt-logs
 
       # Run unit test suite
       - name: Run pytest (Python Unit Tests)
-        run: uv run pytest tests/
+        run: uv run --frozen pytest tests/
